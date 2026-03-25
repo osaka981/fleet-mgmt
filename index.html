@@ -531,49 +531,52 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
 </div>
 
 <!-- Driver Modal -->
-<div id="driver-modal" style="display:none" class="modal-bg" onclick="closeBg(event,'driver-modal')">
+<div id="driver-modal" style="display:none" class="modal-bg">
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-header"><span class="modal-title" id="dm-title">ドライバー 登録</span><button class="modal-close" onclick="closeModal('driver-modal')">✕</button></div>
     <div class="modal-body"><div class="form-grid">
       <div class="section-title">基本情報</div>
-      <div class="form-group"><label>氏名（漢字）*</label><input type="text" id="d-name" placeholder="山田 太郎"></div>
-      <div class="form-group"><label>氏名（フリガナ）</label><input type="text" id="d-kana" placeholder="ヤマダ タロウ"></div>
-      <div class="form-group"><label>区分</label><select id="d-type" onchange="toggleSubconFields()"><option value="社員">社員</option><option value="外注">外注</option></select></div>
-      <div class="form-group"><label>営業所</label><select id="d-office"></select></div>
-      <div class="form-group"><label>ステータス</label><select id="d-status" onchange="toggleArchiveFields()"><option value="在籍">在籍</option><option value="休止">休止</option><option value="退職">退職</option></select></div>
-      <div class="form-group"><label>電話番号</label><input type="tel" id="d-tel"></div>
-      <div class="form-group"><label>生年月日（免許証記載）</label><input type="date" id="d-birth"></div>
-      <div class="form-group" style="grid-column:1/-1"><label>住所（免許証記載）</label><input type="text" id="d-addr" placeholder="〒000-0000　都道府県市区町村..."></div>
+      <div class="form-group"><label>姓（漢字）*</label><input type="text" id="d-sei" placeholder="山田" class="modal-field"></div>
+      <div class="form-group"><label>名（漢字）*</label><input type="text" id="d-mei" placeholder="太郎" class="modal-field"></div>
+      <div class="form-group"><label>姓（フリガナ）</label><input type="text" id="d-sei-kana" placeholder="ヤマダ" class="modal-field"></div>
+      <div class="form-group"><label>名（フリガナ）</label><input type="text" id="d-mei-kana" placeholder="タロウ" class="modal-field"></div>
+      <div class="form-group"><label>区分</label><select id="d-type" onchange="toggleSubconFields()" class="modal-field"><option value="社員">社員</option><option value="外注">外注</option></select></div>
+      <div class="form-group"><label>営業所</label><select id="d-office" class="modal-field"></select></div>
+      <div class="form-group"><label>ステータス</label><select id="d-status" onchange="toggleArchiveFields()" class="modal-field"><option value="在籍">在籍</option><option value="休止">休止</option><option value="退職">退職</option></select></div>
+      <div class="form-group"><label>電話番号</label><input type="tel" id="d-tel" class="modal-field"></div>
+      <div class="form-group"><label>生年月日（免許証記載）</label><input type="date" id="d-birth" class="modal-field"></div>
+      <div class="form-group" style="grid-column:1/-1"><label>住所（免許証記載）</label><input type="text" id="d-addr" placeholder="〒000-0000　都道府県市区町村..." class="modal-field"></div>
       <!-- 休止・退職時フィールド -->
       <div id="archive-fields" style="display:none;grid-column:1/-1;background:#fde8e8;border:1px solid #f5c6c6;border-radius:8px;padding:10px 13px">
         <div style="font-size:11px;font-weight:600;color:#c62828;margin-bottom:8px">📋 休止・退職情報</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div class="form-group"><label>退職・休止日</label><input type="date" id="d-leave-date"></div>
-          <div class="form-group"><label>理由</label><select id="d-leave-reason"><option value="">選択してください</option><option value="退職">退職</option><option value="契約終了">契約終了</option><option value="休職">休職</option><option value="産休・育休">産休・育休</option><option value="その他">その他</option></select></div>
-          <div class="form-group" style="grid-column:1/-1"><label>備考</label><input type="text" id="d-leave-note" placeholder="例：一身上の都合"></div>
+          <div class="form-group"><label>退職・休止日</label><input type="date" id="d-leave-date" class="modal-field"></div>
+          <div class="form-group"><label>理由</label><select id="d-leave-reason" class="modal-field"><option value="">選択してください</option><option value="退職">退職</option><option value="契約終了">契約終了</option><option value="休職">休職</option><option value="産休・育休">産休・育休</option><option value="その他">その他</option></select></div>
+          <div class="form-group" style="grid-column:1/-1"><label>備考</label><input type="text" id="d-leave-note" placeholder="例：一身上の都合" class="modal-field"></div>
         </div>
       </div>
       <!-- 外注専用フィールド -->
       <div class="subcon-section" id="subcon-fields" style="display:none">
         <div class="subcon-title">🏢 外注情報（再委託承認願・誓約書・適合証明書に使用）</div>
         <div class="subcon-grid">
-          <div class="form-group"><label>外注先会社名（法人の場合）</label><input type="text" id="d-sub-company" placeholder="〇〇運送株式会社（個人は空欄）"></div>
-          <div class="form-group"><label>代表者ふりがな</label><input type="text" id="d-sub-kana" placeholder="やまだ たろう"></div>
-          <div class="form-group"><label>代表者生年月日</label><input type="date" id="d-sub-birth"></div>
-          <div class="form-group"><label>受持地域</label><input type="text" id="d-sub-area" placeholder="西成区全域"></div>
-          <div class="form-group"><label>社員数（個人は1）</label><input type="number" id="d-sub-count" placeholder="1" min="1" value="1"></div>
-          <div class="form-group"><label>連絡先（外注先）</label><input type="tel" id="d-sub-tel" placeholder="090-0000-0000"></div>
+          <div class="form-group"><label>外注先会社名（法人の場合）</label><input type="text" id="d-sub-company" placeholder="〇〇運送株式会社（個人は空欄）" class="modal-field"></div>
+          <div class="form-group"><label>代表者ふりがな</label><input type="text" id="d-sub-kana" placeholder="やまだ たろう" class="modal-field"></div>
+          <div class="form-group"><label>代表者生年月日</label><input type="date" id="d-sub-birth" class="modal-field"></div>
+          <div class="form-group"><label>受持地域</label><input type="text" id="d-sub-area" placeholder="西成区全域" class="modal-field"></div>
+          <div class="form-group"><label>社員数（個人は1）</label><input type="number" id="d-sub-count" placeholder="1" min="1" value="1" class="modal-field"></div>
+          <div class="form-group"><label>連絡先（外注先）</label><input type="tel" id="d-sub-tel" placeholder="090-0000-0000" class="modal-field"></div>
         </div>
       </div>
       <div class="section-title">運転免許証</div>
-      <div class="form-group"><label>有効期限</label><input type="date" id="d-license-exp"></div>
-      <div class="form-group"><label>免許番号</label><input type="text" id="d-license-no"></div>
-      <div class="form-group"><label>免許種別</label><select id="d-license-type"><option>普通自動車</option><option>準中型</option><option>中型</option><option>大型</option><option>普通自動二輪</option></select></div>
-      <div class="form-group"><label>免許の条件等</label><input type="text" id="d-license-cond" placeholder="眼鏡等 / なし"></div>
-      <div class="section-title">その他書類</div>
-      <div class="form-group" style="grid-column:1/-1"><label>書類名</label><input type="text" id="d-other-name" placeholder="雇用契約書 / 委託契約書 等"></div>
-      <div class="form-group"><label>有効期限</label><input type="date" id="d-other-exp"></div>
-      <div class="form-group"><label>備考</label><input type="text" id="d-other-note"></div>
+      <div class="form-group"><label>有効期限</label><input type="date" id="d-license-exp" class="modal-field"></div>
+      <div class="form-group"><label>免許番号</label><input type="text" id="d-license-no" class="modal-field"></div>
+      <div class="form-group"><label>免許種別</label><select id="d-license-type" class="modal-field"><option>普通自動車</option><option>準中型</option><option>中型</option><option>大型</option><option>普通自動二輪</option></select></div>
+      <div class="form-group"><label>免許の条件等</label><input type="text" id="d-license-cond" placeholder="眼鏡等 / なし" class="modal-field"></div>
+      <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
+        <span>その他書類</span>
+        <button class="btn btn-sm btn-primary" onclick="addOtherDoc()" style="font-size:10px;padding:2px 8px">＋ 追加</button>
+      </div>
+      <div id="other-docs-list" style="grid-column:1/-1;display:flex;flex-direction:column;gap:8px"></div>
     </div></div>
     <div class="modal-footer"><button class="btn" onclick="closeModal('driver-modal')">キャンセル</button><button class="btn btn-primary" onclick="saveDriver()">保存する</button></div>
   </div>
@@ -1307,27 +1310,84 @@ function openDriverModal(id){
   editingDriverId=id||null;
   document.getElementById('dm-title').textContent=id?'ドライバー 編集':'ドライバー 登録';
   document.getElementById('d-office').innerHTML=offices.map(o=>`<option>${o}</option>`).join('');
-  ['d-name','d-kana','d-tel','d-birth','d-addr','d-license-exp','d-license-no','d-license-cond','d-other-name','d-other-exp','d-other-note','d-sub-company','d-sub-kana','d-sub-birth','d-sub-area','d-sub-tel','d-leave-date','d-leave-note'].forEach(f=>document.getElementById(f).value='');
+  ['d-sei','d-mei','d-sei-kana','d-mei-kana','d-tel','d-birth','d-addr','d-license-exp','d-license-no','d-license-cond','d-sub-company','d-sub-kana','d-sub-birth','d-sub-area','d-sub-tel','d-leave-date','d-leave-note'].forEach(f=>{const el=document.getElementById(f);if(el)el.value='';});
   document.getElementById('d-type').value='社員';document.getElementById('d-sub-count').value='1';
   document.getElementById('d-status').value='在籍';
   document.getElementById('subcon-fields').style.display='none';
   document.getElementById('archive-fields').style.display='none';
+  document.getElementById('other-docs-list').innerHTML='';
+  otherDocCount=0;
   if(id){
     const d=drivers.find(x=>x.id==id);
     if(d){
-      document.getElementById('d-name').value=d.name||'';document.getElementById('d-kana').value=d.kana||'';document.getElementById('d-type').value=d.type||'社員';document.getElementById('d-office').value=d.office||'';document.getElementById('d-tel').value=d.tel||'';document.getElementById('d-birth').value=d.birth||'';document.getElementById('d-addr').value=d.addr||'';document.getElementById('d-license-exp').value=d.license?.exp||'';document.getElementById('d-license-no').value=d.license?.no||'';document.getElementById('d-license-type').value=d.license?.type||'普通自動車';document.getElementById('d-license-cond').value=d.license?.cond||'';document.getElementById('d-other-name').value=d.other?.name||'';document.getElementById('d-other-exp').value=d.other?.exp||'';document.getElementById('d-other-note').value=d.other?.note||'';
+      const np=(d.name||'').split(' ');
+      const kp=(d.kana||'').split(' ');
+      document.getElementById('d-sei').value=np[0]||'';
+      document.getElementById('d-mei').value=np[1]||'';
+      document.getElementById('d-sei-kana').value=kp[0]||'';
+      document.getElementById('d-mei-kana').value=kp[1]||'';
+      document.getElementById('d-type').value=d.type||'社員';
+      document.getElementById('d-office').value=d.office||'';
+      document.getElementById('d-tel').value=d.tel||'';
+      document.getElementById('d-birth').value=d.birth||'';
+      document.getElementById('d-addr').value=d.addr||'';
+      document.getElementById('d-license-exp').value=d.license?.exp||'';
+      document.getElementById('d-license-no').value=d.license?.no||'';
+      document.getElementById('d-license-type').value=d.license?.type||'普通自動車';
+      document.getElementById('d-license-cond').value=d.license?.cond||'';
       document.getElementById('d-status').value=d.status||'在籍';
+      const docs=Array.isArray(d.otherDocs)?d.otherDocs:(d.other?.name?[d.other]:[]);
+      docs.forEach(doc=>addOtherDoc(doc));
       if(d.status==='退職'||d.status==='休止'){document.getElementById('archive-fields').style.display='block';document.getElementById('d-leave-date').value=d.leave?.date||'';document.getElementById('d-leave-reason').value=d.leave?.reason||'';document.getElementById('d-leave-note').value=d.leave?.note||'';}
       if(d.type==='外注'){document.getElementById('subcon-fields').style.display='block';document.getElementById('d-sub-company').value=d.sub?.company||'';document.getElementById('d-sub-kana').value=d.sub?.kana||'';document.getElementById('d-sub-birth').value=d.sub?.birth||'';document.getElementById('d-sub-area').value=d.sub?.area||'';document.getElementById('d-sub-count').value=d.sub?.count||1;document.getElementById('d-sub-tel').value=d.sub?.tel||'';}
     }
   }
   document.getElementById('driver-modal').style.display='flex';
+  setTimeout(()=>initModalKeyNav('driver-modal'),100);
 }
+
+let otherDocCount=0;
+function addOtherDoc(data){
+  otherDocCount++;
+  const id=otherDocCount;
+  const el=document.createElement('div');
+  el.id='other-doc-'+id;
+  el.style.cssText='display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:end;background:#f9f9f9;border:1px solid #e0e0e0;border-radius:7px;padding:8px 10px';
+  el.innerHTML=`<div class="form-group" style="grid-column:1/-1;margin:0"><label style="font-size:11px;color:#666;font-weight:500">書類名</label><input type="text" class="modal-field" id="other-doc-name-${id}" value="${data?.name||''}" placeholder="健康診断書 / 誓約書 等"></div><div class="form-group" style="margin:0"><label style="font-size:11px;color:#666;font-weight:500">有効期限</label><input type="date" class="modal-field" id="other-doc-exp-${id}" value="${data?.exp||''}"></div><div class="form-group" style="margin:0"><label style="font-size:11px;color:#666;font-weight:500">備考</label><input type="text" class="modal-field" id="other-doc-note-${id}" value="${data?.note||''}" placeholder="メモ"></div><button class="btn btn-sm btn-danger" onclick="removeOtherDoc(${id})" style="align-self:end">削除</button>`;
+  document.getElementById('other-docs-list').appendChild(el);
+  setTimeout(()=>initModalKeyNav('driver-modal'),50);
+}
+function removeOtherDoc(id){const el=document.getElementById('other-doc-'+id);if(el)el.remove();}
+
+function initModalKeyNav(modalId){
+  const modal=document.getElementById(modalId);
+  if(!modal)return;
+  const fields=Array.from(modal.querySelectorAll('.modal-field'));
+  fields.forEach((f,i)=>{
+    f.onkeydown=function(e){
+      if(e.key==='Enter'||e.key==='ArrowDown'){e.preventDefault();const next=fields[i+1];if(next)next.focus();}
+      if(e.key==='ArrowUp'){e.preventDefault();const prev=fields[i-1];if(prev)prev.focus();}
+    };
+  });
+}
+
 function saveDriver(){
-  const name=document.getElementById('d-name').value.trim();if(!name){alert('氏名は必須です');return;}
+  const sei=document.getElementById('d-sei').value.trim();
+  const mei=document.getElementById('d-mei').value.trim();
+  if(!sei&&!mei){alert('氏名（姓または名）は必須です');return;}
+  const name=(sei+' '+mei).trim();
+  const kana=(document.getElementById('d-sei-kana').value.trim()+' '+document.getElementById('d-mei-kana').value.trim()).trim();
   const type=document.getElementById('d-type').value;
   const status=document.getElementById('d-status').value;
-  const obj={id:editingDriverId||Date.now(),name,kana:document.getElementById('d-kana').value,type,status,office:document.getElementById('d-office').value,tel:document.getElementById('d-tel').value,birth:document.getElementById('d-birth').value,addr:document.getElementById('d-addr').value,license:{exp:document.getElementById('d-license-exp').value,no:document.getElementById('d-license-no').value,type:document.getElementById('d-license-type').value,cond:document.getElementById('d-license-cond').value},other:{name:document.getElementById('d-other-name').value,exp:document.getElementById('d-other-exp').value,note:document.getElementById('d-other-note').value},sub:type==='外注'?{company:document.getElementById('d-sub-company').value,kana:document.getElementById('d-sub-kana').value,birth:document.getElementById('d-sub-birth').value,area:document.getElementById('d-sub-area').value,count:document.getElementById('d-sub-count').value,tel:document.getElementById('d-sub-tel').value}:{},leave:(status==='退職'||status==='休止')?{date:document.getElementById('d-leave-date').value,reason:document.getElementById('d-leave-reason').value,note:document.getElementById('d-leave-note').value}:{}};
+  const otherDocs=[];
+  document.querySelectorAll('#other-docs-list > div[id^="other-doc-"]').forEach(el=>{
+    const id=el.id.replace('other-doc-','');
+    const n=document.getElementById('other-doc-name-'+id)?.value?.trim()||'';
+    const exp=document.getElementById('other-doc-exp-'+id)?.value||'';
+    const note=document.getElementById('other-doc-note-'+id)?.value||'';
+    if(n||exp)otherDocs.push({name:n,exp,note});
+  });
+  const obj={id:editingDriverId||Date.now(),name,kana,type,status,office:document.getElementById('d-office').value,tel:document.getElementById('d-tel').value,birth:document.getElementById('d-birth').value,addr:document.getElementById('d-addr').value,license:{exp:document.getElementById('d-license-exp').value,no:document.getElementById('d-license-no').value,type:document.getElementById('d-license-type').value,cond:document.getElementById('d-license-cond').value},otherDocs,other:otherDocs[0]||{},sub:type==='外注'?{company:document.getElementById('d-sub-company').value,kana:document.getElementById('d-sub-kana').value,birth:document.getElementById('d-sub-birth').value,area:document.getElementById('d-sub-area').value,count:document.getElementById('d-sub-count').value,tel:document.getElementById('d-sub-tel').value}:{},leave:(status==='退職'||status==='休止')?{date:document.getElementById('d-leave-date').value,reason:document.getElementById('d-leave-reason').value,note:document.getElementById('d-leave-note').value}:{}};
   if(editingDriverId){const i=drivers.findIndex(d=>d.id==editingDriverId);if(i>=0)drivers[i]=obj;else drivers.push(obj);}else drivers.push(obj);
   saveLocal();closeModal('driver-modal');renderDrivers(currentOfficeFilter);renderDashboard();renderDocPage();
   if(status==='退職'||status==='休止')renderArchive();
