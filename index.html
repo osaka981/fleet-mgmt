@@ -973,22 +973,17 @@ async function generateDoc(office,type){
 
     // Apps Script PDF生成対象（主要書類）
     const pdfTypes={
-      'genkyo_person': '現況届（従事員）',
-      'genkyo_vehicle': '現況届（車両）',
       'koyou': '雇用証明書',
       'houkoku': '報告書',
       'seiyaku_osaka': '誓約書（大阪急配）',
       'tekigo_osaka': '適合証明書（大阪急配）',
     };
 
-    // 現況届（従事員・車両）まとめて生成
+    // 現況届（従事員・車両）1ファイルにまとめて生成
     if(type==='genkyo'){
-      prog.textContent='生成中: 現況届（従事員）...';
-      const f1=await generatePdfViaApps(office,'genkyo_person',dateStr);
+      prog.textContent='生成中: 現況届（従事員・車両）...';
+      const f1=await generatePdfViaApps(office,'genkyo',dateStr);
       generatedFiles.push({name:f1,office});
-      prog.textContent='生成中: 現況届（車両）...';
-      const f2=await generatePdfViaApps(office,'genkyo_vehicle',dateStr);
-      generatedFiles.push({name:f2,office});
     }
     else if(pdfTypes[type]){
       prog.textContent=`生成中: ${pdfTypes[type]}（PDF）...`;
