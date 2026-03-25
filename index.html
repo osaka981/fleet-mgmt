@@ -701,8 +701,7 @@ function renderDocPage(){
       <div class="doc-card-name">${office}営業所 <span class="badge badge-info" style="font-size:10px">${POST_OFFICE_MAP[office]||office+'郵便局'}宛</span></div>
       <div class="doc-card-info">社員 ${employees.length}名 / 外注 ${subcons.length}名 / 車両 ${offV.length}台</div>
       <div class="doc-card-btns" style="margin-bottom:6px">
-        <button class="btn btn-sm btn-primary" onclick="generateDoc('${office}','genkyo_person')">📋 現況届（従事員）</button>
-        <button class="btn btn-sm btn-primary" onclick="generateDoc('${office}','genkyo_vehicle')">🚗 現況届（車両）</button>
+        <button class="btn btn-sm btn-primary" onclick="generateDoc('${office}','genkyo')">📋 現況届（従事員・車両）</button>
         <button class="btn btn-sm btn-primary" onclick="generateDoc('${office}','koyou')">📄 雇用証明書</button>
         <button class="btn btn-sm btn-primary" onclick="generateDoc('${office}','houkoku')">📑 報告書</button>
       </div>
@@ -982,7 +981,16 @@ async function generateDoc(office,type){
       'tekigo_osaka': '適合証明書（大阪急配）',
     };
 
-    if(pdfTypes[type]){
+    // 現況届（従事員・車両）まとめて生成
+    if(type==='genkyo'){
+      prog.textContent='生成中: 現況届（従事員）...';
+      const f1=await generatePdfViaApps(office,'genkyo_person',dateStr);
+      generatedFiles.push({name:f1,office});
+      prog.textContent='生成中: 現況届（車両）...';
+      const f2=await generatePdfViaApps(office,'genkyo_vehicle',dateStr);
+      generatedFiles.push({name:f2,office});
+    }
+    else if(pdfTypes[type]){
       prog.textContent=`生成中: ${pdfTypes[type]}（PDF）...`;
       const fileName=await generatePdfViaApps(office, type, dateStr);
       generatedFiles.push({name:fileName, office});
@@ -1030,7 +1038,7 @@ async function generateDoc(office,type){
 async function generateAllDocs(office){
   const prog=document.getElementById(`prog-${office}`);
   prog.className='gen-progress show';
-  const types=['genkyo_person','genkyo_vehicle','koyou','houkoku','saitaku','seiyaku_osaka','seiyaku_sub','tekigo_osaka','tekigo_sub'];
+  const types=['genkyo','koyou','houkoku','saitaku','seiyaku_osaka','seiyaku_sub','tekigo_osaka','tekigo_sub'];
   for(const type of types){
     await generateDoc(office,type);
     await new Promise(r=>setTimeout(r,200));
