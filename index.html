@@ -2384,9 +2384,9 @@ function renderCompanyPage(companyId, pageId){
   html += '</div></div>';
   html += '<div class="company-card">';
   html += '<div class="company-tabs">';
-  html += '<div class="company-tab active" id="ctab-drivers-' + companyId + '" onclick="switchCompanyTab(\"drivers\",' + companyId + ')">ドライバー（' + dc.length + '名）</div>';
-  html += '<div class="company-tab" id="ctab-vehicles-' + companyId + '" onclick="switchCompanyTab(\"vehicles\",' + companyId + ')">車両（' + vc.length + '台）</div>';
-  html += '<div class="company-tab" id="ctab-files-' + companyId + '" onclick="switchCompanyTab(\"files\",' + companyId + ')">書類・写真</div>';
+  html += '<div class="company-tab active" id="ctab-drivers-' + companyId + '" onclick="switchCompanyTab(\'drivers\',' + companyId + ')">ドライバー（' + dc.length + '名）</div>';
+  html += '<div class="company-tab" id="ctab-vehicles-' + companyId + '" onclick="switchCompanyTab(\'vehicles\',' + companyId + ')">車両（' + vc.length + '台）</div>';
+  html += '<div class="company-tab" id="ctab-files-' + companyId + '" onclick="switchCompanyTab(\'files\',' + companyId + ')">書類・写真</div>';
   html += '</div>';
   html += '<div class="company-tab-content active" id="ctabcontent-drivers-' + companyId + '">';
   html += '<div style="margin-bottom:8px"><button class="btn btn-sm btn-primary" onclick="openCompanyDriverModal(' + companyId + ')">＋ ドライバー追加</button></div>';
