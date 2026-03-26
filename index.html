@@ -549,6 +549,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
               <option value="driver">ドライバー</option>
               <option value="vehicle">車両</option>
             </select>
+            <button class="btn btn-primary" onclick="openFileMgrUploadGeneral()" style="white-space:nowrap">📎 まとめて追加</button>
           </div>
         </div>
         <div class="content" id="filemgr-content"></div>
@@ -813,15 +814,15 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
 </div>
 <!-- File Manager Upload Modal -->
 <div id="filemgr-modal" style="display:none" class="modal-bg">
-  <div class="modal modal-sm" onclick="event.stopPropagation()">
-    <div class="modal-header"><span class="modal-title">書類・写真を追加</span><button class="modal-close" onclick="closeModal('filemgr-modal')">✕</button></div>
+  <div class="modal" style="max-width:760px" onclick="event.stopPropagation()">
+    <div class="modal-header"><span class="modal-title" id="filemgr-modal-title">📎 書類・写真を追加</span><button class="modal-close" onclick="closeModal('filemgr-modal')">✕</button></div>
     <div class="modal-body">
-      <div class="file-drop-zone" id="filemgr-zone" ondragover="fileDragOver(event,'filemgr-zone')" ondragleave="fileDragLeave('filemgr-zone')" ondrop="fileDrop(event,'filemgr')">
-        <input type="file" accept="image/*,.pdf" multiple onchange="fileSelect(event,'filemgr')">
+      <div class="file-drop-zone" id="filemgr-zone" ondragover="fileDragOver(event,'filemgr-zone')" ondragleave="fileDragLeave('filemgr-zone')" ondrop="fileMgrDrop(event)">
+        <input type="file" accept="image/*,.pdf" multiple onchange="fileMgrSelect(event)">
         <div style="font-size:13px;color:#4a90e2;font-weight:500;margin-bottom:4px">📎 ファイルをドロップまたはタップして選択</div>
-        <div style="font-size:11px;color:#888">写真・PDF（複数可）</div>
+        <div style="font-size:11px;color:#888">複数ファイル同時可・PDF/画像対応</div>
       </div>
-      <div id="filemgr-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
+      <div id="filemgr-assign-list" style="margin-top:12px;display:flex;flex-direction:column;gap:8px"></div>
       <div style="font-size:11px;color:#888;margin-top:8px">※ Google Driveに自動保存されます</div>
     </div>
     <div class="modal-footer">
@@ -1611,17 +1612,17 @@ function openVehicleModal(id){
   editingVehicleId=id||null;
   document.getElementById('vm-title').textContent=id?'車両 編集':'車両 登録';
   document.getElementById('v-office').innerHTML=offices.map(o=>`<option>${o}</option>`).join('');
-  document.getElementById('v-driver').innerHTML='<option value="">未割当</option>'+drivers.map(d=>`<option value="${d.name}">${d.name}（${d.office}）</option>`).join('');
+  document.getElementById('v-driver').innerHTML='<option value="">未割当</option>'+drivers.map(d=>`<option value="${d.id}">${d.name}（${d.office}）</option>`).join('');
   ['v-plate','v-model','v-color','v-owner','v-user','v-sub','v-note','v-shaken-exp','v-shaken-chassis','v-shaken-type','v-jibai-exp','v-jibai-no','v-jibai-company','v-nin-exp','v-nin-no','v-nin-company'].forEach(f=>document.getElementById(f).value='');
   document.getElementById('v-type').value='社有';document.getElementById('v-kind').value='軽四';
-  if(id){const v=vehicles.find(x=>x.id==id);if(v){document.getElementById('v-plate').value=v.plate||'';document.getElementById('v-model').value=v.model||'';document.getElementById('v-kind').value=v.kind||'軽四';document.getElementById('v-type').value=v.type||'社有';document.getElementById('v-office').value=v.office||'';document.getElementById('v-driver').value=v.driver||'';document.getElementById('v-color').value=v.color||'';document.getElementById('v-owner').value=v.owner||'';document.getElementById('v-user').value=v.vehicleUser||'';document.getElementById('v-sub').value=v.sub||'';document.getElementById('v-note').value=v.note||'';document.getElementById('v-shaken-exp').value=v.shaken?.exp||'';document.getElementById('v-shaken-chassis').value=v.shaken?.chassis||'';document.getElementById('v-shaken-type').value=v.shaken?.type||'';document.getElementById('v-jibai-exp').value=v.jibai?.exp||'';document.getElementById('v-jibai-no').value=v.jibai?.no||'';document.getElementById('v-jibai-company').value=v.jibai?.company||'';document.getElementById('v-nin-exp').value=v.nin?.exp||'';document.getElementById('v-nin-no').value=v.nin?.no||'';document.getElementById('v-nin-company').value=v.nin?.company||'';}}
+  if(id){const v=vehicles.find(x=>x.id==id);if(v){document.getElementById('v-plate').value=v.plate||'';document.getElementById('v-model').value=v.model||'';document.getElementById('v-kind').value=v.kind||'軽四';document.getElementById('v-type').value=v.type||'社有';document.getElementById('v-office').value=v.office||'';document.getElementById('v-driver').value=v.driverId||'';document.getElementById('v-color').value=v.color||'';document.getElementById('v-owner').value=v.owner||'';document.getElementById('v-user').value=v.vehicleUser||'';document.getElementById('v-sub').value=v.sub||'';document.getElementById('v-note').value=v.note||'';document.getElementById('v-shaken-exp').value=v.shaken?.exp||'';document.getElementById('v-shaken-chassis').value=v.shaken?.chassis||'';document.getElementById('v-shaken-type').value=v.shaken?.type||'';document.getElementById('v-jibai-exp').value=v.jibai?.exp||'';document.getElementById('v-jibai-no').value=v.jibai?.no||'';document.getElementById('v-jibai-company').value=v.jibai?.company||'';document.getElementById('v-nin-exp').value=v.nin?.exp||'';document.getElementById('v-nin-no').value=v.nin?.no||'';document.getElementById('v-nin-company').value=v.nin?.company||'';}}
   document.getElementById('vehicle-modal').style.display='flex';
   modalFiles['v-files']=[];
   renderFilePreview('v-files');
 }
 function saveVehicle(){
   const plate=document.getElementById('v-plate').value.trim();if(!plate){alert('車両番号は必須です');return;}
-  const obj={id:editingVehicleId||Date.now(),plate,model:document.getElementById('v-model').value,kind:document.getElementById('v-kind').value,type:document.getElementById('v-type').value,office:document.getElementById('v-office').value,driver:document.getElementById('v-driver').value,color:document.getElementById('v-color').value||'白',owner:document.getElementById('v-owner').value,vehicleUser:document.getElementById('v-user').value,sub:document.getElementById('v-sub').value,note:document.getElementById('v-note').value,shaken:{exp:document.getElementById('v-shaken-exp').value,chassis:document.getElementById('v-shaken-chassis').value,type:document.getElementById('v-shaken-type').value},jibai:{exp:document.getElementById('v-jibai-exp').value,no:document.getElementById('v-jibai-no').value,company:document.getElementById('v-jibai-company').value},nin:{exp:document.getElementById('v-nin-exp').value,no:document.getElementById('v-nin-no').value,company:document.getElementById('v-nin-company').value}};
+  const obj={id:editingVehicleId||Date.now(),plate,model:document.getElementById('v-model').value,kind:document.getElementById('v-kind').value,type:document.getElementById('v-type').value,office:document.getElementById('v-office').value,driver:(drivers.find(d=>d.id==document.getElementById('v-driver').value)||{name:''}).name,driverId:document.getElementById('v-driver').value||null,color:document.getElementById('v-color').value||'白',owner:document.getElementById('v-owner').value,vehicleUser:document.getElementById('v-user').value,sub:document.getElementById('v-sub').value,note:document.getElementById('v-note').value,shaken:{exp:document.getElementById('v-shaken-exp').value,chassis:document.getElementById('v-shaken-chassis').value,type:document.getElementById('v-shaken-type').value},jibai:{exp:document.getElementById('v-jibai-exp').value,no:document.getElementById('v-jibai-no').value,company:document.getElementById('v-jibai-company').value},nin:{exp:document.getElementById('v-nin-exp').value,no:document.getElementById('v-nin-no').value,company:document.getElementById('v-nin-company').value}};
   if(editingVehicleId){const i=vehicles.findIndex(v=>v.id==editingVehicleId);if(i>=0)vehicles[i]=obj;else vehicles.push(obj);}else vehicles.push(obj);
   saveLocal();closeModal('vehicle-modal');renderVehicles(currentOfficeFilter);renderDashboard();renderDocPage();
 }
@@ -2022,7 +2023,7 @@ function renderFileMgr(){
       html += `<div style="font-size:12px;font-weight:600;color:#888;margin:0 0 8px;padding:4px 0;border-bottom:1px solid #e0e0e0">👤 ドライバー（${allDrivers.length}名）</div>`;
       html += allDrivers.map(d => {
         const files = d.attachedFiles || [];
-        const currentVehicle = vehicles.find(v => v.driverId == d.id) || companies.flatMap(c=>c.vehicles||[]).find(v=>v.driverId==d.id);
+        const currentVehicle = vehicles.find(v => v.driverId && String(v.driverId) === String(d.id)) || vehicles.find(v => v.driver === d.name) || companies.flatMap(c=>c.vehicles||[]).find(v=>v.driverId && String(v.driverId)===String(d.id)) || companies.flatMap(c=>c.vehicles||[]).find(v=>v.driver===d.name);
         const tempVehicle = d.tempVehicleId ? (vehicles.find(v=>v.id==d.tempVehicleId) || companies.flatMap(c=>c.vehicles||[]).find(v=>v.id==d.tempVehicleId)) : null;
         return `<div class="company-card" style="margin-bottom:8px">
           <div class="company-card-header" style="cursor:default">
@@ -2062,7 +2063,7 @@ function renderFileMgr(){
       html += `<div style="font-size:12px;font-weight:600;color:#888;margin:8px 0;padding:4px 0;border-bottom:1px solid #e0e0e0">🚗 車両（${allVehicles.length}台）</div>`;
       html += allVehicles.map(v => {
         const files = v.attachedFiles || [];
-        const assignedDriver = drivers.find(d=>d.id==v.driverId) || companies.flatMap(c=>c.drivers||[]).find(d=>d.id==v.driverId);
+        const assignedDriver = drivers.find(d=>d.id==v.driverId) || companies.flatMap(c=>c.drivers||[]).find(d=>d.id==v.driverId) || (v.driver ? {name:v.driver} : null);
         const tempDrivers = drivers.filter(d=>d.tempVehicleId==v.id);
         return `<div class="company-card" style="margin-bottom:8px">
           <div class="company-card-header" style="cursor:default">
@@ -2094,58 +2095,190 @@ function renderFileMgr(){
 
 // 書類追加モーダル（書類管理ページから）
 let fileMgrTarget = null;
+let fileMgrFiles = [];
 function openFileMgrUpload(kind, id, companyName){
   fileMgrTarget = {kind, id, companyName};
-  modalFiles['filemgr'] = [];
-  renderFilePreview('filemgr');
+  fileMgrFiles = [];
+  renderFileMgrAssignList();
+  // タイトルを紐づけ先名に変更
+  let name = '';
+  if(kind==='driver'){
+    const d = drivers.find(x=>x.id==id) || companies.flatMap(c=>c.drivers||[]).find(x=>x.id==id);
+    name = d?.name || '';
+  } else {
+    const v = vehicles.find(x=>x.id==id) || companies.flatMap(c=>c.vehicles||[]).find(x=>x.id==id);
+    name = v?.plate || '';
+  }
+  document.getElementById('filemgr-modal-title').textContent = '📎 ' + name + ' の書類追加';
   document.getElementById('filemgr-modal').style.display = 'flex';
 }
 
+// 振り分けUI無しで汎用的に開く（ダッシュボードのドロップゾーン等から呼ぶ）
+function openFileMgrUploadGeneral(){
+  fileMgrTarget = null;
+  fileMgrFiles = [];
+  renderFileMgrAssignList();
+  document.getElementById('filemgr-modal-title').textContent = '📎 書類・写真を振り分け登録';
+  document.getElementById('filemgr-modal').style.display = 'flex';
+}
+
+function fileMgrSelect(event){
+  const newFiles = Array.from(event.target.files);
+  newFiles.forEach(f => {
+    fileMgrFiles.push({ file: f, preview: null, targetKind: fileMgrTarget?.kind || '', targetId: fileMgrTarget?.id || '', docType: '' });
+    // プレビュー生成
+    const idx = fileMgrFiles.length - 1;
+    if(f.type.startsWith('image/')){
+      const reader = new FileReader();
+      reader.onload = e => { fileMgrFiles[idx].preview = e.target.result; renderFileMgrAssignList(); };
+      reader.readAsDataURL(f);
+    }
+  });
+  renderFileMgrAssignList();
+  event.target.value = '';
+}
+
+function fileMgrDrop(event){
+  event.preventDefault();
+  document.getElementById('filemgr-zone').classList.remove('dragover');
+  const newFiles = Array.from(event.dataTransfer.files);
+  newFiles.forEach(f => {
+    fileMgrFiles.push({ file: f, preview: null, targetKind: fileMgrTarget?.kind || '', targetId: fileMgrTarget?.id || '', docType: '' });
+    const idx = fileMgrFiles.length - 1;
+    if(f.type.startsWith('image/')){
+      const reader = new FileReader();
+      reader.onload = e => { fileMgrFiles[idx].preview = e.target.result; renderFileMgrAssignList(); };
+      reader.readAsDataURL(f);
+    }
+  });
+  renderFileMgrAssignList();
+}
+
+function renderFileMgrAssignList(){
+  const el = document.getElementById('filemgr-assign-list');
+  if(!el) return;
+  if(!fileMgrFiles.length){ el.innerHTML = ''; return; }
+
+  // 全ドライバー・車両リスト生成（セレクト用）
+  const allDrivers = [
+    ...drivers.map(d => ({id:d.id, label:`👤 ${d.name}`, kind:'driver'})),
+    ...companies.flatMap(c => (c.drivers||[]).map(d => ({id:d.id, label:`👤 ${d.name}（${c.name}）`, kind:'driver'})))
+  ];
+  const allVehicles = [
+    ...vehicles.map(v => ({id:v.id, label:`🚗 ${v.plate}`, kind:'vehicle'})),
+    ...companies.flatMap(c => (c.vehicles||[]).map(v => ({id:v.id, label:`🚗 ${v.plate}（${c.name}）`, kind:'vehicle'})))
+  ];
+  const allTargets = [...allDrivers, ...allVehicles];
+
+  const docTypes = {
+    driver: ['運転免許証','健康診断書','その他'],
+    vehicle: ['車検証','自賠責保険証','任意保険証','その他'],
+    '': ['運転免許証','車検証','自賠責保険証','任意保険証','健康診断書','その他']
+  };
+
+  el.innerHTML = fileMgrFiles.map((item, idx) => {
+    const ext = item.file.name.split('.').pop();
+    const isImg = item.file.type.startsWith('image/');
+    const thumb = isImg && item.preview
+      ? `<img src="${item.preview}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #e0e0e0;flex-shrink:0">`
+      : `<div style="width:60px;height:60px;border-radius:6px;border:1px solid #e0e0e0;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📄</div>`;
+
+    // 現在選択中の紐づけ先
+    const curKind = item.targetKind;
+    const targetOpts = allTargets.map(t =>
+      `<option value="${t.kind}:${t.id}" ${curKind===t.kind && String(item.targetId)===String(t.id) ? 'selected' : ''}>${t.label}</option>`
+    ).join('');
+
+    const dtList = (docTypes[curKind] || docTypes['']).map(dt =>
+      `<option value="${dt}" ${item.docType===dt ? 'selected' : ''}>${dt}</option>`
+    ).join('');
+
+    // 自動リネーム後のファイル名を生成
+    const autoName = getAutoFileName(item, idx);
+
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px;background:#f9fbff;border:1px solid #e0e0e0;border-radius:8px">
+      ${thumb}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;color:#888;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.file.name}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px">
+          <select style="font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:5px;background:#fff" onchange="fileMgrSetTarget(${idx},this.value)">
+            <option value="">— 紐づけ先を選択 —</option>
+            ${targetOpts}
+          </select>
+          <select style="font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:5px;background:#fff" onchange="fileMgrSetDocType(${idx},this.value)">
+            <option value="">— 書類種別 —</option>
+            ${dtList}
+          </select>
+        </div>
+        <div style="font-size:10px;color:#4a90e2">📝 保存名: <strong>${autoName}</strong></div>
+      </div>
+      <button onclick="fileMgrFiles.splice(${idx},1);renderFileMgrAssignList()" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:16px;padding:0;flex-shrink:0">×</button>
+    </div>`;
+  }).join('');
+}
+
+function getAutoFileName(item, idx){
+  const ext = item.file.name.split('.').pop();
+  let baseName = '';
+  if(item.targetKind === 'driver'){
+    const d = drivers.find(x=>String(x.id)===String(item.targetId)) || companies.flatMap(c=>c.drivers||[]).find(x=>String(x.id)===String(item.targetId));
+    if(d) baseName = d.name;
+  } else if(item.targetKind === 'vehicle'){
+    const v = vehicles.find(x=>String(x.id)===String(item.targetId)) || companies.flatMap(c=>c.vehicles||[]).find(x=>String(x.id)===String(item.targetId));
+    if(v) baseName = v.plate.replace(/\s/g,'');
+  }
+  if(!baseName) return item.file.name;
+  const docPart = item.docType ? `_${item.docType}` : '';
+  return `${baseName}${docPart}.${ext}`;
+}
+
+function fileMgrSetTarget(idx, val){
+  if(!val){ fileMgrFiles[idx].targetKind=''; fileMgrFiles[idx].targetId=''; }
+  else { const [k,id] = val.split(':'); fileMgrFiles[idx].targetKind=k; fileMgrFiles[idx].targetId=id; }
+  renderFileMgrAssignList();
+}
+
+function fileMgrSetDocType(idx, val){
+  fileMgrFiles[idx].docType = val;
+  renderFileMgrAssignList();
+}
+
 async function saveFileMgr(){
-  if(!fileMgrTarget) return;
-  const files = modalFiles['filemgr'] || [];
-  if(!files.length){ closeModal('filemgr-modal'); return; }
+  if(!fileMgrFiles.length){ closeModal('filemgr-modal'); return; }
 
   const btn = document.getElementById('filemgr-save-btn');
   btn.textContent = 'アップロード中...'; btn.disabled = true;
 
-  const {kind, id, companyName} = fileMgrTarget;
+  for(const item of fileMgrFiles){
+    if(!item.targetKind || !item.targetId){ continue; }  // 紐づけ先未設定はスキップ
 
-  // アップロード先フォルダを特定
-  let folderName = '', subFolderName = '';
-  if(kind === 'driver'){
-    const d = drivers.find(x=>x.id==id) || companies.flatMap(c=>c.drivers||[]).find(x=>x.id==id);
-    folderName = d?.office || (d?.offices||[])[0] || '未設定';
-    subFolderName = d?.name || 'unknown';
-  } else {
-    const v = vehicles.find(x=>x.id==id) || companies.flatMap(c=>c.vehicles||[]).find(x=>x.id==id);
-    folderName = v?.office || (v?.offices||[])[0] || '未設定';
-    subFolderName = '車両/' + (v?.plate || 'unknown');
+    const {targetKind: kind, targetId: id} = item;
+
+    // ターゲット取得
+    let target = null, folderName = '', subFolderName = '';
+    if(kind === 'driver'){
+      target = drivers.find(x=>String(x.id)===String(id)) || companies.flatMap(c=>c.drivers||[]).find(x=>String(x.id)===String(id));
+      folderName = target?.office || (target?.offices||[])[0] || '未設定';
+      subFolderName = target?.name || 'unknown';
+    } else {
+      target = vehicles.find(x=>String(x.id)===String(id)) || companies.flatMap(c=>c.vehicles||[]).find(x=>String(x.id)===String(id));
+      folderName = target?.office || (target?.offices||[])[0] || '未設定';
+      subFolderName = '車両/' + (target?.plate || 'unknown');
+    }
+    if(!target) continue;
+
+    // 自動リネーム
+    const autoName = getAutoFileName(item, 0);
+    const renamedFile = new File([item.file], autoName, {type: item.file.type});
+
+    const uploaded = await uploadFilesToDrive([renamedFile], folderName, subFolderName);
+
+    // ターゲットに紐付け
+    if(!target.attachedFiles) target.attachedFiles = [];
+    target.attachedFiles.push(...uploaded);
   }
 
-  const uploaded = await uploadFilesToDrive(files, folderName, subFolderName);
-
-  // データに紐付け
-  if(kind === 'driver'){
-    const d = drivers.find(x=>x.id==id);
-    if(d){ if(!d.attachedFiles) d.attachedFiles=[]; d.attachedFiles.push(...uploaded); saveLocal(); }
-    else {
-      companies.forEach(c => {
-        const cd = (c.drivers||[]).find(x=>x.id==id);
-        if(cd){ if(!cd.attachedFiles) cd.attachedFiles=[]; cd.attachedFiles.push(...uploaded); saveCompanies(); }
-      });
-    }
-  } else {
-    const v = vehicles.find(x=>x.id==id);
-    if(v){ if(!v.attachedFiles) v.attachedFiles=[]; v.attachedFiles.push(...uploaded); saveLocal(); }
-    else {
-      companies.forEach(c => {
-        const cv = (c.vehicles||[]).find(x=>x.id==id);
-        if(cv){ if(!cv.attachedFiles) cv.attachedFiles=[]; cv.attachedFiles.push(...uploaded); saveCompanies(); }
-      });
-    }
-  }
-
+  saveLocal(); saveCompanies();
   btn.textContent = '保存する'; btn.disabled = false;
   closeModal('filemgr-modal');
   renderFileMgr();
