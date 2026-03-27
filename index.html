@@ -898,11 +898,12 @@ let PASSWORD=localStorage.getItem('fleet_pw')||'1234';
 let offices=JSON.parse(localStorage.getItem('fleet_offices')||'["西成","浜寺","藤井寺","大阪西","集荷","本社"]');
 let vehicles=JSON.parse(localStorage.getItem('fleet_vehicles')||'[]');
 let drivers=JSON.parse(localStorage.getItem('fleet_drivers')||'[]');
+let unassignedFiles=JSON.parse(localStorage.getItem('fleet_unassigned')||'[]'); // 未分類ファイル
 let contractors=JSON.parse(localStorage.getItem('fleet_companies')||localStorage.getItem('fleet_contractors')||'[]');
 let currentOfficeFilter=null,vSortCol=null,vSortDir=1,dSortCol=null,dSortDir=1;
 let editingVehicleId=null,editingDriverId=null;
 
-function saveLocal(){localStorage.setItem('fleet_vehicles',JSON.stringify(vehicles));localStorage.setItem('fleet_drivers',JSON.stringify(drivers));localStorage.setItem('fleet_offices',JSON.stringify(offices));localStorage.setItem('fleet_companies',JSON.stringify(companies));}
+function saveLocal(){localStorage.setItem('fleet_vehicles',JSON.stringify(vehicles));localStorage.setItem('fleet_drivers',JSON.stringify(drivers));localStorage.setItem('fleet_offices',JSON.stringify(offices));localStorage.setItem('fleet_companies',JSON.stringify(companies));localStorage.setItem('fleet_unassigned',JSON.stringify(unassignedFiles));}
 function parsePlate(plate){if(!plate)return{chiiki:'',bunrui:'',kana:'',num:''};const p=plate.trim().replace(/\s+/g,' ').split(' ');if(p.length>=4)return{chiiki:p[0],bunrui:p[1],kana:p[2],num:p[3]};const m=plate.match(/^([^\d]+?)(\d{3})\s*([あ-ん])\s*(\d+)/);if(m)return{chiiki:m[1].trim(),bunrui:m[2],kana:m[3],num:m[4]};return{chiiki:plate,bunrui:'',kana:'',num:''};}
 
 // ====== 同期 ======
@@ -2187,7 +2188,83 @@ function renderFileMgr(){
   }
 
   if(!html) html = '<div style="padding:24px;text-align:center;color:#888;font-size:12px">該当するデータがありません</div>';
+
+  // 未分類ボックス（常に表示）
+  if(unassignedFiles.length > 0 || (!typeFilter && !document.getElementById('filemgr-search')?.value)){
+    html += renderUnassignedBox();
+  }
+
   el.innerHTML = html;
+}
+
+function renderUnassignedBox(){
+  if(!unassignedFiles.length) return '';
+
+  // 全ドライバー・車両リスト（紐づけ先選択用）
+  const allTargets = [
+    ...drivers.map(d => ({id:d.id, label:`👤 ${d.name}`, kind:'driver'})),
+    ...companies.flatMap(c => (c.drivers||[]).map(d => ({id:d.id, label:`👤 ${d.name}（${c.name}）`, kind:'driver'}))),
+    ...vehicles.map(v => ({id:v.id, label:`🚗 ${v.plate}`, kind:'vehicle'})),
+    ...companies.flatMap(c => (c.vehicles||[]).map(v => ({id:v.id, label:`🚗 ${v.plate}（${c.name}）`, kind:'vehicle'})))
+  ];
+  const targetOpts = allTargets.map(t => `<option value="${t.kind}:${t.id}">${t.label}</option>`).join('');
+
+  const items = unassignedFiles.map((f, i) => {
+    const isPdf = f.name.match(/\.pdf$/i);
+    const isImg = f.name.match(/\.(jpg|jpeg|png|gif)$/i);
+    const thumb = isImg && f.dataUrl
+      ? `<img src="${f.dataUrl}" style="width:50px;height:50px;object-fit:cover;border-radius:4px;cursor:pointer" onclick="openFilePreview('','${esc(f.name)}','${f.dataUrl?.substring(0,20)||''}');openFilePreviewFromAttached('','${esc(f.name)}',unassignedFiles[${i}]?.dataUrl||'')">`
+      : `<div style="width:50px;height:50px;border-radius:4px;background:#f5f5f5;border:1px solid #e0e0e0;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer" onclick="openFilePreviewFromAttached('','${esc(f.name)}',unassignedFiles[${i}]?.dataUrl||'')">${isPdf?'📄':'📎'}</div>`;
+    const savedDate = f.savedAt ? new Date(f.savedAt).toLocaleDateString('ja-JP') : '';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f0f0f0">
+      ${thumb}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</div>
+        <div style="font-size:10px;color:#aaa">${f.docType||'種別未設定'} ${savedDate?'・'+savedDate:''} ${f.note?'・<span style="color:#e65100">'+esc(f.note)+'</span>':''}</div>
+      </div>
+      <select onchange="assignUnassignedFile(${i},this.value)" style="font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:5px;min-width:180px">
+        <option value="">— 紐づけ先を選択 —</option>
+        ${targetOpts}
+      </select>
+      <button onclick="deleteUnassignedFile(${i})" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:16px;flex-shrink:0" title="削除">×</button>
+    </div>`;
+  }).join('');
+
+  return `<div style="margin-top:16px;background:#fff;border:2px solid #ff9800;border-radius:10px;overflow:hidden">
+    <div style="padding:10px 16px;background:#fff3e0;display:flex;align-items:center;gap:8px">
+      <span style="font-size:16px">📥</span>
+      <span style="font-size:13px;font-weight:600;color:#e65100">未分類ボックス（${unassignedFiles.length}件）</span>
+      <span style="font-size:11px;color:#888">紐づけ先を選択して各ドライバー・車両に振り分けてください</span>
+    </div>
+    ${items}
+  </div>`;
+}
+
+function assignUnassignedFile(idx, val){
+  if(!val) return;
+  const [kind, id] = val.split(':');
+  const file = unassignedFiles[idx];
+  if(!file) return;
+
+  const target = kind==='driver'
+    ? (drivers.find(x=>String(x.id)===String(id)) || companies.flatMap(c=>c.drivers||[]).find(x=>String(x.id)===String(id)))
+    : (vehicles.find(x=>String(x.id)===String(id)) || companies.flatMap(c=>c.vehicles||[]).find(x=>String(x.id)===String(id)));
+
+  if(!target){ alert('紐づけ先が見つかりません'); return; }
+
+  if(!target.attachedFiles) target.attachedFiles = [];
+  target.attachedFiles.push({name:file.name, dataUrl:file.dataUrl||'', type:file.type||'', uploadedAt:file.savedAt});
+
+  unassignedFiles.splice(idx, 1);
+  saveLocal(); saveCompanies();
+  renderFileMgr();
+}
+
+function deleteUnassignedFile(idx){
+  if(!confirm('この未分類ファイルを削除しますか？')) return;
+  unassignedFiles.splice(idx, 1);
+  saveLocal();
+  renderFileMgr();
 }
 
 // 書類追加モーダル（書類管理ページから）
@@ -2346,8 +2423,23 @@ async function saveFileMgr(){
   const btn = document.getElementById('filemgr-save-btn');
   btn.textContent = 'アップロード中...'; btn.disabled = true;
 
+  let assignedCount = 0, unassignedCount = 0;
+
   for(const item of fileMgrFiles){
-    if(!item.targetKind || !item.targetId){ continue; }  // 紐づけ先未設定はスキップ
+    // 紐づけ先が未設定 → 未分類ボックスへ保存（消えない）
+    if(!item.targetKind || !item.targetId){
+      const autoName = getAutoFileName(item, 0);
+      unassignedFiles.push({
+        id: Date.now() + Math.random(),
+        name: autoName,
+        docType: item.docType || '',
+        dataUrl: item.file ? await fileToDataUrl(item.file) : (item.dataUrl||''),
+        type: item.file?.type || '',
+        savedAt: new Date().toISOString()
+      });
+      unassignedCount++;
+      continue;
+    }
 
     const {targetKind: kind, targetId: id} = item;
 
@@ -2362,7 +2454,21 @@ async function saveFileMgr(){
       folderName = target?.office || (target?.offices||[])[0] || '未設定';
       subFolderName = '車両/' + (target?.plate || 'unknown');
     }
-    if(!target) continue;
+    if(!target){
+      // ターゲットが見つからない場合も未分類へ
+      const autoName = getAutoFileName(item, 0);
+      unassignedFiles.push({
+        id: Date.now() + Math.random(),
+        name: autoName,
+        docType: item.docType || '',
+        dataUrl: item.file ? await fileToDataUrl(item.file) : (item.dataUrl||''),
+        type: item.file?.type || '',
+        savedAt: new Date().toISOString(),
+        note: '紐づけ先が見つかりませんでした'
+      });
+      unassignedCount++;
+      continue;
+    }
 
     // 自動リネーム
     const autoName = getAutoFileName(item, 0);
@@ -2373,12 +2479,27 @@ async function saveFileMgr(){
     // ターゲットに紐付け
     if(!target.attachedFiles) target.attachedFiles = [];
     target.attachedFiles.push(...uploaded);
+    assignedCount++;
   }
 
   saveLocal(); saveCompanies();
   btn.textContent = '保存する'; btn.disabled = false;
   closeModal('filemgr-modal');
+
+  // 結果メッセージ
+  if(unassignedCount > 0){
+    alert(`✅ ${assignedCount}件を紐づけ保存しました。\n⚠️ ${unassignedCount}件は紐づけ先が未設定のため「未分類ボックス」に保存しました。\n書類・写真管理ページの下部から後で紐づけできます。`);
+  }
   renderFileMgr();
+}
+
+function fileToDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 function deleteAttachedFile(kind, id, idx, companyName){
