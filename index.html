@@ -1918,7 +1918,7 @@ async function submitSelfForm(){
       regcode, companyId, companyName,
       note, doctype:'新規登録',
       timestamp:new Date().toISOString(),
-      files:sfFiles.map(f=>({name:f.name,dataUrl:f.dataUrl.slice(0,200)}))
+      files:[] // 後でDriveアップロード後に設定
     };
   } else {
     // 書類更新モード
@@ -1933,13 +1933,44 @@ async function submitSelfForm(){
       office, name, kana,
       doctype:selectedDocs.join('・'), note,
       timestamp:new Date().toISOString(),
-      files:sfFiles.map(f=>({name:f.name,dataUrl:f.dataUrl.slice(0,200)}))
+      files:[] // 後でDriveアップロード後に設定
     };
   }
 
   document.getElementById('sf-submit').disabled=true;
   document.getElementById('sf-submit').textContent='送信中...';
-  try{await fetch(API_URL,{method:'POST',body:JSON.stringify(payload)});}catch(e){}
+
+  // ファイルをGoogle Driveにアップロードしてからsubmitする
+  try{
+    const uploadedFiles=[];
+    const folderName=payload.office||'新規登録';
+    const subFolderName=name||'未設定';
+    for(const f of sfFiles){
+      try{
+        const res=await fetch(API_URL,{
+          method:'POST',
+          body:JSON.stringify({
+            action:'uploadFile',
+            folder:folderName,
+            subFolder:subFolderName,
+            fileName:f.name,
+            mimeType:f.type||'image/jpeg',
+            dataUrl:f.dataUrl
+          })
+        });
+        const data=await res.json();
+        if(data.ok){
+          uploadedFiles.push({name:f.name,type:f.type||'',url:data.url,fileId:data.fileId,dataUrl:f.dataUrl});
+        } else {
+          uploadedFiles.push({name:f.name,type:f.type||'',dataUrl:f.dataUrl});
+        }
+      }catch(e){
+        uploadedFiles.push({name:f.name,type:f.type||'',dataUrl:f.dataUrl});
+      }
+    }
+    payload.files=uploadedFiles;
+    await fetch(API_URL,{method:'POST',body:JSON.stringify(payload)});
+  }catch(e){}
 
   const inbox=JSON.parse(localStorage.getItem('fleet_inbox')||'[]');
   inbox.unshift({
@@ -1959,7 +1990,7 @@ async function submitSelfForm(){
     doctype:payload.doctype||'新規登録',
     note,
     timestamp:new Date().toISOString(),
-    files:sfFiles.map(f=>({name:f.name, dataUrl:f.dataUrl||'', type:f.type||''})),
+    files:payload.files&&payload.files.length?payload.files:sfFiles.map(f=>({name:f.name, dataUrl:f.dataUrl||'', type:f.type||''})),
     status:'未確認'
   });
   localStorage.setItem('fleet_inbox',JSON.stringify(inbox.slice(0,200)));
