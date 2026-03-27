@@ -1980,17 +1980,51 @@ function openFilePreview(url, name, dataUrl){
   title.textContent = name;
   const isPdf = name.match(/\.pdf$/i);
   const isImg = name.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+
+  // ローカルdataUrl優先。なければURLを使用
   const src = dataUrl || url;
 
-  dlLink.href = src;
+  // Google DriveのURLを埋め込み用に変換
+  // https://drive.google.com/file/d/FILE_ID/view → https://drive.google.com/file/d/FILE_ID/preview
+  let embedSrc = src;
+  if(src && src.includes('drive.google.com')){
+    embedSrc = src.replace(/\/view(\?.*)?$/, '/preview').replace(/\/edit(\?.*)?$/, '/preview');
+    // drive.google.comのexportリンクはそのまま
+  }
+
+  dlLink.href = src || '#';
   dlLink.download = name;
+  if(src && src.includes('drive.google.com')){
+    dlLink.target = '_blank';
+    dlLink.removeAttribute('download');
+  }
 
   if(isPdf){
-    body.innerHTML = `<iframe src="${src}" style="width:100%;height:70vh;border:none;display:block"></iframe>`;
+    if(src && src.startsWith('data:')){
+      // dataURLのPDF → blobに変換してiframeで表示
+      try{
+        const byteStr = atob(src.split(',')[1]);
+        const bytes = new Uint8Array(byteStr.length);
+        for(let i=0;i<byteStr.length;i++) bytes[i]=byteStr.charCodeAt(i);
+        const blob = new Blob([bytes],{type:'application/pdf'});
+        const blobUrl = URL.createObjectURL(blob);
+        body.innerHTML = `<iframe src="${blobUrl}" style="width:100%;height:70vh;border:none;display:block"></iframe>`;
+      }catch(e){
+        body.innerHTML = `<div style="color:#fff;padding:24px;text-align:center"><div style="font-size:48px;margin-bottom:12px">📄</div><div style="margin-bottom:12px">${name}</div><a href="${src}" download="${name}" style="color:#4a90e2;padding:8px 16px;border:1px solid #4a90e2;border-radius:6px">⬇ ダウンロード</a></div>`;
+      }
+    } else if(embedSrc && embedSrc.includes('drive.google.com')){
+      // Google Drive → /preview URLでiframe表示
+      body.innerHTML = `<iframe src="${embedSrc}" style="width:100%;height:70vh;border:none;display:block" allow="autoplay"></iframe>`;
+    } else if(embedSrc){
+      body.innerHTML = `<iframe src="${embedSrc}" style="width:100%;height:70vh;border:none;display:block"></iframe>`;
+    } else {
+      body.innerHTML = `<div style="color:#fff;padding:24px;text-align:center"><div style="font-size:48px">📄</div><div>${name}</div></div>`;
+    }
   } else if(isImg){
-    body.innerHTML = `<img src="${src}" style="max-width:100%;max-height:70vh;object-fit:contain;display:block;margin:auto;padding:12px">`;
+    const imgSrc = src || '';
+    body.innerHTML = `<img src="${imgSrc}" style="max-width:100%;max-height:70vh;object-fit:contain;display:block;margin:auto;padding:12px" onerror="this.style.display='none';this.nextSibling.style.display='block'" ><div style="display:none;color:#fff;padding:24px;text-align:center"><div style="font-size:48px">🖼️</div><div>${name}</div><div style="margin-top:12px"><a href="${imgSrc}" target="_blank" style="color:#4a90e2">別タブで開く</a></div></div>`;
   } else {
-    body.innerHTML = `<div style="color:#fff;padding:24px;text-align:center"><div style="font-size:48px;margin-bottom:12px">📎</div><div>${name}</div><div style="margin-top:12px"><a href="${src}" download="${name}" style="color:#4a90e2">ダウンロードして確認</a></div></div>`;
+    body.innerHTML = `<div style="color:#fff;padding:24px;text-align:center"><div style="font-size:48px;margin-bottom:12px">📎</div><div style="margin-bottom:12px">${name}</div>${src?`<a href="${src}" ${src.includes('drive.google.com')?'target="_blank"':'download="'+name+'"'} style="color:#4a90e2;padding:8px 16px;border:1px solid #4a90e2;border-radius:6px">⬇ ${src.includes('drive.google.com')?'Google Driveで開く':'ダウンロード'}</a>`:'ファイルなし'}</div>`;
   }
   document.getElementById('file-preview-modal').style.display = 'flex';
 }
