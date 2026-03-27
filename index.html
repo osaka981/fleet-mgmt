@@ -1778,12 +1778,22 @@ let sfFiles=[];
 
 function initSelfForm(){
   if(location.search.includes('form=1')||location.hash==='#form'){
+    // 他の画面を全て非表示
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-screen').style.display='none';
     document.getElementById('self-form-screen').style.display='block';
     const sfOffices=JSON.parse(localStorage.getItem('fleet_offices')||'["西成","浜寺","藤井寺","大阪西"]');
     document.getElementById('sf-office').innerHTML='<option value="">選択してください</option>'+sfOffices.map(o=>`<option>${o}</option>`).join('');
     sfSetMode('update');
+    // 自動ログインが後から app-screen を表示しても self-form-screen を守るため監視
+    const observer = new MutationObserver(() => {
+      const appEl = document.getElementById('app-screen');
+      if(appEl && appEl.style.display !== 'none'){
+        appEl.style.display = 'none';
+      }
+    });
+    const appEl = document.getElementById('app-screen');
+    if(appEl) observer.observe(appEl, {attributes:true, attributeFilter:['style']});
   }
 }
 
