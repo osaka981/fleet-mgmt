@@ -2,10 +2,11 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>大阪急配 フリート管理</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden;max-width:100vw}
 body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f5f5;color:#1a1a1a;font-size:13px}
 #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh}
 .login-card{background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:40px;width:340px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.08)}
@@ -223,16 +224,16 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
   .topbar{flex-wrap:wrap;gap:6px}
 }
 /* ===== セルフ入力フォーム（スマホ専用ページ） ===== */
-#self-form-screen{display:none;min-height:100vh;background:#f0f4ff;padding:16px;padding-bottom:calc(env(safe-area-inset-bottom,20px) + 60px);position:fixed;inset:0;z-index:999;overflow-y:auto}
-.self-form-card{background:#fff;border-radius:16px;padding:24px 20px;max-width:480px;margin:0 auto;box-shadow:0 2px 16px rgba(74,144,226,.12)}
+#self-form-screen{display:none;min-height:100vh;background:#f0f4ff;padding:16px;padding-bottom:calc(env(safe-area-inset-bottom,20px) + 60px);position:fixed;inset:0;z-index:999;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.self-form-card{background:#fff;border-radius:16px;padding:24px 20px;max-width:480px;margin:0 auto;box-shadow:0 2px 16px rgba(74,144,226,.12);overflow:hidden}
 .self-form-logo{text-align:center;margin-bottom:20px}
 .self-form-logo-title{font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:3px}
 .self-form-logo-sub{font-size:12px;color:#888}
 .self-form-group{margin-bottom:14px}
 .self-form-label{font-size:12px;font-weight:600;color:#555;margin-bottom:5px;display:block}
-.self-form-input{width:100%;padding:11px 13px;font-size:14px;border:1.5px solid #ddd;border-radius:8px;background:#fff;color:#1a1a1a;font-family:inherit;-webkit-appearance:none}
+.self-form-input{width:100%;max-width:100%;padding:11px 13px;font-size:14px;border:1.5px solid #ddd;border-radius:8px;background:#fff;color:#1a1a1a;font-family:inherit;-webkit-appearance:none}
 .self-form-input:focus{outline:none;border-color:#4a90e2}
-.self-form-select{width:100%;padding:11px 13px;font-size:14px;border:1.5px solid #ddd;border-radius:8px;background:#fff;color:#1a1a1a;font-family:inherit;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.self-form-select{width:100%;max-width:100%;padding:11px 13px;font-size:14px;border:1.5px solid #ddd;border-radius:8px;background:#fff;color:#1a1a1a;font-family:inherit;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 .self-form-upload{width:100%;padding:20px;border:2px dashed #c5d8f8;border-radius:10px;text-align:center;cursor:pointer;background:#f7f9ff;position:relative;transition:all .2s}
 .self-form-upload:hover,.self-form-upload.drag-over{border-color:#4a90e2;background:#eaf2ff}
 .self-form-upload input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
@@ -412,7 +413,8 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
     <div id="self-form-success" style="display:none" class="self-form-success">
       <div class="self-form-success-title" style="margin-top:16px">送信が完了しました</div>
       <div class="self-form-success-sub">担当者が確認後、データに反映します。<br>ありがとうございました。</div>
-      <button class="self-form-btn" style="margin-top:20px" onclick="resetSelfForm()">もう一件送信する</button>
+      <button class="self-form-btn" style="margin-top:20px;margin-bottom:10px" onclick="resetSelfForm()">もう一件送信する</button>
+      <button class="self-form-btn" style="margin-top:0;margin-bottom:20px;background:#888" onclick="closeSelfForm()">閉じる</button>
     </div>
   </div>
 </div>
@@ -1087,7 +1089,27 @@ function renderOfficeNav(){document.getElementById('office-nav').innerHTML=offic
 function renderSettingsOffices(){document.getElementById('settings-office-list').innerHTML=offices.map(o=>{const vc=vehicles.filter(v=>v.office===o).length,dc=drivers.filter(d=>d.office===o).length;return`<div class="office-row"><div style="flex:1">${o}</div><div style="font-size:11px;color:#888">車両 ${vc}台 / D ${dc}名</div><button class="btn btn-sm btn-danger" onclick="deleteOffice('${o}')">削除</button></div>`}).join('');}
 function openOfficeModal(){document.getElementById('office-name-input').value='';document.getElementById('office-modal').style.display='flex';setTimeout(()=>document.getElementById('office-name-input').focus(),50);}
 function saveOffice(){const n=document.getElementById('office-name-input').value.trim();if(!n||offices.includes(n)){alert(n?'既に存在します':'営業所名を入力');return;}offices.push(n);saveLocal();closeModal('office-modal');renderOfficeNav();renderSettingsOffices();rebuildOfficeSelects();renderDocPage();}
-function deleteOffice(name){if(!confirm(`「${name}」を削除しますか？`))return;offices=offices.filter(o=>o!==name);saveLocal();renderOfficeNav();renderSettingsOffices();rebuildOfficeSelects();if(currentOfficeFilter===name){currentOfficeFilter=null;renderVehicles(null);}renderDocPage();}
+function deleteOffice(name){
+  // 車両・ドライバーが登録されている場合は削除不可
+  const vc=vehicles.filter(v=>v.office===name).length;
+  const dc=drivers.filter(d=>{
+    const offs=Array.isArray(d.offices)?d.offices:d.office?[d.office]:[];
+    return offs.includes(name);
+  }).length;
+  // 委託会社のドライバー・車両も確認
+  let ccD=0,ccV=0;
+  companies.forEach(c=>{
+    (c.drivers||[]).forEach(d=>{if((d.offices||[]).includes(name))ccD++;});
+    (c.vehicles||[]).forEach(v=>{if((v.offices||[]).includes(name))ccV++;});
+  });
+  const totalV=vc+ccV, totalD=dc+ccD;
+  if(totalV>0||totalD>0){
+    alert(`「${name}」には車両 ${totalV}台・ドライバー ${totalD}名が登録されています。\n先に車両・ドライバーの営業所を変更してから削除してください。`);
+    return;
+  }
+  if(!confirm(`「${name}」を削除しますか？`))return;
+  offices=offices.filter(o=>o!==name);saveLocal();renderOfficeNav();renderSettingsOffices();rebuildOfficeSelects();if(currentOfficeFilter===name){currentOfficeFilter=null;renderVehicles(null);}renderDocPage();
+}
 function rebuildOfficeSelects(){['v-office'].forEach(id=>{const sel=document.getElementById(id);if(!sel)return;const cur=sel.value;sel.innerHTML=offices.map(o=>`<option${o===cur?' selected':''}>${o}</option>`).join('');});}
 
 // ====== テーブル ======
@@ -2204,6 +2226,11 @@ function resetSelfForm(){
   sfSetMode('update');
 }
 
+function closeSelfForm(){
+  document.getElementById('self-form-screen').style.display='none';
+  document.body.style.overflow='';
+}
+
 // ====== 振り分け先リスト共通ヘルパー ======
 function getCascadeData(){
   const sd = drivers.filter(d=>!d.status||d.status==='在籍').map(d=>{
@@ -3164,7 +3191,16 @@ function renderInbox(){
           ${filesHTML}
         </div>
         <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
-          ${isNew&&item.status!=='登録完了'&&item.status!=='登録済'?`<button class="btn btn-sm btn-primary" onclick="registerFromInbox(${item.id})" style="font-size:10px">👤 登録</button>`:''}
+          ${(()=>{
+            // 新規登録モードの場合は登録ボタン表示
+            if(isNew && item.status!=='登録完了' && item.status!=='登録済') return `<button class="btn btn-sm btn-primary" onclick="registerFromInbox(${item.id})" style="font-size:10px">👤 登録</button>`;
+            // 書類更新モードだが氏名がドライバーに見つからない場合も登録ボタン表示
+            if(!isNew && item.status!=='登録完了' && item.status!=='登録済'){
+              const nameMatch = drivers.find(d=>d.name===item.name) || companies.flatMap(co=>co.drivers||[]).find(d=>d.name===item.name);
+              if(!nameMatch) return `<button class="btn btn-sm btn-primary" onclick="registerFromInbox(${item.id})" style="font-size:10px" title="氏名が未登録です">👤 新規登録</button>`;
+            }
+            return '';
+          })()}
           ${item.status==='未確認'?`<button class="btn btn-sm" onclick="markInboxRead(${item.id})" style="font-size:10px">確認済</button>`:''}
           ${(item.files||[]).some(f=>typeof f==='object'&&(f.url||f.fileId||f.dataUrl))&&item.status!=='登録済'?`<button class="btn btn-sm btn-success" onclick="saveInboxFilesToDriver(${item.id})" style="font-size:10px">💾 保存</button>`:''}
           <button class="btn btn-sm btn-danger" onclick="deleteInboxItem(${item.id})" style="font-size:10px">🗑 削除</button>
@@ -3458,11 +3494,61 @@ function registerFromInbox(id){
   const item=inbox.find(i=>i.id===id);
   if(!item)return;
 
-  let newId = null; // 登録されたドライバーのID
+  const isCompany = item.companyId && item.companyName;
+  const officeOpts = offices.filter(o=>o!=='集荷'&&o!=='本社').map(o=>`<option value="${o}">${o}</option>`).join('');
+  const typeOpts = '<option value="社員">社員</option><option value="外注（個人）">外注（個人）</option>';
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-bg';
+  modal.style.display = 'flex';
+  modal.innerHTML = `<div class="modal" style="max-width:460px" onclick="event.stopPropagation()">
+    <div class="modal-header"><span class="modal-title">👤 ドライバー登録</span><button class="modal-close" onclick="this.closest('.modal-bg').remove()">✕</button></div>
+    <div class="modal-body">
+      <div style="padding:10px 14px;background:#e3f2fd;border-radius:8px;margin-bottom:14px;font-size:12px">
+        <strong>${esc(item.name)}</strong> ${isCompany?'（'+esc(item.companyName)+'）':''}
+        ${item.birth?'<br>生年月日：'+item.birth:''}
+        ${item.tel?'　電話：'+item.tel:''}
+      </div>
+      ${isCompany?'<div style="font-size:11px;color:#888;margin-bottom:10px">委託会社「'+esc(item.companyName)+'」のドライバーとして登録します</div>':''}
+      ${!isCompany?`<div class="form-group" style="margin-bottom:12px">
+        <label style="font-size:11px;color:#666;font-weight:500">区分</label>
+        <select id="reg-type" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px">${typeOpts}</select>
+      </div>`:''}
+      <div class="form-group" style="margin-bottom:12px">
+        <label style="font-size:11px;color:#666;font-weight:500">担当営業所 *</label>
+        <select id="reg-office" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px">
+          <option value="">選択してください</option>
+          ${officeOpts}
+        </select>
+        ${item.office?`<div style="font-size:10px;color:#4a90e2;margin-top:4px">送信元の営業所：${esc(item.office)}</div>`:''}
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="this.closest('.modal-bg').remove()">キャンセル</button>
+      <button class="btn btn-primary" onclick="execRegisterFromInbox(${id});this.closest('.modal-bg').remove()">登録する</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+
+  // 送信元の営業所があれば自動選択
+  if(item.office){
+    const sel=modal.querySelector('#reg-office');
+    if(sel) sel.value=item.office;
+  }
+}
+
+function execRegisterFromInbox(id){
+  const inbox=JSON.parse(localStorage.getItem('fleet_inbox')||'[]');
+  const item=inbox.find(i=>i.id===id);
+  if(!item)return;
+
+  const selectedOffice = document.getElementById('reg-office')?.value||'';
+  if(!selectedOffice){alert('営業所を選択してください');return;}
+  const selectedType = document.getElementById('reg-type')?.value||'社員';
+
+  let newId = null;
 
   if(item.companyId && item.companyName){
-    // 委託会社ドライバーとして登録
-    if(!confirm(`「${item.name}」を委託会社「${item.companyName}」のドライバーとして登録しますか？`))return;
     const c=companies.find(x=>x.id==item.companyId);
     if(!c){alert('委託会社が見つかりません');return;}
     if(!c.drivers)c.drivers=[];
@@ -3471,7 +3557,7 @@ function registerFromInbox(id){
       id:newId,
       name:item.name,
       kana:item.kana||'',
-      offices:[],
+      offices:[selectedOffice],
       tel:item.tel||'',
       birth:item.birth||'',
       addr:item.addr||'',
@@ -3485,16 +3571,14 @@ function registerFromInbox(id){
     fetch(API_URL,{method:'POST',body:JSON.stringify({action:'updateInboxStatus',id:item.id,status:'登録完了'})}).catch(()=>{});
     renderInbox(); renderCompanyNav();
   } else {
-    // 社員・外注として通常登録
-    if(!confirm(`「${item.name}」を社員／外注ドライバーとして登録しますか？\n（区分は登録後にドライバー管理で変更できます）`))return;
     newId = Date.now();
     const newDriver={
       id:newId,
       name:item.name,
       kana:item.kana||'',
-      type:'社員',
-      office:'',
-      offices:[],
+      type:selectedType,
+      office:selectedOffice,
+      offices:[selectedOffice],
       status:'在籍',
       tel:item.tel||'',
       birth:item.birth||'',
@@ -3512,17 +3596,15 @@ function registerFromInbox(id){
     renderInbox(); renderDrivers(currentOfficeFilter); renderDashboard();
   }
 
-  // 添付ファイルがあれば振り分けモーダルを案内
   const files = (item.files||[]).filter(f=>typeof f==='object'&&(f.url||f.fileId||f.dataUrl));
   if(files.length){
-    alert(`✅ 「${item.name}」をドライバーとして登録しました。\n\n続けて「💾 保存」ボタンで添付ファイルを振り分けてください。\n両方完了すると「登録済」フォルダに移動します。`);
+    alert(`✅ 「${item.name}」を${selectedOffice}営業所のドライバーとして登録しました。\n\n続けて「💾 保存」ボタンで添付ファイルを振り分けてください。`);
   } else {
-    // ファイルなし → そのまま登録済に
     item.status='登録済';
     localStorage.setItem('fleet_inbox',JSON.stringify(inbox));
     fetch(API_URL,{method:'POST',body:JSON.stringify({action:'updateInboxStatus',id:item.id,status:'登録済'})}).catch(()=>{});
     renderInbox();
-    alert(`✅ 「${item.name}」を登録しました。\n担当営業所をドライバー管理ページで設定してください。`);
+    alert(`✅ 「${item.name}」を${selectedOffice}営業所に登録しました。`);
   }
 }
 
