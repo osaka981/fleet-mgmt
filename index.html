@@ -167,6 +167,23 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
 .contractor-tabs{display:flex;border-bottom:1px solid #e0e0e0}
 .contractor-tab{padding:8px 16px;font-size:12px;cursor:pointer;color:#888;border-bottom:2px solid transparent}
 .contractor-tab.active{color:#4a90e2;border-bottom-color:#4a90e2;font-weight:500}
+.ai-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;font-size:12px;font-weight:500;border-radius:7px;border:1.5px solid #7c4dff;background:linear-gradient(135deg,#ede7f6,#e8eaf6);color:#5e35b1;cursor:pointer;transition:all .2s;margin-top:6px}
+.ai-btn:hover{background:linear-gradient(135deg,#d1c4e9,#c5cae9);border-color:#5e35b1}
+.ai-btn:disabled{opacity:.5;cursor:not-allowed}
+.ai-btn .ai-spinner{display:none;width:14px;height:14px;border:2px solid #b39ddb;border-top-color:#5e35b1;border-radius:50%;animation:aispin .7s linear infinite}
+.ai-btn.loading .ai-spinner{display:inline-block}
+.ai-btn.loading .ai-icon{display:none}
+@keyframes aispin{to{transform:rotate(360deg)}}
+.ai-result-bar{margin-top:6px;padding:8px 12px;border-radius:7px;font-size:11px;display:none}
+.ai-result-bar.show{display:block}
+.ai-result-bar.ok{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
+.ai-result-bar.err{background:#fde8e8;color:#c62828;border:1px solid #ef9a9a}
+.mail-btn{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;font-size:11px;font-weight:500;border-radius:6px;border:1px solid #1565c0;background:#e3f2fd;color:#1565c0;cursor:pointer;transition:all .15s}
+.mail-btn:hover{background:#bbdefb}
+.mail-btn:disabled{opacity:.5;cursor:not-allowed}
+.mail-settings{background:#f3e5f5;border:1px solid #ce93d8;border-radius:8px;padding:10px 13px;margin-bottom:8px}
+.mail-settings label{font-size:11px;color:#6a1b9a;font-weight:600}
+.mail-settings input{width:100%;padding:6px 10px;font-size:12px;border:1px solid #ce93d8;border-radius:6px;margin-top:4px;background:#fff}
 @media print{
   .sidebar,.topbar,.sync-bar,.filter-bar,.btn,.nav-item{display:none!important}
   .main{margin-left:0!important}
@@ -640,6 +657,28 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
             </div>
           </div>
 
+          <div style="margin-top:28px;font-size:12px;font-weight:600;margin-bottom:10px;color:#888">🤖 AI書類読み取り設定（Claude API）</div>
+          <div style="background:#ede7f6;border:1px solid #b39ddb;border-radius:10px;padding:16px">
+            <div style="font-size:12px;color:#555;margin-bottom:10px">免許証・車検証の画像をAIで解析してフォームに自動入力します。利用にはClaude APIキーが必要です。</div>
+            <div class="form-group" style="margin-bottom:8px">
+              <label style="color:#5e35b1;font-weight:600">Claude APIキー</label>
+              <input type="password" id="ai-api-key" placeholder="sk-ant-..." style="width:100%;padding:8px 10px;font-size:12px;border:1.5px solid #b39ddb;border-radius:6px;letter-spacing:.05em" onchange="saveAiSettings()">
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-sm" style="border-color:#b39ddb;color:#5e35b1" onclick="testAiKey()">🔑 接続テスト</button>
+              <span id="ai-key-status" style="font-size:11px;color:#888"></span>
+            </div>
+            <div style="font-size:10px;color:#888;margin-top:8px">※ APIキーはブラウザのlocalStorageに保存されます。第三者には共有されません。</div>
+          </div>
+
+          <div style="margin-top:28px;font-size:12px;font-weight:600;margin-bottom:10px;color:#888">📧 メール送信設定</div>
+          <div style="background:#e3f2fd;border:1px solid #90caf9;border-radius:10px;padding:16px">
+            <div style="font-size:12px;color:#555;margin-bottom:10px">営業所ごとのPDF書類＋ドライバー免許証データを郵便局担当者にメール送信します。</div>
+            <div id="mail-settings-list" style="display:flex;flex-direction:column;gap:8px"></div>
+            <button class="btn btn-sm btn-primary" style="margin-top:10px" onclick="saveMailSettings()">💾 メール設定を保存</button>
+            <div style="font-size:10px;color:#888;margin-top:6px">※ 送信はGAS（MailApp）経由で行われます。1日の送信上限にご注意ください。</div>
+          </div>
+
           <div style="margin-top:28px;font-size:12px;font-weight:600;margin-bottom:10px;color:#888">パスワード変更</div>
           <div class="form-group" style="margin-bottom:8px"><label>現在のパスワード</label><input type="password" id="pw-old" style="width:100%"></div>
           <div class="form-group" style="margin-bottom:8px"><label>新しいパスワード</label><input type="password" id="pw-new" style="width:100%"></div>
@@ -665,6 +704,8 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
           <div style="font-size:11px;color:#888">車検証・保険証書の写真・PDF（複数可）</div>
         </div>
         <div id="v-files-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+        <button type="button" class="ai-btn" onclick="aiReadDocument('vehicle')" id="ai-btn-vehicle"><span class="ai-icon">🤖</span><span class="ai-spinner"></span> AI読み取り（車検証→自動入力）</button>
+        <div class="ai-result-bar" id="ai-result-vehicle"></div>
       </div>
       <div class="section-title">基本情報</div>
       <div class="form-group"><label>車両番号 * （例: 堺 480 り 5560）</label><input type="text" id="v-plate" placeholder="堺 480 り 5560"></div>
@@ -700,6 +741,8 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
           <div style="font-size:11px;color:#888">免許証・書類の写真・PDF（複数可）</div>
         </div>
         <div id="d-files-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+        <button type="button" class="ai-btn" onclick="aiReadDocument('driver')" id="ai-btn-driver"><span class="ai-icon">🤖</span><span class="ai-spinner"></span> AI読み取り（免許証→自動入力）</button>
+        <div class="ai-result-bar" id="ai-result-driver"></div>
       </div>
       <div class="section-title">基本情報</div>
       <div class="form-group"><label>姓（漢字）*</label><input type="text" id="d-sei" placeholder="山田" class="modal-field"></div>
@@ -784,6 +827,8 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
           <div style="font-size:11px;color:#888">免許証・書類の写真・PDF（複数可）</div>
         </div>
         <div id="cd-files-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+        <button type="button" class="ai-btn" onclick="aiReadDocument('company-driver')" id="ai-btn-company-driver"><span class="ai-icon">🤖</span><span class="ai-spinner"></span> AI読み取り（免許証→自動入力）</button>
+        <div class="ai-result-bar" id="ai-result-company-driver"></div>
       </div>
       <div class="section-title">基本情報</div>
       <div class="form-group"><label>姓（漢字）*</label><input type="text" id="cd-sei" placeholder="山田" class="modal-field"></div>
@@ -820,6 +865,8 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
           <div style="font-size:11px;color:#888">車検証・保険証書の写真・PDF（複数可）</div>
         </div>
         <div id="cv-files-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+        <button type="button" class="ai-btn" onclick="aiReadDocument('company-vehicle')" id="ai-btn-company-vehicle"><span class="ai-icon">🤖</span><span class="ai-spinner"></span> AI読み取り（車検証→自動入力）</button>
+        <div class="ai-result-bar" id="ai-result-company-vehicle"></div>
       </div>
       <div class="section-title">基本情報</div>
       <div class="form-group"><label>車両番号 *</label><input type="text" id="cv-plate" placeholder="堺 480 り 5560" class="modal-field"></div>
@@ -916,6 +963,38 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
       <div class="form-group"><label>備考</label><input type="text" id="c-note" class="modal-field"></div>
     </div>
     <div class="modal-footer"><button class="btn" onclick="closeModal('contractor-modal')">キャンセル</button><button class="btn btn-primary" onclick="saveContractor()">保存する</button></div>
+  </div>
+</div>
+
+<!-- Mail Modal -->
+<div id="mail-modal" style="display:none" class="modal-bg">
+  <div class="modal" style="max-width:600px" onclick="event.stopPropagation()">
+    <div class="modal-header"><span class="modal-title" id="mail-modal-title">📧 メール送信</span><button class="modal-close" onclick="closeModal('mail-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group" style="margin-bottom:12px">
+        <label>宛先メールアドレス *</label>
+        <input type="email" id="mail-to" placeholder="tantosha@yubin.jp" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px">
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label>CC（複数はカンマ区切り）</label>
+        <input type="text" id="mail-cc" placeholder="" style="width:100%;padding:8px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px">
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label>件名</label>
+        <input type="text" id="mail-subject" style="width:100%;padding:8px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px">
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label>本文</label>
+        <textarea id="mail-body" rows="6" style="width:100%;padding:8px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical"></textarea>
+      </div>
+      <div style="margin-bottom:8px;font-size:11px;font-weight:600;color:#888">📎 添付ファイル（Driveから自動添付）</div>
+      <div id="mail-attachments" style="background:#f9fbff;border:1px solid #e0e0e0;border-radius:8px;padding:10px;max-height:180px;overflow-y:auto;font-size:11px;color:#555"></div>
+      <div style="font-size:10px;color:#888;margin-top:6px">※ Google Drive上のPDFファイルがリンク付きで送信されます</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('mail-modal')">キャンセル</button>
+      <button class="btn btn-primary" id="mail-send-btn" onclick="sendMail()">📧 送信する</button>
+    </div>
   </div>
 </div>
 
@@ -1075,6 +1154,7 @@ function renderDocPage(){
       </div>`:''}
       <div class="doc-card-btns">
         <button class="btn btn-sm btn-success" onclick="generateAllDocs('${office}')">⬇ 全書類まとめてDL</button>
+        <button class="mail-btn" onclick="openMailModal('${office}')">📧 メール送信</button>
       </div>
       <div class="gen-progress" id="prog-${office}"></div>
     </div>`;
@@ -3698,13 +3778,376 @@ function deleteCompanyVehicle(companyId, vehicleId){
   saveCompanies();renderCompanyPage(companyId);renderDashboard();
 }
 
+// ====== AI書類読み取り（Claude API連携）======
+function getAiApiKey(){ return localStorage.getItem('fleet_ai_key')||''; }
+function saveAiSettings(){
+  const key = document.getElementById('ai-api-key')?.value?.trim()||'';
+  localStorage.setItem('fleet_ai_key', key);
+}
+function loadAiSettings(){
+  const el = document.getElementById('ai-api-key');
+  if(el) el.value = getAiApiKey();
+}
+async function testAiKey(){
+  const key = getAiApiKey();
+  const st = document.getElementById('ai-key-status');
+  if(!key){ st.textContent='❌ APIキーが未設定です'; st.style.color='#e53935'; return; }
+  st.textContent='テスト中...'; st.style.color='#888';
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:10,messages:[{role:'user',content:'ping'}]})
+    });
+    if(res.ok){ st.textContent='✅ 接続OK'; st.style.color='#2e7d32'; }
+    else { const err=await res.json(); st.textContent='❌ '+((err.error||{}).message||res.status); st.style.color='#e53935'; }
+  }catch(e){ st.textContent='❌ 通信エラー: '+e.message; st.style.color='#e53935'; }
+}
+
+async function aiReadDocument(target){
+  const key = getAiApiKey();
+  if(!key){ alert('⚠️ Claude APIキーが未設定です。\n設定 → AI書類読み取り設定でAPIキーを入力してください。'); return; }
+
+  // 対象モーダルのファイルバッファからdataUrlを取得
+  const bufMap = {
+    'driver': 'd-files', 'vehicle': 'v-files',
+    'company-driver': 'cd-files', 'company-vehicle': 'cv-files'
+  };
+  const bufKey = bufMap[target];
+  const files = modalFiles[bufKey] || [];
+  if(!files.length){ alert('⚠️ まずファイル（画像/PDF）を添付してください。'); return; }
+
+  // 最初の画像ファイルを使用
+  const imgFile = files.find(f => f.type?.startsWith('image/'));
+  const pdfFile = files.find(f => f.type === 'application/pdf');
+  const sourceFile = imgFile || pdfFile;
+  if(!sourceFile || !sourceFile.dataUrl){ alert('⚠️ 画像またはPDFファイルを添付してください。'); return; }
+
+  const btn = document.getElementById('ai-btn-'+target);
+  const resultEl = document.getElementById('ai-result-'+target);
+  btn.classList.add('loading'); btn.disabled = true;
+  resultEl.className='ai-result-bar'; resultEl.style.display='none';
+
+  const isVehicle = target.includes('vehicle');
+  const docType = isVehicle ? '車検証' : '運転免許証';
+
+  // プロンプト構築
+  const prompt = isVehicle ?
+    `この画像は日本の${docType}（自動車検査証）です。以下の情報をJSON形式で抽出してください。読み取れない項目は空文字""にしてください。
+{
+  "plate": "車両番号（例: 堺 480 り 5560）- 地域名 分類番号 かな 一連指定番号をスペース区切りで",
+  "model": "車名（例: スズキ キャリイ）",
+  "kind": "車種分類 - 軽四/軽バン/軽トラ/普通車 のいずれか",
+  "color": "車体の色",
+  "owner": "所有者の氏名または名称",
+  "vehicleUser": "使用者の氏名または名称",
+  "shakenExp": "有効期限の満了する日（YYYY-MM-DD形式）",
+  "chassis": "車台番号"
+}
+JSONのみ出力してください。` :
+    `この画像は日本の${docType}です。以下の情報をJSON形式で抽出してください。読み取れない項目は空文字""にしてください。
+{
+  "sei": "姓（漢字）",
+  "mei": "名（漢字）",
+  "seiKana": "姓（フリガナ・カタカナ）",
+  "meiKana": "名（フリガナ・カタカナ）",
+  "birth": "生年月日（YYYY-MM-DD形式）",
+  "addr": "住所（免許証記載のもの）",
+  "licenseExp": "有効期限（YYYY-MM-DD形式）- 免許証裏面ではなく表面記載の有効期限",
+  "licenseNo": "免許証番号（12桁数字）",
+  "licenseType": "免許の種類 - 普通自動車/準中型/中型/大型/普通自動二輪 のいずれか",
+  "licenseCond": "免許の条件等（例: 眼鏡等）- 条件がなければ空文字"
+}
+JSONのみ出力してください。`;
+
+  try{
+    // 画像データ準備
+    const dataUrl = sourceFile.dataUrl;
+    const base64Data = dataUrl.split(',')[1];
+    const mediaType = sourceFile.type || (imgFile ? 'image/jpeg' : 'application/pdf');
+
+    const contentParts = [];
+    if(mediaType === 'application/pdf'){
+      contentParts.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:base64Data}});
+    } else {
+      contentParts.push({type:'image',source:{type:'base64',media_type:mediaType,data:base64Data}});
+    }
+    contentParts.push({type:'text',text:prompt});
+
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':key,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1024,
+        messages:[{role:'user',content:contentParts}]
+      })
+    });
+
+    if(!res.ok){
+      const err = await res.json();
+      throw new Error((err.error||{}).message || 'APIエラー: '+res.status);
+    }
+
+    const data = await res.json();
+    const text = data.content?.map(c=>c.text||'').join('') || '';
+
+    // JSONを抽出
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('AI応答からJSON形式のデータを取得できませんでした');
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    // フォームに自動入力
+    if(isVehicle){
+      applyVehicleAiResult(target, parsed);
+    } else {
+      applyDriverAiResult(target, parsed);
+    }
+
+    const filledCount = Object.values(parsed).filter(v=>v).length;
+    resultEl.className='ai-result-bar show ok';
+    resultEl.textContent=`✅ ${docType}から${filledCount}項目を読み取りました。内容を確認してください。`;
+
+  }catch(e){
+    console.error('AI読み取りエラー:',e);
+    resultEl.className='ai-result-bar show err';
+    resultEl.textContent='❌ 読み取りエラー: '+e.message;
+  }finally{
+    btn.classList.remove('loading'); btn.disabled = false;
+  }
+}
+
+function applyDriverAiResult(target, data){
+  const prefix = target === 'company-driver' ? 'cd' : 'd';
+  const setVal = (id, val) => { const el=document.getElementById(id); if(el && val) el.value = val; };
+  setVal(prefix+'-sei', data.sei);
+  setVal(prefix+'-mei', data.mei);
+  setVal(prefix+'-sei-kana', data.seiKana);
+  setVal(prefix+'-mei-kana', data.meiKana);
+  setVal(prefix+'-license-exp', data.licenseExp);
+  setVal(prefix+'-license-no', data.licenseNo);
+  setVal(prefix+'-license-cond', data.licenseCond);
+  // ドライバーモーダルのみ
+  if(prefix === 'd'){
+    setVal('d-birth', data.birth);
+    setVal('d-addr', data.addr);
+  } else {
+    setVal('cd-birth', data.birth);
+  }
+  // 免許種別（select）
+  if(data.licenseType){
+    const sel = document.getElementById(prefix+'-license-type');
+    if(sel){
+      const opts = Array.from(sel.options);
+      const match = opts.find(o => o.value === data.licenseType || o.text === data.licenseType);
+      if(match) sel.value = match.value;
+    }
+  }
+}
+
+function applyVehicleAiResult(target, data){
+  const prefix = target === 'company-vehicle' ? 'cv' : 'v';
+  const setVal = (id, val) => { const el=document.getElementById(id); if(el && val) el.value = val; };
+  setVal(prefix+'-plate', data.plate);
+  setVal(prefix+'-model', data.model);
+  setVal(prefix+'-color', data.color);
+  setVal(prefix+'-owner', data.owner);
+  setVal(prefix+'-user', data.vehicleUser);
+  setVal(prefix+'-shaken-exp', data.shakenExp);
+  if(prefix === 'v') setVal('v-shaken-chassis', data.chassis);
+  // 車種分類（select）
+  if(data.kind){
+    const sel = document.getElementById(prefix+'-kind');
+    if(sel){
+      const opts = Array.from(sel.options);
+      const match = opts.find(o => o.value === data.kind || o.text === data.kind);
+      if(match) sel.value = match.value;
+    }
+  }
+}
+
+// ====== メール送信機能 ======
+function getMailSettings(){
+  return JSON.parse(localStorage.getItem('fleet_mail_settings')||'{}');
+}
+function saveMailSettings(){
+  const settings = {};
+  Object.keys(POST_OFFICE_MAP).forEach(office => {
+    const el = document.getElementById('mail-addr-'+office);
+    if(el && el.value.trim()) settings[office] = el.value.trim();
+  });
+  localStorage.setItem('fleet_mail_settings', JSON.stringify(settings));
+  alert('✅ メール設定を保存しました');
+}
+function renderMailSettings(){
+  const settings = getMailSettings();
+  const el = document.getElementById('mail-settings-list');
+  if(!el) return;
+  const targetOffices = Object.keys(POST_OFFICE_MAP);
+  el.innerHTML = targetOffices.map(office => `
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:12px;font-weight:500;min-width:60px">${office}</span>
+      <span style="font-size:11px;color:#888;min-width:80px">${POST_OFFICE_MAP[office]}</span>
+      <input type="email" id="mail-addr-${office}" value="${settings[office]||''}" placeholder="担当者メール" style="flex:1;padding:6px 10px;font-size:12px;border:1px solid #90caf9;border-radius:6px">
+    </div>`).join('');
+}
+
+let mailCurrentOffice = '';
+function openMailModal(office){
+  mailCurrentOffice = office;
+  const settings = getMailSettings();
+  const postOffice = POST_OFFICE_MAP[office] || office+'郵便局';
+  const dateStr = getDocDate();
+
+  document.getElementById('mail-modal-title').textContent = `📧 ${office}営業所 → ${postOffice} メール送信`;
+  document.getElementById('mail-to').value = settings[office] || '';
+  document.getElementById('mail-cc').value = '';
+  document.getElementById('mail-subject').value = `【大阪急配】${office}営業所 書類提出 ${dateStr.replace(/-/g,'/')}`;
+
+  // 本文テンプレート
+  const offD = drivers.filter(d=>d.office===office&&(!d.status||d.status==='在籍'));
+  const offV = vehicles.filter(v=>v.office===office);
+  // 委託会社のドライバー・車両も含める
+  let companyDriverCount = 0;
+  companies.forEach(c=>{
+    (c.drivers||[]).forEach(d=>{ if((d.offices||[]).includes(office)) companyDriverCount++; });
+  });
+  const totalDrivers = offD.length + companyDriverCount;
+
+  document.getElementById('mail-body').value =
+`${postOffice}
+ご担当者様
+
+いつもお世話になっております。
+大阪急配株式会社の川村です。
+
+${office}営業所の書類を送付いたします。
+
+■ 提出内容
+・従事員数：${totalDrivers}名
+・車両台数：${offV.length}台
+・提出日：${dateStr.replace(/-/g,'/')}
+
+添付のPDFファイルをご確認ください。
+ドライバーの免許証データも併せて添付しております。
+
+不備等ございましたらご連絡ください。
+よろしくお願いいたします。
+
+━━━━━━━━━━━━━━━━━━
+大阪急配株式会社
+代表 川村 知弘
+℡ 072-258-9811
+━━━━━━━━━━━━━━━━━━`;
+
+  // 添付ファイルリスト構築
+  renderMailAttachments(office);
+
+  document.getElementById('mail-modal').style.display='flex';
+}
+
+function renderMailAttachments(office){
+  const el = document.getElementById('mail-attachments');
+  if(!el) return;
+
+  // ドライバーの免許証添付ファイル
+  const offD = drivers.filter(d=>d.office===office&&(!d.status||d.status==='在籍'));
+  const companyDrivers = [];
+  companies.forEach(c=>{
+    (c.drivers||[]).forEach(d=>{
+      if((d.offices||[]).includes(office)) companyDrivers.push({...d, _company:c.name});
+    });
+  });
+  const allDrivers = [...offD, ...companyDrivers];
+
+  let items = [];
+
+  // ドライバーの免許証ファイル
+  allDrivers.forEach(d => {
+    const files = (d.attachedFiles||[]).filter(f => f.fileId || f.url);
+    if(files.length){
+      files.forEach(f => {
+        items.push({
+          name: `${d.name} - ${f.name}`,
+          fileId: f.fileId || '',
+          url: f.url || '',
+          type: 'driver-license'
+        });
+      });
+    }
+  });
+
+  if(!items.length){
+    el.innerHTML = '<div style="text-align:center;color:#aaa;padding:12px">添付可能なファイル（Drive保存済）がありません。<br>ドライバーの書類をDriveにアップロードしてから送信してください。</div>';
+    return;
+  }
+
+  el.innerHTML = items.map((item,i) => `
+    <div style="display:flex;align-items:center;gap:6px;padding:4px 0;${i>0?'border-top:1px solid #f0f0f0':''}">
+      <input type="checkbox" checked class="mail-attach-check" data-file-id="${item.fileId}" data-url="${item.url}" data-name="${esc(item.name)}">
+      <span style="font-size:11px">${item.name.match(/\.pdf$/i)?'📄':'🖼️'}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.name)}</span>
+    </div>`).join('');
+}
+
+async function sendMail(){
+  const to = document.getElementById('mail-to').value.trim();
+  if(!to){ alert('⚠️ 宛先メールアドレスを入力してください'); return; }
+  const cc = document.getElementById('mail-cc').value.trim();
+  const subject = document.getElementById('mail-subject').value.trim();
+  const body = document.getElementById('mail-body').value;
+
+  // 添付ファイル取得
+  const checks = document.querySelectorAll('.mail-attach-check:checked');
+  const attachments = Array.from(checks).map(cb => ({
+    fileId: cb.dataset.fileId,
+    url: cb.dataset.url,
+    name: cb.dataset.name
+  })).filter(a => a.fileId);
+
+  const btn = document.getElementById('mail-send-btn');
+  btn.disabled = true; btn.textContent = '送信中...';
+
+  try{
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'sendMail',
+        to, cc, subject, body,
+        attachments,
+        office: mailCurrentOffice
+      })
+    });
+    const json = await res.json();
+    if(json.ok){
+      alert('✅ メールを送信しました！');
+      closeModal('mail-modal');
+      // 送信履歴を記録
+      const tag = document.getElementById('doc-tag')?.value||'定期（3ヶ月）';
+      recordHistory(mailCurrentOffice, [{name:'メール送信_'+subject}], tag);
+    } else {
+      alert('❌ 送信エラー: '+(json.error||'不明なエラー'));
+    }
+  }catch(e){
+    alert('❌ 通信エラー: '+e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = '📧 送信する';
+  }
+}
+
 // ====== 初期化 ======
 function renderAll(){
   renderOfficeNav();
   try{renderCompanyNav();}catch(e){console.error('renderCompanyNav error:',e);}
   renderDashboard();renderVehicles(null);renderDrivers(null);renderDocPage();
 }
-function renderSettingsAll(){renderSettingsOffices();generateQR();renderInbox();}
+function renderSettingsAll(){renderSettingsOffices();generateQR();renderInbox();loadAiSettings();renderMailSettings();}
 setTodayDate();
 initSelfForm();
 
