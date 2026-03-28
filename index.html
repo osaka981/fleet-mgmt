@@ -412,6 +412,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
         <div class="nav-item" onclick="showPage('contractors',this)" data-page="contractors"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="12" height="9" rx="1.5"/><path d="M5 3V2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1"/><path d="M4 7h6M4 9.5h4"/></svg>委託会社管理</div>
         <div class="nav-item" onclick="showPage('documents',this)" data-page="documents"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="10" height="12" rx="1.5"/><path d="M4 5h6M4 8h6M4 11h4"/></svg>書類生成</div>
         <div class="nav-item" onclick="showPage('filemgr',this)" data-page="filemgr"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 3h5l1.5 2H13v7H1z"/><path d="M5 9h4M7 7v4"/></svg>書類・写真管理</div>
+        <div class="nav-item" onclick="showPage('storage',this)" data-page="storage"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 2h10v10H2z"/><path d="M2 5h10M5 5v7"/><circle cx="9" cy="8.5" r="1.5"/></svg>データ保管</div>
         <div class="nav-item" onclick="showPage('bulk',this)" data-page="bulk"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 4h12M1 8h12M1 12h8"/><circle cx="11" cy="12" r="2"/><path d="M11 10v-1M9.3 10.7l-.7-.7M13.7 10.7l.7-.7"/></svg>一括更新</div>
         <div class="nav-item" onclick="showPage('print',this)" data-page="print"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="10" height="7" rx="1"/><path d="M4 5V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M4 9h6M4 11h4"/></svg>印刷一覧</div>
         <div class="nav-item" onclick="showPage('history',this)" data-page="history"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5.5"/><path d="M7 4v3.5l2.5 1.5"/></svg>提出履歴</div>
@@ -483,6 +484,26 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
           <div class="doc-gen-grid" id="doc-office-cards"></div>
         </div>
       </div>
+      <div id="page-storage" class="page">
+        <div class="topbar">
+          <h1>データ保管</h1>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="text" id="storage-search" placeholder="氏名・車両番号で検索..." style="padding:5px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px;width:200px" oninput="renderStorage()">
+            <select id="storage-filter" style="padding:5px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px" onchange="renderStorage()">
+              <option value="">すべて</option>
+              <option value="driver">ドライバー</option>
+              <option value="vehicle">車両</option>
+              <option value="unassigned">未分類</option>
+            </select>
+            <select id="storage-office" style="padding:5px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px" onchange="renderStorage()">
+              <option value="">営業所：すべて</option>
+            </select>
+            <button class="btn btn-primary" onclick="openFileMgrUploadGeneral()">📎 ファイル追加</button>
+          </div>
+        </div>
+        <div class="content" id="storage-content"></div>
+      </div>
+
       <div id="page-bulk" class="page">
         <div class="topbar">
           <h1>一括更新</h1>
@@ -1636,6 +1657,7 @@ function showPage(name,el){
   if(name==='print'){rebuildPrintSelect();renderPrint();}
   if(name==='history')renderHistory();
   if(name==='filemgr')renderFileMgr();
+  if(name==='storage')renderStorage();
   if(name==='settings'){renderSettingsAll();}
   if(name==='contractors'&&currentCompanyId)renderCompanyPage(currentCompanyId);
   else if(name==='contractors')renderContractorsList();
@@ -1680,6 +1702,26 @@ function saveVehicle(){
   const plate=document.getElementById('v-plate').value.trim();if(!plate){alert('車両番号は必須です');return;}
   const obj={id:editingVehicleId||Date.now(),plate,model:document.getElementById('v-model').value,kind:document.getElementById('v-kind').value,type:document.getElementById('v-type').value,office:document.getElementById('v-office').value,driver:(drivers.find(d=>d.id==document.getElementById('v-driver').value)||{name:''}).name,driverId:document.getElementById('v-driver').value||null,color:document.getElementById('v-color').value||'白',owner:document.getElementById('v-owner').value,vehicleUser:document.getElementById('v-user').value,sub:document.getElementById('v-sub').value,note:document.getElementById('v-note').value,shaken:{exp:document.getElementById('v-shaken-exp').value,chassis:document.getElementById('v-shaken-chassis').value,type:document.getElementById('v-shaken-type').value},jibai:{exp:document.getElementById('v-jibai-exp').value,no:document.getElementById('v-jibai-no').value,company:document.getElementById('v-jibai-company').value},nin:{exp:document.getElementById('v-nin-exp').value,no:document.getElementById('v-nin-no').value,company:document.getElementById('v-nin-company').value}};
   if(editingVehicleId){const i=vehicles.findIndex(v=>v.id==editingVehicleId);if(i>=0)vehicles[i]=obj;else vehicles.push(obj);}else vehicles.push(obj);
+  // ★ モーダルの添付ファイルをDriveにアップロード
+  const vFiles = modalFiles['v-files'] || [];
+  if(vFiles.length > 0){
+    const target = vehicles.find(x=>x.id==obj.id) || obj;
+    if(!Array.isArray(target.attachedFiles)) target.attachedFiles=[];
+    (async()=>{
+      for(const f of vFiles){
+        if(!f.dataUrl) continue;
+        try{
+          const res = await fetch(API_URL,{method:'POST',body:JSON.stringify({
+            action:'uploadFile', folder:obj.office||'未設定',
+            subFolder:'車両/'+obj.plate.replace(/\s/g,''), fileName:f.name, mimeType:f.type, dataUrl:f.dataUrl
+          })});
+          const data = await res.json();
+          if(data.ok) target.attachedFiles.push({name:f.name,type:f.type,url:data.url,fileId:data.fileId,dataUrl:'',uploadedAt:new Date().toISOString()});
+        }catch(e){}
+      }
+      saveLocal(); renderFileMgr();
+    })();
+  }
   saveLocal();closeModal('vehicle-modal');renderVehicles(currentOfficeFilter);renderDashboard();renderDocPage();
 }
 function openDriverModal(id){
@@ -1775,6 +1817,34 @@ function saveDriver(){
     offices: selectedOffices,
     tel:document.getElementById('d-tel').value,birth:document.getElementById('d-birth').value,addr:document.getElementById('d-addr').value,license:{exp:document.getElementById('d-license-exp').value,no:document.getElementById('d-license-no').value,type:document.getElementById('d-license-type').value,cond:document.getElementById('d-license-cond').value},otherDocs,other:otherDocs[0]||{},sub:type==='外注（個人）'?{company:document.getElementById('d-sub-company').value,kana:document.getElementById('d-sub-kana').value,birth:document.getElementById('d-sub-birth').value,area:document.getElementById('d-sub-area').value,count:document.getElementById('d-sub-count').value,tel:document.getElementById('d-sub-tel').value}:{},leave:(status==='退職'||status==='休止')?{date:document.getElementById('d-leave-date').value,reason:document.getElementById('d-leave-reason').value,note:document.getElementById('d-leave-note').value}:{}};
   if(editingDriverId){const i=drivers.findIndex(d=>d.id==editingDriverId);if(i>=0)drivers[i]=obj;else drivers.push(obj);}else drivers.push(obj);
+  // ★ モーダルの添付ファイルをDriveにアップロード
+  const dFiles = modalFiles['d-files'] || [];
+  if(dFiles.length > 0){
+    const target = drivers.find(x=>x.id==obj.id) || obj;
+    if(!Array.isArray(target.attachedFiles)) target.attachedFiles=[];
+    (async()=>{
+      for(const f of dFiles){
+        const dataUrl = f.dataUrl || '';
+        if(!dataUrl) continue;
+        try{
+          const res = await fetch(API_URL,{method:'POST',body:JSON.stringify({
+            action:'uploadFile', folder:obj.offices?.[0]||obj.office||'未設定',
+            subFolder:obj.name, fileName:f.name, mimeType:f.type, dataUrl
+          })});
+          const data = await res.json();
+          if(data.ok){
+            target.attachedFiles.push({name:f.name,type:f.type,url:data.url,fileId:data.fileId,dataUrl:'',uploadedAt:new Date().toISOString()});
+          } else {
+            target.attachedFiles.push({name:f.name,type:f.type,dataUrl:dataUrl.substring(0,200),url:'',fileId:'',uploadedAt:new Date().toISOString()});
+          }
+        }catch(e){
+          target.attachedFiles.push({name:f.name,type:f.type,dataUrl:dataUrl.substring(0,200),url:'',fileId:'',uploadedAt:new Date().toISOString()});
+        }
+      }
+      saveLocal();
+      renderFileMgr();
+    })();
+  }
   saveLocal();closeModal('driver-modal');renderDrivers(currentOfficeFilter);renderDashboard();renderDocPage();
   if(status==='退職'||status==='休止')renderArchive();
 }
@@ -2183,6 +2253,96 @@ async function uploadFilesToDrive(files, folder, subFolder){
     results.push(entry);
   }
   return results;
+}
+
+// ★ データ保管ページのレンダー
+function renderStorage(){
+  const search = (document.getElementById('storage-search')?.value || '').toLowerCase();
+  const typeFilter = document.getElementById('storage-filter')?.value || '';
+  const officeFilter = document.getElementById('storage-office')?.value || '';
+  const el = document.getElementById('storage-content');
+  if(!el) return;
+
+  // 営業所セレクトを動的更新
+  const officeSelect = document.getElementById('storage-office');
+  if(officeSelect && officeSelect.options.length <= 1){
+    offices.forEach(o => { const opt = document.createElement('option'); opt.value = o; opt.textContent = o; officeSelect.appendChild(opt); });
+  }
+
+  let html = '';
+  let totalFiles = 0;
+
+  // ドライバー
+  if(!typeFilter || typeFilter === 'driver'){
+    let allDrivers = [
+      ...drivers.map(d => ({...d, _src:'自社'})),
+      ...companies.flatMap(co => (co.drivers||[]).map(d => ({...d, _src:co.name})))
+    ];
+    if(search) allDrivers = allDrivers.filter(d => d.name?.toLowerCase().includes(search));
+    if(officeFilter) allDrivers = allDrivers.filter(d => d.office===officeFilter || (Array.isArray(d.offices)?d.offices:[]).includes(officeFilter));
+
+    const driversWithFiles = allDrivers.filter(d => (Array.isArray(d.attachedFiles) ? d.attachedFiles : []).length > 0);
+    if(driversWithFiles.length){
+      html += '<div style="font-size:13px;font-weight:600;color:#1565c0;margin:0 0 10px;padding:6px 0;border-bottom:2px solid #1565c0">👤 ドライバー書類（'+driversWithFiles.length+'名）</div>';
+      driversWithFiles.forEach(d => {
+        const files = Array.isArray(d.attachedFiles) ? d.attachedFiles : [];
+        totalFiles += files.length;
+        html += '<div style="background:#fff;border:1px solid #e0e0e0;border-radius:8px;margin-bottom:8px;padding:12px 14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div><strong>'+d.name+'</strong> <span style="font-size:10px;color:#888">'+d._src+'</span></div><span style="font-size:11px;color:#888">'+files.length+'件</span></div>';
+        html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+        files.forEach((f,i) => {
+          const fid = f.fileId || (f.url && f.url.match(/\/d\/([a-zA-Z0-9_-]+)/) ? f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1] : '');
+          const isImg = f.name?.match(/\.(jpg|jpeg|png|gif)$/i);
+          const thumbSrc = f.dataUrl || (fid && isImg ? 'https://drive.google.com/thumbnail?id='+fid+'&sz=w120' : '');
+          const icon = isImg ? (thumbSrc ? '<img src="'+thumbSrc+'" style="width:100%;height:100%;object-fit:cover">' : '🖼️') : (f.name?.match(/\.pdf$/i) ? '📄' : '📎');
+          html += '<div class="file-thumb" style="cursor:pointer" onclick="openAttachedFilePreview(\'driver\','+d.id+','+i+',\'\')" title="'+(f.name||'')+'">'+icon+'<div class="file-thumb-name">'+(f.name||'')+'</div></div>';
+        });
+        html += '</div></div>';
+      });
+    }
+  }
+
+  // 車両
+  if(!typeFilter || typeFilter === 'vehicle'){
+    let allVehicles = [
+      ...vehicles.map(v => ({...v, _src:'自社'})),
+      ...companies.flatMap(co => (co.vehicles||[]).map(v => ({...v, _src:co.name})))
+    ];
+    if(search) allVehicles = allVehicles.filter(v => v.plate?.toLowerCase().includes(search));
+    if(officeFilter) allVehicles = allVehicles.filter(v => v.office===officeFilter || (Array.isArray(v.offices)?v.offices:[]).includes(officeFilter));
+
+    const vehiclesWithFiles = allVehicles.filter(v => (Array.isArray(v.attachedFiles) ? v.attachedFiles : []).length > 0);
+    if(vehiclesWithFiles.length){
+      html += '<div style="font-size:13px;font-weight:600;color:#e65100;margin:12px 0 10px;padding:6px 0;border-bottom:2px solid #e65100">🚗 車両書類（'+vehiclesWithFiles.length+'台）</div>';
+      vehiclesWithFiles.forEach(v => {
+        const files = Array.isArray(v.attachedFiles) ? v.attachedFiles : [];
+        totalFiles += files.length;
+        html += '<div style="background:#fff;border:1px solid #e0e0e0;border-radius:8px;margin-bottom:8px;padding:12px 14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div><strong>'+v.plate+'</strong> <span style="font-size:10px;color:#888">'+v._src+'</span></div><span style="font-size:11px;color:#888">'+files.length+'件</span></div>';
+        html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+        files.forEach((f,i) => {
+          const fid = f.fileId || (f.url && f.url.match(/\/d\/([a-zA-Z0-9_-]+)/) ? f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1] : '');
+          const isImg = f.name?.match(/\.(jpg|jpeg|png|gif)$/i);
+          const thumbSrc = f.dataUrl || (fid && isImg ? 'https://drive.google.com/thumbnail?id='+fid+'&sz=w120' : '');
+          const icon = isImg ? (thumbSrc ? '<img src="'+thumbSrc+'" style="width:100%;height:100%;object-fit:cover">' : '🖼️') : (f.name?.match(/\.pdf$/i) ? '📄' : '📎');
+          html += '<div class="file-thumb" style="cursor:pointer" onclick="openAttachedFilePreview(\'vehicle\','+v.id+','+i+',\'\')" title="'+(f.name||'')+'">'+icon+'<div class="file-thumb-name">'+(f.name||'')+'</div></div>';
+        });
+        html += '</div></div>';
+      });
+    }
+  }
+
+  // 未分類
+  if(!typeFilter || typeFilter === 'unassigned'){
+    if(unassignedFiles.length > 0){
+      totalFiles += unassignedFiles.length;
+      html += '<div style="font-size:13px;font-weight:600;color:#e53935;margin:12px 0 10px;padding:6px 0;border-bottom:2px solid #e53935">📥 未分類ファイル（'+unassignedFiles.length+'件）</div>';
+      html += renderUnassignedBox();
+    }
+  }
+
+  if(!html) html = '<div style="padding:24px;text-align:center;color:#888;font-size:12px">保管されたファイルがありません</div>';
+  else html = '<div style="font-size:11px;color:#888;margin-bottom:12px;padding:8px 12px;background:#e3f2fd;border-radius:6px;border:1px solid #bbdefb">📁 全 '+totalFiles+' ファイル　|　ファイルをクリックでプレビュー　|　未分類は紐づけ先を選択して振り分けできます</div>' + html;
+
+  el.innerHTML = html;
 }
 
 // 書類・写真管理ページのレンダー
@@ -3385,17 +3545,16 @@ function openCompanyDriverModal(companyId, driverId){
 function renderOfficeMultiSelect(elId, selected){
   const el=document.getElementById(elId);
   if(!el) return;
-  el.innerHTML=offices.map(o=>`
-    <label class="office-multi-check ${selected.includes(o)?'checked':''}" onclick="toggleOfficeCheck(this,'${o}','${elId}')">
-      <input type="checkbox" style="display:none" ${selected.includes(o)?'checked':''} value="${o}">
-      ${o}
-    </label>`).join('');
+  el.style.cssText='display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;min-height:38px';
+  el.innerHTML=offices.map(o=>{
+    const isChecked=selected.includes(o);
+    return '<label class="office-checkbox-label'+(isChecked?' checked':'')+'" style="cursor:pointer"><input type="checkbox" value="'+o+'"'+(isChecked?' checked':'')+' onchange="toggleOfficeCheck(this)" style="display:none">'+o+'</label>';
+  }).join('');
 }
 
-function toggleOfficeCheck(label, office, elId){
-  label.classList.toggle('checked');
-  const cb=label.querySelector('input');
-  cb.checked=!cb.checked;
+function toggleOfficeCheck(cb){
+  const label=cb.parentElement;
+  if(cb.checked){label.classList.add('checked');}else{label.classList.remove('checked');}
 }
 
 function getSelectedOffices(elId){
@@ -3426,6 +3585,23 @@ function saveCompanyDriver(){
   if(!c.drivers) c.drivers=[];
   if(editingCompanyDriverId){const i=c.drivers.findIndex(x=>x.id==editingCompanyDriverId);if(i>=0)c.drivers[i]=obj;else c.drivers.push(obj);}
   else c.drivers.push(obj);
+  // ★ ファイルをDriveにアップロード
+  const cdFiles = modalFiles['cd-files'] || [];
+  if(cdFiles.length > 0){
+    if(!Array.isArray(obj.attachedFiles)) obj.attachedFiles=[];
+    const co=companies.find(x=>x.id==currentCompanyId);
+    (async()=>{
+      for(const f of cdFiles){
+        if(!f.dataUrl) continue;
+        try{
+          const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'uploadFile',folder:co?.name||'委託会社',subFolder:obj.name,fileName:f.name,mimeType:f.type,dataUrl:f.dataUrl})});
+          const data=await res.json();
+          if(data.ok) obj.attachedFiles.push({name:f.name,type:f.type,url:data.url,fileId:data.fileId,dataUrl:'',uploadedAt:new Date().toISOString()});
+        }catch(e){}
+      }
+      saveCompanies(); renderCompanyPage(currentCompanyId);
+    })();
+  }
   saveCompanies();closeModal('company-driver-modal');renderCompanyPage(currentCompanyId);renderDashboard();
 }
 
@@ -3493,6 +3669,23 @@ function saveCompanyVehicle(){
   if(!c.vehicles) c.vehicles=[];
   if(editingCompanyVehicleId){const i=c.vehicles.findIndex(x=>x.id==editingCompanyVehicleId);if(i>=0)c.vehicles[i]=obj;else c.vehicles.push(obj);}
   else c.vehicles.push(obj);
+  // ★ ファイルをDriveにアップロード
+  const cvFiles = modalFiles['cv-files'] || [];
+  if(cvFiles.length > 0){
+    if(!Array.isArray(obj.attachedFiles)) obj.attachedFiles=[];
+    const co=companies.find(x=>x.id==currentCompanyId);
+    (async()=>{
+      for(const f of cvFiles){
+        if(!f.dataUrl) continue;
+        try{
+          const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'uploadFile',folder:co?.name||'委託会社',subFolder:'車両/'+obj.plate,fileName:f.name,mimeType:f.type,dataUrl:f.dataUrl})});
+          const data=await res.json();
+          if(data.ok) obj.attachedFiles.push({name:f.name,type:f.type,url:data.url,fileId:data.fileId,dataUrl:'',uploadedAt:new Date().toISOString()});
+        }catch(e){}
+      }
+      saveCompanies(); renderCompanyPage(currentCompanyId);
+    })();
+  }
   saveCompanies();closeModal('company-vehicle-modal');renderCompanyPage(currentCompanyId);renderDashboard();
 }
 
