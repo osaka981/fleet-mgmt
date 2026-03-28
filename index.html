@@ -223,7 +223,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
   .topbar{flex-wrap:wrap;gap:6px}
 }
 /* ===== セルフ入力フォーム（スマホ専用ページ） ===== */
-#self-form-screen{display:none;min-height:100vh;background:#f0f4ff;padding:16px;position:fixed;inset:0;z-index:999;overflow-y:auto}
+#self-form-screen{display:none;min-height:100vh;background:#f0f4ff;padding:16px;padding-bottom:env(safe-area-inset-bottom,40px);position:fixed;inset:0;z-index:999;overflow-y:auto}
 .self-form-card{background:#fff;border-radius:16px;padding:24px 20px;max-width:480px;margin:0 auto;box-shadow:0 2px 16px rgba(74,144,226,.12)}
 .self-form-logo{text-align:center;margin-bottom:20px}
 .self-form-logo-title{font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:3px}
@@ -243,9 +243,11 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
 .self-form-preview{position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1px solid #e0e0e0}
 .self-form-preview img{width:100%;height:100%;object-fit:cover}
 .self-form-preview-del{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:99px;background:rgba(0,0,0,.5);color:#fff;border:none;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center}
-.self-form-btn{width:100%;padding:14px;font-size:15px;font-weight:600;border-radius:10px;border:none;background:#4a90e2;color:#fff;cursor:pointer;margin-top:8px}
+.self-form-btn{width:100%;padding:14px;font-size:15px;font-weight:600;border-radius:10px;border:none;background:#4a90e2;color:#fff;cursor:pointer;margin-top:8px;margin-bottom:32px}
 .self-form-btn:hover{background:#357abd}
 .self-form-btn:disabled{background:#aaa;cursor:not-allowed}
+.sf-lock-overlay{display:none;position:absolute;inset:0;background:rgba(255,255,255,.6);z-index:10;border-radius:16px}
+.sf-lock-overlay.active{display:block}
 .self-form-success{text-align:center;padding:28px 16px}
 .self-form-success-icon{font-size:48px;margin-bottom:12px}
 .self-form-success-title{font-size:17px;font-weight:700;margin-bottom:8px}
@@ -288,7 +290,8 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
 
 <!-- 従業員セルフ入力フォーム -->
 <div id="self-form-screen">
-  <div class="self-form-card">
+  <div class="self-form-card" style="position:relative">
+    <div class="sf-lock-overlay" id="sf-lock-overlay"></div>
     <div id="self-form-body">
       <div class="self-form-logo">
         <div class="self-form-logo-title">大阪急配株式会社</div>
@@ -345,7 +348,8 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
       <div id="sf-new-fields" style="display:none">
         <div class="self-form-group">
           <label class="self-form-label">生年月日 *</label>
-          <input type="date" id="sf-birth" class="self-form-input">
+          <input type="text" id="sf-birth" class="self-form-input" placeholder="例：1990-01-23 または 1990/1/23" inputmode="numeric">
+          <div style="font-size:11px;color:#888;margin-top:4px">西暦で入力してください（例：1990-01-23）</div>
         </div>
         <div class="self-form-group">
           <label class="self-form-label">電話番号 *</label>
@@ -406,8 +410,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
       <div id="sf-err" style="font-size:12px;color:#e53935;text-align:center;margin-top:8px;min-height:16px"></div>
     </div>
     <div id="self-form-success" style="display:none" class="self-form-success">
-      <div class="self-form-success-icon">✅</div>
-      <div class="self-form-success-title">送信が完了しました</div>
+      <div class="self-form-success-title" style="margin-top:16px">送信が完了しました</div>
       <div class="self-form-success-sub">担当者が確認後、データに反映します。<br>ありがとうございました。</div>
       <button class="self-form-btn" style="margin-top:20px" onclick="resetSelfForm()">もう一件送信する</button>
     </div>
@@ -2034,6 +2037,24 @@ function renderSfPreviews(){
 }
 function sfRemoveFile(i){sfFiles.splice(i,1);renderSfPreviews();}
 
+// 生年月日正規化（手入力対応: 1990/1/23, 1990-1-23, 19900123 等 → YYYY-MM-DD）
+function normalizeBirthDate(input){
+  if(!input) return '';
+  const s = input.trim().replace(/[年月]/g,'-').replace(/日/g,'');
+  // YYYY-MM-DD or YYYY/M/D
+  let m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+  // YYYYMMDD
+  m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if(m) return m[1]+'-'+m[2]+'-'+m[3];
+  return input; // そのまま返す
+}
+
+function sfLockForm(lock){
+  const overlay = document.getElementById('sf-lock-overlay');
+  if(overlay) overlay.classList.toggle('active', lock);
+}
+
 async function submitSelfForm(){
   const errEl=document.getElementById('sf-err');
   errEl.textContent='';
@@ -2050,9 +2071,11 @@ async function submitSelfForm(){
   if(sfMode==='new'){
     // 新規登録モード
     const regcode=document.getElementById('sf-regcode').value.trim().toUpperCase();
-    const birth=document.getElementById('sf-birth').value;
+    const birthRaw=document.getElementById('sf-birth').value;
+    const birth=normalizeBirthDate(birthRaw);
     const tel=document.getElementById('sf-tel').value.trim();
     if(!birth){errEl.textContent='生年月日を入力してください';return;}
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(birth)){errEl.textContent='生年月日の形式が正しくありません（例：1990-01-23）';return;}
     if(!tel){errEl.textContent='電話番号を入力してください';return;}
     // 登録番号がある場合のみ委託会社を検索
     let companyId=null, companyName='';
@@ -2090,6 +2113,7 @@ async function submitSelfForm(){
 
   document.getElementById('sf-submit').disabled=true;
   document.getElementById('sf-submit').textContent='送信中...';
+  sfLockForm(true);
   try{await fetch(API_URL,{method:'POST',body:JSON.stringify(payload)});}catch(e){}
 
   // ★ 写真をDriveにアップロード（受信ボックスフォルダへ）
@@ -2140,6 +2164,7 @@ async function submitSelfForm(){
     status:'未確認'
   });
   localStorage.setItem('fleet_inbox',JSON.stringify(inbox.slice(0,200)));
+  sfLockForm(false);
   document.getElementById('self-form-body').style.display='none';
   document.getElementById('self-form-success').style.display='block';
 }
@@ -2152,6 +2177,7 @@ function resetSelfForm(){
   document.getElementById('sf-submit').disabled=false;
   document.getElementById('sf-submit').textContent='送信する';
   document.getElementById('sf-previews').innerHTML='';
+  sfLockForm(false);
   document.getElementById('self-form-body').style.display='block';
   document.getElementById('self-form-success').style.display='none';
   sfSetMode('update');
