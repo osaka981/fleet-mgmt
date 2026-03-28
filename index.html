@@ -923,8 +923,8 @@ async function syncFromSheet(){
     // drivers/vehicles取得
     const res=await fetch(API_URL+'?action=getAll');const json=await res.json();
     if(json.ok){
-      if(json.data.drivers?.length){drivers=json.data.drivers.map(d=>{['license','other','sub'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]={};} });if(!d.license)d.license={};if(!d.other)d.other={};if(!d.sub)d.sub={};return d;});}
-      if(json.data.vehicles?.length){vehicles=json.data.vehicles.map(v=>{['shaken','jibai','nin'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]={};}});if(!v.shaken)v.shaken={};if(!v.jibai)v.jibai={};if(!v.nin)v.nin={};return v;});}
+      if(json.data.drivers?.length){drivers=json.data.drivers.map(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=Array.isArray(d[k])?[]:{};} });if(!d.license)d.license={};if(!d.other)d.other={};if(!d.sub)d.sub={};return d;});}
+      if(json.data.vehicles?.length){vehicles=json.data.vehicles.map(v=>{['shaken','jibai','nin','attachedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=Array.isArray(v[k])?[]:{};} });if(!v.shaken)v.shaken={};if(!v.jibai)v.jibai={};if(!v.nin)v.nin={};return v;});}
       saveLocal();renderAll();
     }
     // inbox取得（GASから）
@@ -2182,7 +2182,7 @@ function renderFileMgr(){
   // ドライバー一覧（自社＋委託会社）
   if(!typeFilter || typeFilter === 'driver'){
     let allDrivers = [
-      ...drivers.map(d => ({...d, _kind:'driver', _office: d.office || (d.offices||[]).join('・')})),
+      ...drivers.map(d => ({...d, _kind:'driver', _office: d.office || (Array.isArray(d.offices) ? d.offices : (typeof d.offices==='string' ? (function(){try{return JSON.parse(d.offices)}catch(e){return[]}}()) : [])).join('・')})),
       ...companies.flatMap(c => (c.drivers||[]).map(d => ({...d, _kind:'driver', _company:c.name, _office:(d.offices||[]).join('・')})))
     ];
     // フィルター適用
