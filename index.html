@@ -207,11 +207,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
 }
 /* ===== セルフ入力フォーム（スマホ専用ページ） ===== */
 #self-form-screen{display:none;min-height:100vh;background:#f0f4ff;padding:16px;position:fixed;inset:0;z-index:999;overflow-y:auto}
-.self-form-card{background:#fff;border-radius:16px;padding:24px 20px 80px;max-width:480px;margin:0 auto;box-shadow:0 2px 16px rgba(74,144,226,.12)}
-.sf-sending-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1100;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px}
-.sf-sending-spinner{width:48px;height:48px;border:5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sf-spin .8s linear infinite}
-.sf-sending-text{color:#fff;font-size:15px;font-weight:600}
-@keyframes sf-spin{to{transform:rotate(360deg)}}
+.self-form-card{background:#fff;border-radius:16px;padding:24px 20px;max-width:480px;margin:0 auto;box-shadow:0 2px 16px rgba(74,144,226,.12)}
 .self-form-logo{text-align:center;margin-bottom:20px}
 .self-form-logo-title{font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:3px}
 .self-form-logo-sub{font-size:12px;color:#888}
@@ -941,14 +937,28 @@ async function syncInboxFromSheet(){
   try{
     const res = await fetch(API_URL+'?action=getInbox');
     const json = await res.json();
-    if(!json.ok || !json.inbox?.length) return;
+    if(!json.ok) return;
 
-    // ローカルのinboxと統合（idで重複除去、GAS側が新しければ追加）
+    // ローカルのinboxを取得
     const localInbox = JSON.parse(localStorage.getItem('fleet_inbox')||'[]');
-    const localIds = new Set(localInbox.map(i=>String(i.id)));
-    const newItems = json.inbox.filter(i => !localIds.has(String(i.id)));
-    if(newItems.length){
-      const merged = [...newItems, ...localInbox]
+
+    // GAS側のtimestampをキーにしたMap
+    const gasMap = new Map();
+    (json.inbox||[]).forEach(i => gasMap.set(i.timestamp, i));
+
+    // ローカルにしかない削除済み・編集済みを保持しつつ、GASの新しいデータを追加
+    // GASのIDはtimestampベース、ローカルはDate.now()ベースなのでtimestampで照合
+    const localTimestamps = new Set(localInbox.map(i=>i.timestamp));
+    const newFromGas = (json.inbox||[]).filter(i => !localTimestamps.has(i.timestamp));
+
+    // 新規のGASデータにIDを付与（ローカルIDと衝突しないよう）
+    newFromGas.forEach(i => {
+      if(!i.id) i.id = new Date(i.timestamp).getTime() || Date.now();
+      if(!i.status) i.status = '未確認';
+    });
+
+    if(newFromGas.length){
+      const merged = [...newFromGas, ...localInbox]
         .sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp))
         .slice(0,200);
       localStorage.setItem('fleet_inbox', JSON.stringify(merged));
@@ -957,6 +967,8 @@ async function syncInboxFromSheet(){
       const unread = merged.filter(i=>i.status==='未確認').length;
       const badge = document.getElementById('inbox-badge');
       if(badge) badge.textContent = unread ? String(unread) : '';
+    } else {
+      renderInbox();
     }
   }catch(e){ console.log('inbox sync error:', e); }
 }
@@ -1943,48 +1955,7 @@ async function submitSelfForm(){
 
   document.getElementById('sf-submit').disabled=true;
   document.getElementById('sf-submit').textContent='送信中...';
-
-  // 送信中オーバーレイ表示（操作ブロック）
-  const overlay=document.createElement('div');
-  overlay.className='sf-sending-overlay';
-  overlay.innerHTML='<div class="sf-sending-spinner"></div><div class="sf-sending-text">送信中...</div>';
-  document.body.appendChild(overlay);
-
-  try{
-    // ファイルをGoogle Driveにアップロードしてからsubmit
-    const uploadedFiles=[];
-    const folderName=payload.office||'新規登録';
-    const subFolderName=name||'未設定';
-    for(const f of sfFiles){
-      try{
-        const res=await fetch(API_URL,{
-          method:'POST',
-          body:JSON.stringify({
-            action:'uploadFile',
-            folder:folderName,
-            subFolder:subFolderName,
-            fileName:f.name,
-            mimeType:f.type||'image/jpeg',
-            dataUrl:f.dataUrl
-          })
-        });
-        const data=await res.json();
-        if(data.ok){
-          uploadedFiles.push({name:f.name,type:f.type||'',url:data.url,fileId:data.fileId});
-        }else{
-          uploadedFiles.push({name:f.name,type:f.type||''});
-        }
-      }catch(e){
-        uploadedFiles.push({name:f.name,type:f.type||''});
-      }
-    }
-    payload.files=uploadedFiles;
-    await fetch(API_URL,{method:'POST',body:JSON.stringify(payload)});
-  }catch(e){}
-  finally{
-    // オーバーレイ除去
-    if(overlay.parentNode) overlay.parentNode.removeChild(overlay);
-  }
+  try{await fetch(API_URL,{method:'POST',body:JSON.stringify(payload)});}catch(e){}
 
   const inbox=JSON.parse(localStorage.getItem('fleet_inbox')||'[]');
   inbox.unshift({
@@ -2004,7 +1975,7 @@ async function submitSelfForm(){
     doctype:payload.doctype||'新規登録',
     note,
     timestamp:new Date().toISOString(),
-    files:payload.files&&payload.files.length?payload.files:sfFiles.map(f=>({name:f.name, dataUrl:f.dataUrl||'', type:f.type||''})),
+    files:sfFiles.map(f=>({name:f.name, dataUrl:f.dataUrl||'', type:f.type||''})),
     status:'未確認'
   });
   localStorage.setItem('fleet_inbox',JSON.stringify(inbox.slice(0,200)));
@@ -2724,10 +2695,16 @@ function renderInbox(){
         ${(item.files||[]).map((f,fi)=>{
           const fname = typeof f==='string' ? f : f.name;
           const fdataUrl = typeof f==='object' ? (f.dataUrl||'') : '';
+          const furl = typeof f==='object' ? (f.url||'') : '';
           const isImg = fname.match(/\.(jpg|jpeg|png|gif)$/i);
           const isPdf = fname.match(/\.pdf$/i);
           if(fdataUrl && isImg){
-            return `<img src="${fdataUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #e0e0e0;cursor:pointer" onclick="openFilePreviewFromAttached('','${esc(fname)}','${fdataUrl.substring(0,30)}');openInboxFilePreview(${item.id},${fi})" title="${esc(fname)}">`;
+            return `<img src="${fdataUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #e0e0e0;cursor:pointer" onclick="openInboxFilePreview(${item.id},${fi})" title="${esc(fname)}">`;
+          }
+          if(furl){
+            return `<a href="${esc(furl)}" target="_blank" style="display:flex;align-items:center;gap:3px;padding:2px 6px;background:#f0f4ff;border-radius:4px;font-size:10px;color:#4a90e2;cursor:pointer;border:1px solid #c5d8f8;text-decoration:none">
+              ${isPdf?'📄':'📎'} ${esc(fname)}
+            </a>`;
           }
           return `<div onclick="openInboxFilePreview(${item.id},${fi})" style="display:flex;align-items:center;gap:3px;padding:2px 6px;background:#f0f4ff;border-radius:4px;font-size:10px;color:#4a90e2;cursor:pointer;border:1px solid #c5d8f8">
             ${isPdf?'📄':'📎'} ${esc(fname)}
@@ -2789,7 +2766,15 @@ function openInboxFilePreview(inboxId, fileIdx){
   if(!f) return;
   const fname = typeof f==='string' ? f : f.name;
   const fdataUrl = typeof f==='object' ? (f.dataUrl||'') : '';
-  openFilePreviewFromAttached('', fname, fdataUrl);
+  const furl = typeof f==='object' ? (f.url||'') : '';
+  // dataUrlがあればそれを優先、なければDrive URLで開く
+  if(fdataUrl){
+    openFilePreviewFromAttached('', fname, fdataUrl);
+  } else if(furl){
+    window.open(furl, '_blank');
+  } else {
+    alert('このファイルはプレビューできません（URLなし）');
+  }
 }
 
 function saveInboxFilesToDriver(inboxId){
