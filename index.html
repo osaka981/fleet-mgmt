@@ -2114,37 +2114,58 @@ async function submitSelfForm(){
   document.getElementById('sf-submit').disabled=true;
   document.getElementById('sf-submit').textContent='送信中...';
   sfLockForm(true);
-  try{await fetch(API_URL,{method:'POST',body:JSON.stringify(payload)});}catch(e){}
 
-  // ★ 写真をDriveにアップロード（受信ボックスフォルダへ）
+  const entryId = Date.now();
+
+  // ★ Step1: 写真をDriveにアップロード（先にアップロードしてURL取得）
   const uploadedFiles = [];
-  for(const f of sfFiles){
-    try{
-      const upRes = await fetch(API_URL, {
-        method:'POST',
-        body: JSON.stringify({
-          action: 'uploadFile',
-          folder: '_受信ボックス',
-          subFolder: name + '_' + new Date().toISOString().slice(0,10),
-          fileName: f.name,
-          mimeType: f.type,
-          dataUrl: f.dataUrl
-        })
-      });
-      const upData = await upRes.json();
-      if(upData.ok){
-        uploadedFiles.push({name:f.name, type:f.type, url:upData.url, fileId:upData.fileId, dataUrl:''});
-      } else {
-        uploadedFiles.push({name:f.name, type:f.type, dataUrl:f.dataUrl.substring(0,200), url:'', fileId:''});
+  if(sfFiles.length > 0){
+    document.getElementById('sf-submit').textContent='写真アップロード中...';
+    for(let fi=0; fi<sfFiles.length; fi++){
+      const f = sfFiles[fi];
+      document.getElementById('sf-submit').textContent=`写真アップロード中 (${fi+1}/${sfFiles.length})...`;
+      try{
+        const upRes = await fetch(API_URL, {
+          method:'POST',
+          body: JSON.stringify({
+            action: 'uploadFile',
+            folder: '_受信ボックス',
+            subFolder: name + '_' + new Date().toISOString().slice(0,10),
+            fileName: f.name,
+            mimeType: f.type,
+            dataUrl: f.dataUrl
+          })
+        });
+        const upData = await upRes.json();
+        if(upData.ok){
+          uploadedFiles.push({name:f.name, type:f.type, url:upData.url, fileId:upData.fileId, dataUrl:''});
+        } else {
+          console.error('Upload error:', upData.error);
+          uploadedFiles.push({name:f.name, type:f.type, dataUrl:'', url:'', fileId:'', error:upData.error||'upload failed'});
+        }
+      }catch(e){
+        console.error('Upload fetch error:', e);
+        uploadedFiles.push({name:f.name, type:f.type, dataUrl:'', url:'', fileId:'', error:e.message});
       }
-    }catch(e){
-      uploadedFiles.push({name:f.name, type:f.type, dataUrl:f.dataUrl.substring(0,200), url:'', fileId:''});
     }
   }
 
+  // ★ Step2: フォームデータをGASに送信（Drive URLを含む）
+  document.getElementById('sf-submit').textContent='データ送信中...';
+  payload.id = entryId;
+  payload.files = uploadedFiles.map(f=>({name:f.name, type:f.type||'', url:f.url||'', fileId:f.fileId||''}));
+  try{
+    const formRes = await fetch(API_URL,{method:'POST',body:JSON.stringify(payload)});
+    const formJson = await formRes.json();
+    if(!formJson.ok) console.error('submitForm error:', formJson.error);
+  }catch(e){
+    console.error('submitForm fetch error:', e);
+  }
+
+  // ★ Step3: ローカルinboxにも保存
   const inbox=JSON.parse(localStorage.getItem('fleet_inbox')||'[]');
   inbox.unshift({
-    id:Date.now(),
+    id:entryId,
     mode:sfMode,
     office:payload.office||'',
     name,kana,
