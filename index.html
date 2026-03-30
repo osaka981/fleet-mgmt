@@ -30,11 +30,11 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f
 .nav-group-arrow{font-size:10px;color:#4a90e2;font-weight:700;margin-left:auto}
 .nav-group-body{overflow:hidden;transition:max-height .2s ease}
 .nav-group-body.collapsed{max-height:0!important;overflow:hidden}
-.storage-grid{display:grid;grid-template-columns:1fr;gap:6px;grid-auto-rows:minmax(120px,auto)}
-@media(min-width:900px){.storage-grid{grid-template-columns:repeat(2,1fr);grid-auto-rows:140px}}
-@media(min-width:1300px){.storage-grid{grid-template-columns:repeat(3,1fr);grid-auto-rows:140px}}
-.storage-grid>div{height:100%}
-.storage-card-expanded{grid-column:1/-1}
+.storage-grid{display:grid;grid-template-columns:1fr;gap:8px}
+@media(min-width:768px){.storage-grid{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1100px){.storage-grid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:1400px){.storage-grid{grid-template-columns:repeat(4,1fr)}}
+.storage-grid>div{min-height:140px}
 .nav-add-btn{width:20px;height:20px;border:1px solid #ddd;border-radius:4px;background:transparent;cursor:pointer;color:#888;font-size:14px;display:flex;align-items:center;justify-content:center}
 .nav-add-btn:hover{background:#f5f5f5}
 .nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;cursor:pointer;color:#666;transition:all .15s;margin:1px 6px;font-size:12px}
@@ -3918,7 +3918,7 @@ function renderStorage(){
       const plateStr=cv?cv.plate:'車両未割当';
 
       if(!expanded){
-        return '<div style="background:#f0f0ee;border:2px solid #999;border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;height:100%;box-sizing:border-box;overflow:hidden" onclick="storageToggleExpand(\''+key+'\')">'+
+        return '<div style="background:#f0f0ee;border:2px solid #999;border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;min-height:120px;box-sizing:border-box;overflow:hidden" onclick="storageToggleExpand(\''+key+'\')">'+
           '<div style="display:flex;align-items:center;gap:10px">'+
             '<div style="width:32px;height:32px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:500;font-size:11px;flex-shrink:0">'+typeIcon+'</div>'+
             '<div style="min-width:0"><div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d.name+'</div>'+
@@ -3933,7 +3933,7 @@ function renderStorage(){
       }
 
       // 展開状態
-      let cardHtml='<div class="storage-card-expanded" style="background:#eaeae8;border:2px solid #888;border-radius:10px;padding:14px 16px">';
+      let cardHtml='<div style="background:#eaeae8;border:2px solid #888;border-radius:10px;padding:14px 16px">';
       cardHtml+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;cursor:pointer" onclick="storageToggleExpand(\''+key+'\')">';
       cardHtml+='<div style="display:flex;align-items:center;gap:10px">';
       cardHtml+='<div style="width:34px;height:34px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:500;font-size:12px">'+typeIcon+'</div>';
@@ -4007,7 +4007,7 @@ function renderStorage(){
     html+='<div class="storage-grid">';
     html+=unassignedVehicles.map(v=>{
       var vaf=v.attachedFiles||[];
-      return '<div style="background:#f0f0ee;border:2px solid #999;border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;height:100%;box-sizing:border-box;overflow:hidden">'+
+      return '<div style="background:#f0f0ee;border:2px solid #999;border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;min-height:120px;box-sizing:border-box;overflow:hidden">'+
         '<div><strong style="font-size:14px">'+v.plate+'</strong> <span style="font-size:11px;color:#777">'+(v.model||'')+'</span><div style="font-size:11px;color:#888;margin-top:2px">'+(v._offices.join('・')||v.office||'未設定')+'</div></div>'+
         '<div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;margin-top:auto">'+
           expBadge(minExp([v.shaken?.exp,v.jibai?.exp,v.nin?.exp]))+
