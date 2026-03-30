@@ -148,14 +148,6 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
 .hist-office{font-size:11px;color:#4a90e2;font-weight:500;white-space:nowrap}
 .hist-time{font-size:10px;color:#bbb;white-space:nowrap}
 .hist-tag{display:inline-block;padding:1px 6px;border-radius:99px;font-size:10px;font-weight:500;background:#e3f2fd;color:#1565c0;white-space:nowrap}
-.bulk-table{width:100%;border-collapse:collapse;font-size:12px;background:#fff}
-.bulk-table th{padding:7px 10px;text-align:left;font-size:11px;font-weight:500;color:#888;background:#fafafa;border-bottom:1px solid #e0e0e0;white-space:nowrap}
-.bulk-table td{padding:4px 6px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
-.bulk-table tr:last-child td{border-bottom:none}
-.bulk-table tr:hover td{background:#f9fbff}
-.bulk-input{width:130px;padding:4px 6px;font-size:11px;border:1px solid #ddd;border-radius:4px;background:#fff;color:#1a1a1a;font-family:inherit}
-.bulk-input:focus{outline:none;border-color:#4a90e2}
-.bulk-input.changed{border-color:#43a047;background:#f1f8e9}
 .office-checkboxes{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;min-height:38px}
 .office-checkbox-label{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;border:1px solid #e0e0e0;cursor:pointer;font-size:11px;color:#555;background:#fafafa;transition:all .15s}
 .office-checkbox-label:hover{border-color:#4a90e2;color:#4a90e2}
@@ -219,8 +211,6 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
   .login-card{width:calc(100% - 32px);padding:28px 20px}
   .doc-date-bar{flex-wrap:wrap;gap:7px}
   .sync-bar{flex-wrap:wrap;gap:6px}
-  .bulk-table{font-size:11px}
-  .bulk-input{width:110px}
   .topbar{flex-wrap:wrap;gap:6px}
 }
 /* ===== セルフ入力フォーム（スマホ専用ページ） ===== */
@@ -469,7 +459,6 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
         <div class="nav-item" onclick="showPage('documents',this)" data-page="documents"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="10" height="12" rx="1.5"/><path d="M4 5h6M4 8h6M4 11h4"/></svg>書類生成</div>
         <div class="nav-item" onclick="showPage('filemgr',this)" data-page="filemgr"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 3h5l1.5 2H13v7H1z"/><path d="M5 9h4M7 7v4"/></svg>書類・写真管理</div>
         <div class="nav-item" onclick="showPage('storage',this)" data-page="storage"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 2h10v10H2z"/><path d="M2 5h10M5 5v7"/><circle cx="9" cy="8.5" r="1.5"/></svg>データ保管</div>
-        <div class="nav-item" onclick="showPage('bulk',this)" data-page="bulk"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 4h12M1 8h12M1 12h8"/><circle cx="11" cy="12" r="2"/><path d="M11 10v-1M9.3 10.7l-.7-.7M13.7 10.7l.7-.7"/></svg>一括更新</div>
         <div class="nav-item" onclick="showPage('print',this)" data-page="print"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="10" height="7" rx="1"/><path d="M4 5V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M4 9h6M4 11h4"/></svg>印刷一覧</div>
         <div class="nav-item" onclick="showPage('history',this)" data-page="history"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5.5"/><path d="M7 4v3.5l2.5 1.5"/></svg>提出履歴</div>
         <div class="nav-item" onclick="showPage('archive',this)" data-page="archive"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="12" height="9" rx="1"/><path d="M1 4l2-3h8l2 3"/><path d="M5 8h4"/></svg>アーカイブ</div>
@@ -561,28 +550,6 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
         <div class="content" id="storage-content"></div>
       </div>
 
-      <div id="page-bulk" class="page">
-        <div class="topbar">
-          <h1>一括更新</h1>
-          <div style="display:flex;gap:8px;align-items:center">
-            <select id="bulk-office" class="status-select" style="font-size:12px;padding:5px 10px" onchange="renderBulk()">
-              <option value="">営業所を選択</option>
-            </select>
-            <select id="bulk-type" class="status-select" style="font-size:12px;padding:5px 10px" onchange="renderBulk()">
-              <option value="drivers">ドライバー（免許証）</option>
-              <option value="vehicles">車両（車検・保険）</option>
-            </select>
-            <button class="btn btn-primary" onclick="saveBulk()">💾 変更を保存</button>
-          </div>
-        </div>
-        <div class="content">
-          <div style="font-size:11px;color:#888;margin-bottom:12px;padding:8px 12px;background:#e3f2fd;border-radius:6px;border:1px solid #bbdefb">
-            💡 期限を変更したセルは緑色になります。「変更を保存」を押すとデータに反映されます。
-          </div>
-          <div class="table-wrap" id="bulk-table-wrap"></div>
-        </div>
-      </div>
-
       <div id="page-print" class="page">
         <div class="topbar">
           <h1>印刷用一覧</h1>
@@ -599,7 +566,10 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
       <div id="page-history" class="page">
         <div class="topbar">
           <h1>提出履歴</h1>
-          <button class="btn btn-sm btn-danger" onclick="clearOldHistory()">1年以上前を削除</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" onclick="clearOldHistory()">🗑 1年以上前を削除</button>
+            <button class="btn btn-sm btn-danger" onclick="clearAllHistory()">🗑 全件削除</button>
+          </div>
         </div>
         <div class="content">
           <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
@@ -1666,10 +1636,21 @@ function renderHistory(){
 }
 
 function clearOldHistory(){
-  if(!confirm('1年以上前の履歴を削除しますか？'))return;
+  const oldCount=submitHistory.filter(h=>new Date(h.date)<new Date(new Date().setFullYear(new Date().getFullYear()-1))).length;
+  if(!oldCount){alert('1年以上前の履歴はありません');return;}
+  if(!confirm(`1年以上前の履歴 ${oldCount}件を削除しますか？`))return;
   const cutoff=new Date();cutoff.setFullYear(cutoff.getFullYear()-1);
   submitHistory=submitHistory.filter(h=>new Date(h.date)>=cutoff);
   saveHistory();renderHistory();
+  alert(`✅ ${oldCount}件削除しました`);
+}
+
+function clearAllHistory(){
+  if(!submitHistory.length){alert('履歴がありません');return;}
+  if(!confirm(`提出履歴 ${submitHistory.length}件を全て削除しますか？\nこの操作は元に戻せません。`))return;
+  submitHistory=[];
+  saveHistory();renderHistory();
+  alert('✅ 全件削除しました');
 }
 
 // ====== 書類生成ディスパッチ ======
@@ -1797,105 +1778,6 @@ async function generateAllDocs(office){
     await new Promise(r=>setTimeout(r,200));
   }
   prog.textContent=`✅ ${office}営業所 全書類のダウンロードが完了しました`;
-}
-
-// ====== 一括更新 ======
-let bulkChanges={};
-
-function renderBulk(){
-  const office=document.getElementById('bulk-office').value;
-  const type=document.getElementById('bulk-type').value;
-  bulkChanges={};
-  if(!office){document.getElementById('bulk-table-wrap').innerHTML='<div style="padding:20px;text-align:center;color:#888;font-size:12px">営業所を選択してください</div>';return;}
-  if(type==='drivers'){
-    const data=drivers.filter(d=>belongsToOffice(d,office)&&(!d.status||d.status==='在籍'));
-    if(!data.length){document.getElementById('bulk-table-wrap').innerHTML='<div style="padding:20px;text-align:center;color:#888;font-size:12px">対象ドライバーがいません</div>';return;}
-    document.getElementById('bulk-table-wrap').innerHTML=`<table class="bulk-table">
-      <thead><tr>
-        <th style="width:140px">氏名</th>
-        <th>区分</th>
-        <th>免許証有効期限</th>
-        <th>免許番号</th>
-        <th>免許種別</th>
-        <th>免許の条件等</th>
-      </tr></thead>
-      <tbody>${data.map(d=>`<tr>
-        <td><strong>${d.name}</strong></td>
-        <td><span class="badge ${d.type==='外注'?'badge-info':'badge-gray'}">${d.type}</span></td>
-        <td>${expBadge(d.license?.exp)}<br><input class="bulk-input" type="date" data-id="${d.id}" data-field="license.exp" value="${d.license?.exp||''}" oninput="markChanged(this)"></td>
-        <td><input class="bulk-input" style="width:160px" type="text" data-id="${d.id}" data-field="license.no" value="${d.license?.no||''}" oninput="markChanged(this)"></td>
-        <td><select class="bulk-input" data-id="${d.id}" data-field="license.type" onchange="markChanged(this)">
-          ${['普通自動車','準中型','中型','大型','普通自動二輪'].map(t=>`<option${d.license?.type===t?' selected':''}>${t}</option>`).join('')}
-        </select></td>
-        <td><input class="bulk-input" type="text" data-id="${d.id}" data-field="license.cond" value="${d.license?.cond||''}" oninput="markChanged(this)"></td>
-      </tr>`).join('')}</tbody>
-    </table>`;
-  } else {
-    const data=vehicles.filter(v=>belongsToOffice(v,office));
-    if(!data.length){document.getElementById('bulk-table-wrap').innerHTML='<div style="padding:20px;text-align:center;color:#888;font-size:12px">対象車両がいません</div>';return;}
-    document.getElementById('bulk-table-wrap').innerHTML=`<table class="bulk-table">
-      <thead><tr>
-        <th style="width:140px">車両番号</th>
-        <th>車種</th>
-        <th>車検有効期限</th>
-        <th>自賠責満了日</th>
-        <th>自賠責保険会社</th>
-        <th>任意保険満了日</th>
-        <th>任意保険会社</th>
-      </tr></thead>
-      <tbody>${data.map(v=>`<tr>
-        <td><strong>${v.plate}</strong></td>
-        <td>${v.model||'—'}</td>
-        <td>${expBadge(v.shaken?.exp)}<br><input class="bulk-input" type="date" data-id="${v.id}" data-field="shaken.exp" value="${v.shaken?.exp||''}" oninput="markChanged(this)"></td>
-        <td>${expBadge(v.jibai?.exp)}<br><input class="bulk-input" type="date" data-id="${v.id}" data-field="jibai.exp" value="${v.jibai?.exp||''}" oninput="markChanged(this)"></td>
-        <td><input class="bulk-input" type="text" data-id="${v.id}" data-field="jibai.company" value="${v.jibai?.company||''}" oninput="markChanged(this)"></td>
-        <td>${expBadge(v.nin?.exp)}<br><input class="bulk-input" type="date" data-id="${v.id}" data-field="nin.exp" value="${v.nin?.exp||''}" oninput="markChanged(this)"></td>
-        <td><input class="bulk-input" type="text" data-id="${v.id}" data-field="nin.company" value="${v.nin?.company||''}" oninput="markChanged(this)"></td>
-      </tr>`).join('')}</tbody>
-    </table>`;
-  }
-}
-
-function markChanged(el){
-  el.classList.add('changed');
-  const id=Number(el.dataset.id);
-  const field=el.dataset.field;
-  if(!bulkChanges[id])bulkChanges[id]={};
-  bulkChanges[id][field]=el.value;
-}
-
-function saveBulk(){
-  const type=document.getElementById('bulk-type').value;
-  let count=0;
-  for(const [id,changes] of Object.entries(bulkChanges)){
-    if(type==='drivers'){
-      const d=drivers.find(x=>x.id==id);
-      if(d){
-        if(!d.license)d.license={};
-        for(const [field,val] of Object.entries(changes)){
-          const keys=field.split('.');
-          if(keys.length===2)d[keys[0]][keys[1]]=val;
-          else d[keys[0]]=val;
-        }
-        count++;
-      }
-    } else {
-      const v=vehicles.find(x=>x.id==id);
-      if(v){
-        for(const [field,val] of Object.entries(changes)){
-          const keys=field.split('.');
-          if(keys.length===2){if(!v[keys[0]])v[keys[0]]={};v[keys[0]][keys[1]]=val;}
-          else v[keys[0]]=val;
-        }
-        count++;
-      }
-    }
-  }
-  saveLocal();
-  bulkChanges={};
-  document.querySelectorAll('.bulk-input.changed').forEach(el=>el.classList.remove('changed'));
-  renderDashboard();
-  alert(`✅ ${count}件のデータを更新しました`);
 }
 
 // ====== 印刷一覧 ======
@@ -2041,7 +1923,6 @@ function showPage(name,el){
   if(name==='vehicles'){document.getElementById('vehicle-office-label').textContent='';renderVehicles(null);}
   if(name==='drivers')renderDrivers(null);
   if(name==='documents'){setTodayDate();renderDocPage();}
-  if(name==='bulk'){rebuildBulkSelects();renderBulk();}
   if(name==='print'){rebuildPrintSelect();renderPrint();}
   if(name==='history')renderHistory();
   if(name==='filemgr')renderFileMgr();
@@ -2049,12 +1930,6 @@ function showPage(name,el){
   if(name==='settings'){renderSettingsAll();}
   if(name==='contractors'&&currentCompanyId)renderCompanyPage(currentCompanyId);
   else if(name==='contractors')renderContractorsList();
-}
-function rebuildBulkSelects(){
-  const sel=document.getElementById('bulk-office');
-  if(!sel)return;
-  const cur=sel.value;
-  sel.innerHTML='<option value="">営業所を選択</option>'+offices.map(o=>`<option${o===cur?' selected':''}>${o}</option>`).join('');
 }
 function rebuildPrintSelect(){
   const sel=document.getElementById('print-office');
