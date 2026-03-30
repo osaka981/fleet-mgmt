@@ -260,10 +260,12 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
 .file-drop-zone{border:2px dashed #90caf9;border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:all .15s;background:#f8fbff;position:relative}
 .file-drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 .file-drop-zone.dragover{border-color:#4a90e2;background:#e3f2fd}
-.file-thumb{position:relative;width:60px;height:60px;border-radius:6px;overflow:hidden;border:1px solid #e0e0e0;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font-size:10px;color:#888;flex-direction:column;gap:2px}
+.file-thumb{position:relative;width:70px;border-radius:6px;overflow:visible;border:1px solid #e0e0e0;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font-size:10px;color:#888;flex-direction:column;gap:0}
+.file-thumb img{width:70px;height:50px;object-fit:cover;border-radius:5px 5px 0 0}
+.file-thumb-cat{font-size:9px;color:#1565c0;background:#e3f2fd;padding:1px 4px;border-radius:0 0 4px 4px;width:100%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .file-thumb img{width:100%;height:100%;object-fit:cover}
 .file-thumb-del{position:absolute;top:1px;right:1px;width:15px;height:15px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;border:none;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;line-height:1}
-.file-thumb-name{font-size:9px;color:#666;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;padding:0 2px}
+.file-thumb-name{font-size:8px;color:#888;max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;padding:1px 2px}
 .office-multi-check{display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:3px 8px;border-radius:99px;border:1px solid #e0e0e0;background:#f5f5f5;transition:all .15s}
 .office-multi-check.checked{background:#eaf2ff;border-color:#4a90e2;color:#4a90e2;font-weight:500}
 </style>
@@ -1506,14 +1508,16 @@ async function processQuickUpload(file,kind,entityId,docKey){
     const folder=kind==='driver'?(target.offices?.[0]||target.office||'未設定'):(target.office||'未設定');
     const subFolder=kind==='driver'?(target.name||''):(target.plate||'');
     try{
+      const catMap={license:'免許証（表）',shaken:'車検証',jibai:'自賠責保険',nin:'任意保険'};
+      const ownerLabel=kind==='driver'?(target.name||''):(target.plate||'');
+      const renamedName=autoRenameFile(file.name,catMap[docKey]||'','',ownerLabel);
       const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({
         action:'uploadFile',folder,subFolder,
-        fileName:file.name,mimeType:file.type,dataUrl
+        fileName:renamedName,mimeType:file.type,dataUrl
       })});
       const json=await res.json();
       if(json.ok){
-        const catMap={license:'免許証（表）',shaken:'車検証',jibai:'自賠責保険',nin:'任意保険'};
-        target.attachedFiles.push({name:file.name,type:file.type,url:json.url||'',fileId:json.fileId||'',dataUrl:'',category:catMap[docKey]||'',uploadedAt:new Date().toISOString()});
+        target.attachedFiles.push({name:renamedName,type:file.type,url:json.url||'',fileId:json.fileId||'',dataUrl:'',category:catMap[docKey]||'',uploadedAt:new Date().toISOString()});
         saveLocal();saveCompanies();
         document.querySelectorAll('.modal-bg').forEach(m=>m.remove());
         renderVehicles(currentOfficeFilter);renderDrivers(currentOfficeFilter);
@@ -2676,13 +2680,14 @@ function saveVehicle(){
     (async()=>{
       for(const f of vFiles){
         if(!f.dataUrl) continue;
+        const renamedName=autoRenameFile(f.name,f.category||'',f.customName||'',obj.plate);
         try{
           const res = await fetch(API_URL,{method:'POST',body:JSON.stringify({
             action:'uploadFile', folder:obj.office||'未設定',
-            subFolder:'車両/'+obj.plate.replace(/\s/g,''), fileName:f.name, mimeType:f.type, dataUrl:f.dataUrl
+            subFolder:'車両/'+obj.plate.replace(/\s/g,''), fileName:renamedName, mimeType:f.type, dataUrl:f.dataUrl
           })});
           const data = await res.json();
-          if(data.ok) target.attachedFiles.push({name:f.name,type:f.type,url:data.url,fileId:data.fileId,dataUrl:'',category:f.category||'',customName:f.customName||'',uploadedAt:new Date().toISOString()});
+          if(data.ok) target.attachedFiles.push({name:renamedName,type:f.type,url:data.url,fileId:data.fileId,dataUrl:'',category:f.category||'',customName:f.customName||'',uploadedAt:new Date().toISOString()});
         }catch(e){}
       }
       saveLocal(); renderFileMgr();
@@ -2792,19 +2797,20 @@ function saveDriver(){
       for(const f of dFiles){
         const dataUrl = f.dataUrl || '';
         if(!dataUrl) continue;
+        const renamedName=autoRenameFile(f.name,f.category||'',f.customName||'',obj.name);
         try{
           const res = await fetch(API_URL,{method:'POST',body:JSON.stringify({
             action:'uploadFile', folder:obj.offices?.[0]||obj.office||'未設定',
-            subFolder:obj.name, fileName:f.name, mimeType:f.type, dataUrl
+            subFolder:obj.name, fileName:renamedName, mimeType:f.type, dataUrl
           })});
           const data = await res.json();
           if(data.ok){
-            target.attachedFiles.push({name:f.name,type:f.type,url:data.url,fileId:data.fileId,dataUrl:'',category:f.category||'',customName:f.customName||'',uploadedAt:new Date().toISOString()});
+            target.attachedFiles.push({name:renamedName,type:f.type,url:data.url,fileId:data.fileId,dataUrl:'',category:f.category||'',customName:f.customName||'',uploadedAt:new Date().toISOString()});
           } else {
-            target.attachedFiles.push({name:f.name,type:f.type,dataUrl:dataUrl.substring(0,200),url:'',fileId:'',category:f.category||'',customName:f.customName||'',uploadedAt:new Date().toISOString()});
+            target.attachedFiles.push({name:renamedName,type:f.type,dataUrl:dataUrl.substring(0,200),url:'',fileId:'',category:f.category||'',customName:f.customName||'',uploadedAt:new Date().toISOString()});
           }
         }catch(e){
-          target.attachedFiles.push({name:f.name,type:f.type,dataUrl:dataUrl.substring(0,200),url:'',fileId:'',category:f.category||'',customName:f.customName||'',uploadedAt:new Date().toISOString()});
+          target.attachedFiles.push({name:renamedName,type:f.type,dataUrl:dataUrl.substring(0,200),url:'',fileId:'',category:f.category||'',customName:f.customName||'',uploadedAt:new Date().toISOString()});
         }
       }
       saveLocal();
@@ -3384,6 +3390,28 @@ function guessFileCategory(fileName, bufKey){
   return '';
 }
 
+// 書類・写真管理ページ用（既存ファイルのカテゴリ推測）
+function guessFileCategoryByName(fileName, kind){
+  const n=(fileName||'').toLowerCase();
+  if(n.includes('免許')&&n.includes('裏')) return '免許証(裏)';
+  if(n.includes('免許')||n.includes('license')) return '免許証';
+  if(n.includes('車検')||n.includes('shaken')) return '車検証';
+  if(n.includes('自賠')||n.includes('jibai')) return '自賠責';
+  if(n.includes('任意')||n.includes('nin')) return '任意保険';
+  if(n.includes('健康')||n.includes('診断')) return '健康診断書';
+  return '';
+}
+
+// アップロード時にカテゴリ+所有者名で自動リネーム
+function autoRenameFile(originalName, category, customName, ownerName){
+  if(!category||category==='') return originalName;
+  const ext=originalName.includes('.')?'.'+originalName.split('.').pop():'';
+  let label=category;
+  if(category==='その他'&&customName) label=customName;
+  const owner=ownerName?'_'+ownerName.replace(/\s/g,''):'';
+  return label+owner+ext;
+}
+
 function renderFilePreview(bufKey){
   const previewEl = document.getElementById(bufKey + '-preview');
   if(!previewEl) return;
@@ -3607,11 +3635,12 @@ function renderFileMgr(){
             ${files.map((f,i) => {
               const fid = f.fileId || (f.url && f.url.match(/\/d\/([a-zA-Z0-9_-]+)/) ? f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1] : '');
               const thumbSrc = f.dataUrl || (fid && f.name.match(/\.(jpg|jpeg|png|gif)$/i) ? 'https://drive.google.com/thumbnail?id='+fid+'&sz=w120' : '');
-              const thumb = thumbSrc && f.name.match(/\.(jpg|jpeg|png|gif)$/i) ? `<img src="${thumbSrc}" style="width:100%;height:100%;object-fit:cover">` : `<span style="font-size:18px">${f.name.match(/\.pdf$/i)?'📄':'📎'}</span>`;
-              const previewDataUrl = f.dataUrl ? f.dataUrl.substring(0,30)+'...' : '';
-              return `<div class="file-thumb" style="cursor:pointer" onclick="openAttachedFilePreview('driver',${d.id},${i},'${d._company||""}')" title="${esc(f.name)}">
+              const isImg = f.name.match(/\.(jpg|jpeg|png|gif)$/i);
+              const thumb = thumbSrc && isImg ? `<img src="${thumbSrc}" style="width:70px;height:50px;object-fit:cover;border-radius:5px 5px 0 0">` : `<div style="height:50px;display:flex;align-items:center;justify-content:center;background:#f5f5f5">${f.name.match(/\.pdf$/i)?'<span style="font-size:20px">📄</span>':'<span style="font-size:20px">📎</span>'}</div>`;
+              const catLabel = f.category || guessFileCategoryByName(f.name,'driver') || '';
+              return `<div class="file-thumb" style="cursor:pointer;width:70px" onclick="openAttachedFilePreview('driver',${d.id},${i},'${d._company||""}')" title="${esc(f.name)}">
               ${thumb}
-              <div class="file-thumb-name">${esc(f.name)}</div>
+              ${catLabel ? `<div class="file-thumb-cat">${catLabel}</div>` : `<div class="file-thumb-name">${esc(f.name)}</div>`}
               <button class="file-thumb-del" onclick="event.stopPropagation();deleteAttachedFile('driver',${d.id},${i},'${d._company||''}')">×</button>
             </div>`;}).join('')}
           </div>` : `<div style="padding:10px 14px;font-size:11px;color:#bbb">書類・写真が登録されていません</div>`}
@@ -3653,10 +3682,12 @@ function renderFileMgr(){
             ${files.map((f,i) => {
               const fid = f.fileId || (f.url && f.url.match(/\/d\/([a-zA-Z0-9_-]+)/) ? f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1] : '');
               const thumbSrc = f.dataUrl || (fid && f.name.match(/\.(jpg|jpeg|png|gif)$/i) ? 'https://drive.google.com/thumbnail?id='+fid+'&sz=w120' : '');
-              const thumb = thumbSrc && f.name.match(/\.(jpg|jpeg|png|gif)$/i) ? `<img src="${thumbSrc}" style="width:100%;height:100%;object-fit:cover">` : `<span style="font-size:18px">${f.name.match(/\.pdf$/i)?'📄':'📎'}</span>`;
-              return `<div class="file-thumb" style="cursor:pointer" onclick="openAttachedFilePreview('vehicle',${v.id},${i},'${v._company||""}')" title="${esc(f.name)}">
+              const isImg = f.name.match(/\.(jpg|jpeg|png|gif)$/i);
+              const thumb = thumbSrc && isImg ? `<img src="${thumbSrc}" style="width:70px;height:50px;object-fit:cover;border-radius:5px 5px 0 0">` : `<div style="height:50px;display:flex;align-items:center;justify-content:center;background:#f5f5f5">${f.name.match(/\.pdf$/i)?'<span style="font-size:20px">📄</span>':'<span style="font-size:20px">📎</span>'}</div>`;
+              const catLabel = f.category || guessFileCategoryByName(f.name,'vehicle') || '';
+              return `<div class="file-thumb" style="cursor:pointer;width:70px" onclick="openAttachedFilePreview('vehicle',${v.id},${i},'${v._company||""}')" title="${esc(f.name)}">
               ${thumb}
-              <div class="file-thumb-name">${esc(f.name)}</div>
+              ${catLabel ? `<div class="file-thumb-cat">${catLabel}</div>` : `<div class="file-thumb-name">${esc(f.name)}</div>`}
               <button class="file-thumb-del" onclick="event.stopPropagation();deleteAttachedFile('vehicle',${v.id},${i},'${v._company||''}')">×</button>
             </div>`;}).join('')}
           </div>` : `<div style="padding:10px 14px;font-size:11px;color:#bbb">書類・写真が登録されていません</div>`}
@@ -5103,10 +5134,11 @@ function saveCompanyDriver(){
     (async()=>{
       for(const f of cdFiles){
         if(!f.dataUrl) continue;
+        const renamedName=autoRenameFile(f.name,f.category||'',f.customName||'',obj.name);
         try{
-          const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'uploadFile',folder:co?.name||'委託会社',subFolder:obj.name,fileName:f.name,mimeType:f.type,dataUrl:f.dataUrl})});
+          const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'uploadFile',folder:co?.name||'委託会社',subFolder:obj.name,fileName:renamedName,mimeType:f.type,dataUrl:f.dataUrl})});
           const data=await res.json();
-          if(data.ok) obj.attachedFiles.push({name:f.name,type:f.type,url:data.url,fileId:data.fileId,dataUrl:'',category:f.category||'',customName:f.customName||'',uploadedAt:new Date().toISOString()});
+          if(data.ok) obj.attachedFiles.push({name:renamedName,type:f.type,url:data.url,fileId:data.fileId,dataUrl:'',category:f.category||'',customName:f.customName||'',uploadedAt:new Date().toISOString()});
         }catch(e){}
       }
       saveCompanies(); renderCompanyPage(currentCompanyId);
@@ -5190,10 +5222,11 @@ function saveCompanyVehicle(){
     (async()=>{
       for(const f of cvFiles){
         if(!f.dataUrl) continue;
+        const renamedName=autoRenameFile(f.name,f.category||'',f.customName||'',obj.plate);
         try{
-          const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'uploadFile',folder:co?.name||'委託会社',subFolder:'車両/'+obj.plate,fileName:f.name,mimeType:f.type,dataUrl:f.dataUrl})});
+          const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'uploadFile',folder:co?.name||'委託会社',subFolder:'車両/'+obj.plate,fileName:renamedName,mimeType:f.type,dataUrl:f.dataUrl})});
           const data=await res.json();
-          if(data.ok) obj.attachedFiles.push({name:f.name,type:f.type,url:data.url,fileId:data.fileId,dataUrl:'',category:f.category||'',customName:f.customName||'',uploadedAt:new Date().toISOString()});
+          if(data.ok) obj.attachedFiles.push({name:renamedName,type:f.type,url:data.url,fileId:data.fileId,dataUrl:'',category:f.category||'',customName:f.customName||'',uploadedAt:new Date().toISOString()});
         }catch(e){}
       }
       saveCompanies(); renderCompanyPage(currentCompanyId);
