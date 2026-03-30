@@ -30,9 +30,9 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f
 .nav-group-arrow{font-size:10px;color:#4a90e2;font-weight:700;margin-left:auto}
 .nav-group-body{overflow:hidden;transition:max-height .2s ease}
 .nav-group-body.collapsed{max-height:0!important;overflow:hidden}
-.storage-grid{display:grid;grid-template-columns:1fr;gap:6px;align-items:stretch;grid-auto-rows:1fr}
-@media(min-width:900px){.storage-grid{grid-template-columns:repeat(2,1fr)}}
-@media(min-width:1300px){.storage-grid{grid-template-columns:repeat(3,1fr)}}
+.storage-grid{display:grid;grid-template-columns:1fr;gap:6px;grid-auto-rows:minmax(120px,auto)}
+@media(min-width:900px){.storage-grid{grid-template-columns:repeat(2,1fr);grid-auto-rows:140px}}
+@media(min-width:1300px){.storage-grid{grid-template-columns:repeat(3,1fr);grid-auto-rows:140px}}
 .storage-grid>div{height:100%}
 .storage-card-expanded{grid-column:1/-1}
 .nav-add-btn{width:20px;height:20px;border:1px solid #ddd;border-radius:4px;background:transparent;cursor:pointer;color:#888;font-size:14px;display:flex;align-items:center;justify-content:center}
@@ -3918,7 +3918,7 @@ function renderStorage(){
       const plateStr=cv?cv.plate:'車両未割当';
 
       if(!expanded){
-        return '<div style="background:#fff;border:2px solid #ccc;border-radius:10px;padding:10px 14px;cursor:pointer;display:flex;align-items:flex-start;justify-content:space-between;height:100%;box-sizing:border-box" onclick="storageToggleExpand(\''+key+'\')">'+
+        return '<div style="background:#fff;border:2px solid #ccc;border-radius:10px;padding:10px 14px;cursor:pointer;display:flex;align-items:flex-start;justify-content:space-between;height:100%;box-sizing:border-box;overflow:hidden" onclick="storageToggleExpand(\''+key+'\')">'+
           '<div style="display:flex;align-items:center;gap:10px">'+
             '<div style="width:32px;height:32px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:500;font-size:11px">'+typeIcon+'</div>'+
             '<div><div style="font-weight:500;font-size:14px">'+d.name+'</div>'+
@@ -4007,7 +4007,7 @@ function renderStorage(){
     html+='<div class="storage-grid">';
     html+=unassignedVehicles.map(v=>{
       var vaf=v.attachedFiles||[];
-      return '<div style="background:#fff;border:2px solid #ccc;border-radius:10px;padding:10px 14px;display:flex;align-items:flex-start;justify-content:space-between;height:100%;box-sizing:border-box">'+
+      return '<div style="background:#fff;border:2px solid #ccc;border-radius:10px;padding:10px 14px;display:flex;align-items:flex-start;justify-content:space-between;height:100%;box-sizing:border-box;overflow:hidden">'+
         '<div><strong>'+v.plate+'</strong> <span style="font-size:11px;color:#888">'+(v.model||'')+' ・ '+(v._offices.join('・')||v.office||'未設定')+'</span></div>'+
         '<div style="display:flex;gap:4px;align-items:center">'+
           expBadge(minExp([v.shaken?.exp,v.jibai?.exp,v.nin?.exp]))+
