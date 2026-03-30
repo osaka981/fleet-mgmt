@@ -1982,7 +1982,7 @@ function renderArchive(){
     </select>
     <span style="font-size:11px;color:#888;margin-left:4px">計 ${archived.length}名</span>`;
   let data=archived;
-  if(filterOffice!=='全て')data=data.filter(d=>d.office===filterOffice);
+  if(filterOffice!=='全て')data=data.filter(d=>belongsToOffice(d,filterOffice));
   if(filterStatus!=='全て')data=data.filter(d=>d.status===filterStatus);
   if(!data.length){document.getElementById('archive-list').innerHTML='<div style="padding:24px;text-align:center;color:#888;font-size:12px">アーカイブされたドライバーはいません</div>';return;}
   document.getElementById('archive-list').innerHTML=data.map(d=>`
@@ -4939,7 +4939,7 @@ async function sendMail(){
 function renderAll(){
   renderOfficeNav();
   try{renderCompanyNav();}catch(e){console.error('renderCompanyNav error:',e);}
-  renderDashboard();renderVehicles(null);renderDrivers(null);renderDocPage();
+  renderDashboard();renderVehicles(null);renderDrivers(null);renderDocPage();renderArchive();
 }
 function renderSettingsAll(){renderSettingsOffices();generateQR();renderInbox();loadAiSettings();renderMailSettings();}
 setTodayDate();
