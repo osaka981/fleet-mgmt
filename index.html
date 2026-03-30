@@ -1914,33 +1914,32 @@ async function execMailSend(taskId){
   if(!to){alert('宛先を入力してください');return;}
   const cc=document.getElementById('ms-cc')?.value?.trim()||'';
   const subject=document.getElementById('ms-subject')?.value||'';
-  const body=document.getElementById('ms-body')?.value||'';
+  const mailBody=document.getElementById('ms-body')?.value||'';
 
   // 選択されたファイルを収集
   const checkedFiles=[];
   document.querySelectorAll('.ms-file:checked').forEach(el=>{
     const src=el.dataset.src;
     const idx=Number(el.dataset.idx);
-    if(src==='driver'&&t.driverFiles[idx]) checkedFiles.push(t.driverFiles[idx]);
-    if(src==='vehicle'&&t.vehicleFiles[idx]) checkedFiles.push(t.vehicleFiles[idx]);
-    if(src==='pdf'&&t.genPdfs[idx]) checkedFiles.push({...t.genPdfs[idx],isPdf:true});
+    if(src==='driver'&&t.driverFiles[idx]) checkedFiles.push({...t.driverFiles[idx],_src:'driver'});
+    if(src==='vehicle'&&t.vehicleFiles[idx]) checkedFiles.push({...t.vehicleFiles[idx],_src:'vehicle'});
+    if(src==='pdf'&&t.genPdfs[idx]) checkedFiles.push({...t.genPdfs[idx],isPdf:true,_src:'pdf'});
   });
 
-  const attachments=checkedFiles.filter(f=>f.fileId&&!f.isPdf).map(f=>f.fileId);
+  const fileIds=checkedFiles.filter(f=>f.fileId&&!f.isPdf).map(f=>f.fileId);
   const pdfRequests=checkedFiles.filter(f=>f.isPdf);
 
-  // Step1: PDFを先にフロントエンドから生成（書類生成と同じデータを使う）
+  const sendBtn=document.getElementById('ms-send-btn');
+
+  // Step1: PDFを先にフロントエンドから生成
   if(pdfRequests.length){
-    const sendBtn=document.getElementById('ms-send-btn');
-    if(sendBtn){sendBtn.disabled=true;sendBtn.textContent='PDF生成中...';}
+    if(sendBtn){sendBtn.disabled=true;sendBtn.textContent='PDF生成中（'+pdfRequests.length+'件）...';}
     for(const pdfReq of pdfRequests){
       try{
         const pdfOffice=pdfReq.office||t.office;
         const dateStr=new Date().toISOString().slice(0,10);
-        // 営業所のドライバー・車両（書類生成と同じフィルタ）
         const offD=drivers.filter(d=>belongsToOffice(d,pdfOffice)&&(!d.status||d.status==='在籍'));
         const offV=vehicles.filter(v=>belongsToOffice(v,pdfOffice));
-        // 委託会社ドライバー・車両も追加
         const coD=[],coV=[];
         companies.forEach(c=>{
           (c.drivers||[]).forEach(d=>{if((d.offices||[]).includes(pdfOffice))coD.push({...d,type:'外注',subCompany:c.name});});
@@ -1950,34 +1949,38 @@ async function execMailSend(taskId){
         if(pdfReq.type==='現況届') docType='genkyo';
         else if(pdfReq.type==='雇用証明書') docType='koyou';
         else if(pdfReq.type==='報告書') docType='houkoku';
-        if(!docType) continue;
+        if(!docType){console.error('不明なPDF種別:',pdfReq.type);continue;}
+
+        if(sendBtn) sendBtn.textContent='生成中: '+pdfReq.type+'...';
+        const allD=[...offD,...coD];
+        const allV=[...offV,...coV];
 
         const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({
           action:'generatePdf',
           docType, office:pdfOffice, dateStr,
-          drivers:[...offD,...coD],
-          vehicles:[...offV,...coV]
+          drivers:allD,
+          vehicles:allV
         })});
         const json=await res.json();
         if(json.ok&&json.fileId){
-          attachments.push(json.fileId);
+          fileIds.push(json.fileId);
         } else {
-          console.error('PDF生成エラー:',pdfReq.type,json.error);
+          alert('⚠️ PDF生成失敗: '+pdfReq.type+'\n'+(json.error||'不明なエラー'));
         }
       }catch(e){
-        console.error('PDF生成通信エラー:',e);
+        alert('⚠️ PDF生成通信エラー: '+pdfReq.type+'\n'+e.message);
       }
     }
   }
 
-  // Step2: メール送信（fileIdのみ）
+  // Step2: メール送信
+  if(sendBtn){sendBtn.disabled=true;sendBtn.textContent='送信中（添付'+fileIds.length+'件）...';}
   try{
-    const sendBtn=document.getElementById('ms-send-btn');
-    if(sendBtn){sendBtn.disabled=true;sendBtn.textContent='送信中...';}
     const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({
       action:'sendMail',
-      to, cc, subject, body,
-      attachments,
+      to, cc, subject,
+      body:mailBody,
+      attachments:fileIds,
       office:t.office
     })});
     const json=await res.json();
@@ -1985,13 +1988,12 @@ async function execMailSend(taskId){
       t.status='sent';t.sentAt=new Date().toISOString();
       saveMailTasks();renderMailTasks();
       document.querySelectorAll('.modal-bg').forEach(m=>m.remove());
-      alert('✅ メールを送信しました（添付 '+attachments.length+'件）');
+      alert('✅ メールを送信しました（添付 '+fileIds.length+'件）');
     } else {
       if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='📧 送信する';}
       alert('❌ 送信エラー: '+(json.error||'不明なエラー'));
     }
   }catch(e){
-    const sendBtn=document.getElementById('ms-send-btn');
     if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='📧 送信する';}
     alert('❌ 通信エラー: '+e.message);
   }
