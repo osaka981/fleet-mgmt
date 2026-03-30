@@ -459,6 +459,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
         <div class="nav-item" onclick="showPage('documents',this)" data-page="documents"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="10" height="12" rx="1.5"/><path d="M4 5h6M4 8h6M4 11h4"/></svg>書類生成</div>
         <div class="nav-item" onclick="showPage('filemgr',this)" data-page="filemgr"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 3h5l1.5 2H13v7H1z"/><path d="M5 9h4M7 7v4"/></svg>書類・写真管理</div>
         <div class="nav-item" onclick="showPage('storage',this)" data-page="storage"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 2h10v10H2z"/><path d="M2 5h10M5 5v7"/><circle cx="9" cy="8.5" r="1.5"/></svg>データ保管</div>
+        <div class="nav-item" onclick="showPage('mail',this)" data-page="mail"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="12" height="8" rx="1.5"/><path d="M1 4l6 4 6-4"/></svg>メール送信 <span id="mail-badge" style="background:#e53935;color:#fff;border-radius:99px;padding:0 5px;font-size:9px;margin-left:2px"></span></div>
         <div class="nav-item" onclick="showPage('print',this)" data-page="print"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="10" height="7" rx="1"/><path d="M4 5V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M4 9h6M4 11h4"/></svg>印刷一覧</div>
         <div class="nav-item" onclick="showPage('history',this)" data-page="history"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5.5"/><path d="M7 4v3.5l2.5 1.5"/></svg>提出履歴</div>
         <div class="nav-item" onclick="showPage('archive',this)" data-page="archive"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="12" height="9" rx="1"/><path d="M1 4l2-3h8l2 3"/><path d="M5 8h4"/></svg>アーカイブ</div>
@@ -561,6 +562,22 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
           </div>
         </div>
         <div class="content" id="print-content"></div>
+      </div>
+
+      <div id="page-mail" class="page">
+        <div class="topbar">
+          <h1>📧 メール送信</h1>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm btn-primary" onclick="openCreateMailTask()">＋ タスク追加</button>
+          </div>
+        </div>
+        <div class="content">
+          <div style="display:flex;border-bottom:1px solid #e0e0e0;margin-bottom:12px" id="mail-tabs">
+            <div onclick="mailSetTab('pending')" class="filter-chip active" data-tab="pending" style="cursor:pointer;padding:7px 14px;font-size:12px">未送信 <span id="mail-pending-count" style="background:#e53935;color:#fff;border-radius:99px;padding:0 5px;font-size:10px;margin-left:2px"></span></div>
+            <div onclick="mailSetTab('sent')" class="filter-chip" data-tab="sent" style="cursor:pointer;padding:7px 14px;font-size:12px">送信済</div>
+          </div>
+          <div id="mail-task-list"></div>
+        </div>
       </div>
 
       <div id="page-history" class="page">
@@ -1560,6 +1577,355 @@ function genTekigoOsakaXml(office,dateStr){
   const tbl=wtbl([600,7856,1000],tblRows,9456);
   return wxDoc([wp('適　合　証　明　書',{center:true,bold:true,size:28}),wp('個人情報の管理に関して、以下のとおり適合することを証明いたします。'),wp(''),wp(`日　　　付：　　${dy.y}年　${dy.m}月　${dy.d}日`),wp(`住　　　所：${COMPANY.address}`),wp(`会　社　名：${COMPANY.name}`),wp(`代表者氏名：${COMPANY.repName}　　　　印`),wp(`社　員　数：（${COMPANY.staffCount}）人`),wp(''),tbl].join(''));}
 
+// ====== メール送信タスク ======
+let mailTasks = JSON.parse(localStorage.getItem('fleet_mail_tasks')||'[]');
+let mailCurrentTab = 'pending';
+
+function saveMailTasks(){localStorage.setItem('fleet_mail_tasks',JSON.stringify(mailTasks));}
+
+function mailSetTab(tab){
+  mailCurrentTab=tab;
+  document.querySelectorAll('#mail-tabs .filter-chip').forEach(c=>c.classList.remove('active'));
+  document.querySelector(`#mail-tabs [data-tab="${tab}"]`)?.classList.add('active');
+  renderMailTasks();
+}
+
+function renderMailTasks(){
+  const el=document.getElementById('mail-task-list');
+  if(!el) return;
+  const pending=mailTasks.filter(t=>t.status==='pending');
+  const sent=mailTasks.filter(t=>t.status==='sent');
+  // バッジ更新
+  const badge=document.getElementById('mail-badge');
+  if(badge) badge.textContent=pending.length?String(pending.length):'';
+  const cntEl=document.getElementById('mail-pending-count');
+  if(cntEl) cntEl.textContent=pending.length?String(pending.length):'';
+
+  const list=mailCurrentTab==='sent'?sent:pending;
+  if(!list.length){
+    el.innerHTML=`<div style="padding:24px;text-align:center;color:#888;font-size:12px">${mailCurrentTab==='sent'?'送信済みのタスクはありません':'未送信のタスクはありません'}</div>`;
+    return;
+  }
+  el.innerHTML=list.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).map(t=>{
+    const typeIcon=t.type==='入社'?'🟢':t.type==='退職'?'🔴':t.type==='営業所移動'?'🟠':'🔵';
+    const typeBadge=t.type==='入社'?'badge-ok':t.type==='退職'?'badge-danger':'badge-info';
+    const office=t.office||'';
+    const postOffice=POST_OFFICE_MAP[office]||office+'郵便局';
+    // 添付ファイル数集計
+    const driverFiles=(t.driverFiles||[]).length;
+    const vehicleFiles=(t.vehicleFiles||[]).length;
+    const genPdfs=(t.genPdfs||[]).length;
+    const totalFiles=driverFiles+vehicleFiles+genPdfs;
+    return `<div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600">
+            ${typeIcon} <span class="badge ${typeBadge}">${esc(t.type)}</span>
+            ${esc(t.driverName)}
+            <span style="font-size:11px;color:#888;font-weight:400">${esc(t.driverType||'')}・${esc(office)}</span>
+          </div>
+          <div style="font-size:11px;color:#888;margin-top:4px">
+            ${postOffice}宛　作成：${new Date(t.createdAt).toLocaleDateString('ja-JP')}
+            ${t.sentAt?'　送信：'+new Date(t.sentAt).toLocaleDateString('ja-JP'):''}
+          </div>
+          <div style="font-size:11px;color:#555;margin-top:4px">
+            添付：${driverFiles?'👤免許証等'+driverFiles+'件 ':''}${vehicleFiles?'🚗車検証等'+vehicleFiles+'件 ':''}${genPdfs?'📋PDF'+genPdfs+'件':''}
+            ${!totalFiles?'<span style="color:#e65100">⚠️ 添付ファイルなし</span>':'　計'+totalFiles+'件'}
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+          ${t.status==='pending'?`
+            <button class="btn btn-sm btn-primary" onclick="openMailSendModal('${t.id}')" style="font-size:10px">📧 送信</button>
+            <button class="btn btn-sm" onclick="markMailTaskSent('${t.id}')" style="font-size:10px">✓ 済</button>
+          `:`
+            <button class="btn btn-sm" onclick="markMailTaskPending('${t.id}')" style="font-size:10px">↩ 未送信に戻す</button>
+          `}
+          <button class="btn btn-sm btn-danger" onclick="deleteMailTask('${t.id}')" style="font-size:10px">🗑</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function createMailTask(type, driverId, driverName, driverType, office, vehicleId){
+  // 重複チェック（同一ドライバー+同一タイプの未送信タスク）
+  const dup=mailTasks.find(t=>t.driverId==driverId&&t.type===type&&t.status==='pending');
+  if(dup) return; // 既にある
+
+  // ドライバーの添付ファイルを取得
+  let driverFiles=[];
+  const d=drivers.find(x=>x.id==driverId);
+  if(d) driverFiles=(d.attachedFiles||[]).map(f=>({name:f.name,fileId:f.fileId||'',url:f.url||''}));
+  else {
+    companies.forEach(c=>{const cd=(c.drivers||[]).find(x=>x.id==driverId);if(cd) driverFiles=(cd.attachedFiles||[]).map(f=>({name:f.name,fileId:f.fileId||'',url:f.url||''}));});
+  }
+
+  // 紐づき車両の添付ファイルを取得
+  let vehicleFiles=[];
+  let vehiclePlate='';
+  const vid=vehicleId||null;
+  let v=vid?vehicles.find(x=>x.id==vid):vehicles.find(x=>x.driverId==driverId||x.driver===driverName);
+  if(!v) companies.forEach(c=>{if(!v) v=(c.vehicles||[]).find(x=>x.driverId==driverId||x.driver===driverName);});
+  if(v){
+    vehiclePlate=v.plate||'';
+    vehicleFiles=(v.attachedFiles||[]).map(f=>({name:f.name,fileId:f.fileId||'',url:f.url||''}));
+  }
+
+  // 生成PDFリスト（種別に応じて）
+  let genPdfs=[];
+  if(type==='入社'||type==='退職'||type==='営業所移動'){
+    genPdfs.push({name:'現況届_'+office+'.pdf',type:'現況届',office});
+    if(driverType==='社員'){
+      genPdfs.push({name:'雇用証明書_'+office+'.pdf',type:'雇用証明書',office});
+    }
+  }
+
+  const task={
+    id:String(Date.now()),
+    type, driverId:String(driverId), driverName, driverType:driverType||'',
+    office, vehicleId:v?String(v.id):'', vehiclePlate,
+    driverFiles, vehicleFiles, genPdfs,
+    status:'pending',
+    createdAt:new Date().toISOString(),
+    sentAt:null
+  };
+  mailTasks.unshift(task);
+  saveMailTasks();
+  renderMailTasks();
+}
+
+function markMailTaskSent(id){
+  const t=mailTasks.find(x=>x.id===id);
+  if(t){t.status='sent';t.sentAt=new Date().toISOString();saveMailTasks();renderMailTasks();}
+}
+function markMailTaskPending(id){
+  const t=mailTasks.find(x=>x.id===id);
+  if(t){t.status='pending';t.sentAt=null;saveMailTasks();renderMailTasks();}
+}
+function deleteMailTask(id){
+  if(!confirm('このタスクを削除しますか？'))return;
+  mailTasks=mailTasks.filter(x=>x.id!==id);
+  saveMailTasks();renderMailTasks();
+}
+
+// 手動タスク追加モーダル
+function openCreateMailTask(){
+  const activeDrivers=[
+    ...drivers.filter(d=>!d.status||d.status==='在籍').map(d=>({id:d.id,name:d.name,type:d.type||'社員',office:(Array.isArray(d.offices)&&d.offices.length?d.offices[0]:d.office)||''})),
+    ...companies.flatMap(c=>(c.drivers||[]).map(d=>({id:d.id,name:d.name,type:'委託('+c.name+')',office:(d.offices||[])[0]||''})))
+  ];
+  const dOpts=activeDrivers.map(d=>`<option value="${d.id}" data-type="${esc(d.type)}" data-office="${esc(d.office)}">${d.name}（${d.type}・${d.office}）</option>`).join('');
+
+  const modal=document.createElement('div');
+  modal.className='modal-bg';modal.style.display='flex';
+  modal.innerHTML=`<div class="modal" style="max-width:420px" onclick="event.stopPropagation()">
+    <div class="modal-header"><span class="modal-title">＋ メールタスク追加</span><button class="modal-close" onclick="this.closest('.modal-bg').remove()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group" style="margin-bottom:12px">
+        <label style="font-size:11px;color:#666;font-weight:500">種別 *</label>
+        <select id="mt-type" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px">
+          <option>入社</option><option>退職</option><option>書類更新</option><option>営業所移動</option><option>車両変更</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label style="font-size:11px;color:#666;font-weight:500">対象ドライバー *</label>
+        <select id="mt-driver" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px">
+          <option value="">選択してください</option>
+          ${dOpts}
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="this.closest('.modal-bg').remove()">キャンセル</button>
+      <button class="btn btn-primary" onclick="execCreateMailTask();this.closest('.modal-bg').remove()">作成</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+function execCreateMailTask(){
+  const type=document.getElementById('mt-type')?.value;
+  const sel=document.getElementById('mt-driver');
+  if(!sel||!sel.value){alert('ドライバーを選択してください');return;}
+  const opt=sel.options[sel.selectedIndex];
+  const dId=Number(sel.value);
+  const dType=opt.dataset.type||'';
+  const dOffice=opt.dataset.office||'';
+  const dName=opt.textContent.split('（')[0];
+  createMailTask(type, dId, dName, dType, dOffice);
+  alert('✅ メールタスクを作成しました');
+}
+
+// 送信モーダル
+function openMailSendModal(taskId){
+  const t=mailTasks.find(x=>x.id===taskId);
+  if(!t)return;
+  const settings=getMailSettings();
+  const postOffice=POST_OFFICE_MAP[t.office]||t.office+'郵便局';
+  const toAddr=settings[t.office]||'';
+
+  // 件名テンプレート
+  const subject=`【大阪急配】${t.driverName} ${t.type}書類のご送付（${postOffice}）`;
+
+  // 本文テンプレート
+  const body=`${postOffice}\nご担当者　様\n\nお世話になっております。\n大阪急配株式会社でございます。\n\n下記書類を送付いたします。\nご確認のほどよろしくお願いいたします。\n\n【対象者】${t.driverName}\n【営業所】${t.office}\n【種別】${t.type}\n${t.vehiclePlate?'【搭乗車両】'+t.vehiclePlate:''}\n\n━━━━━━━━━━━━━━━━━━\n大阪急配株式会社\n管理部\n━━━━━━━━━━━━━━━━━━`;
+
+  // 全車両リスト（代車追加用）
+  const allVehicles=[...vehicles,...companies.flatMap(c=>c.vehicles||[])];
+  const extraVOpts=allVehicles.filter(v=>String(v.id)!==t.vehicleId).map(v=>`<option value="${v.id}">${v.plate} ${v.model||''}</option>`).join('');
+
+  // ファイルチェックリスト
+  const dFilesHtml=(t.driverFiles||[]).map((f,i)=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0"><input type="checkbox" checked class="ms-file" data-src="driver" data-idx="${i}" data-fileid="${f.fileId||''}"> 👤 ${esc(f.name)}</label>`).join('');
+  const vFilesHtml=(t.vehicleFiles||[]).map((f,i)=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0"><input type="checkbox" checked class="ms-file" data-src="vehicle" data-idx="${i}" data-fileid="${f.fileId||''}"> 🚗 ${esc(f.name)}</label>`).join('');
+  const pdfHtml=(t.genPdfs||[]).map((f,i)=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0"><input type="checkbox" checked class="ms-file" data-src="pdf" data-idx="${i}" data-type="${f.type}" data-office="${f.office}"> 📋 ${esc(f.name)}</label>`).join('');
+
+  const isShaIn=t.driverType==='社員';
+  const vPlateLabel=t.vehiclePlate?' ('+esc(t.vehiclePlate)+')':'';
+  const hasKoyou=isShaIn&&!(t.genPdfs||[]).some(p=>p.type==='雇用証明書');
+
+  // 添付ファイルセクション組み立て
+  let attachHtml='';
+  if(dFilesHtml){
+    attachHtml+='<div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #eee"><div style="font-size:10px;color:#888;margin-bottom:4px">👤 ドライバー書類</div>'+dFilesHtml+'</div>';
+  } else {
+    attachHtml+='<div style="font-size:11px;color:#e65100;margin-bottom:6px">⚠️ ドライバーの添付ファイルがありません</div>';
+  }
+  if(vFilesHtml){
+    attachHtml+='<div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #eee"><div style="font-size:10px;color:#888;margin-bottom:4px">🚗 車両書類'+vPlateLabel+'</div>'+vFilesHtml+'</div>';
+  } else {
+    attachHtml+='<div style="font-size:11px;color:#e65100;margin-bottom:6px">⚠️ 車両の添付ファイルがありません</div>';
+  }
+  if(pdfHtml){
+    attachHtml+='<div style="margin-bottom:6px"><div style="font-size:10px;color:#888;margin-bottom:4px">📋 生成PDF</div>'+pdfHtml+'</div>';
+  }
+
+  const modal=document.createElement('div');
+  modal.className='modal-bg';modal.style.display='flex';
+  modal.innerHTML=`<div class="modal" style="max-width:560px" onclick="event.stopPropagation()">
+    <div class="modal-header"><span class="modal-title">📧 メール送信</span><button class="modal-close" onclick="this.closest('.modal-bg').remove()">✕</button></div>
+    <div class="modal-body" style="max-height:75vh;overflow-y:auto">
+      <div class="form-group" style="margin-bottom:10px">
+        <label style="font-size:11px;color:#666;font-weight:500">宛先 *</label>
+        <input type="email" id="ms-to" value="${toAddr}" style="width:100%;padding:7px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px" placeholder="${postOffice}のメールアドレス">
+      </div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label style="font-size:11px;color:#666;font-weight:500">CC</label>
+        <input type="email" id="ms-cc" value="" style="width:100%;padding:7px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px" placeholder="CC（任意）">
+      </div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label style="font-size:11px;color:#666;font-weight:500">件名</label>
+        <input type="text" id="ms-subject" value="${esc(subject)}" style="width:100%;padding:7px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px">
+      </div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label style="font-size:11px;color:#666;font-weight:500">本文</label>
+        <textarea id="ms-body" rows="8" style="width:100%;padding:7px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical">${esc(body)}</textarea>
+      </div>
+      <div style="background:#f9fbff;border:1px solid #e0e0e0;border-radius:8px;padding:12px;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:600;color:#555;margin-bottom:8px">添付ファイル（チェックで選択）</div>
+        ${attachHtml}
+        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="addExtraVehicleToMail('${taskId}')" style="font-size:10px">＋ 別の車両を追加</button>
+          ${hasKoyou?'<button class="btn btn-sm" onclick="addGenPdfToMail(\''+taskId+'\',\'雇用証明書\')" style="font-size:10px">＋ 雇用証明書</button>':''}
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="this.closest('.modal-bg').remove()">キャンセル</button>
+      <button class="btn btn-primary" id="ms-send-btn" onclick="execMailSend('${taskId}');this.closest('.modal-bg').remove()">📧 送信する</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+function addExtraVehicleToMail(taskId){
+  const allVehicles=[...vehicles,...companies.flatMap(c=>c.vehicles||[])];
+  const opts=allVehicles.map(v=>`<option value="${v.id}">${v.plate} ${v.model||''} (${v.office||''})</option>`).join('');
+  const sel=document.createElement('div');
+  sel.className='modal-bg';sel.style.display='flex';
+  sel.innerHTML=`<div class="modal modal-sm" onclick="event.stopPropagation()">
+    <div class="modal-header"><span class="modal-title">🚗 車両を追加</span><button class="modal-close" onclick="this.closest('.modal-bg').remove()">✕</button></div>
+    <div class="modal-body">
+      <select id="extra-v-sel" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px">
+        <option value="">選択してください</option>${opts}
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="this.closest('.modal-bg').remove()">キャンセル</button>
+      <button class="btn btn-primary" onclick="execAddExtraVehicle('${taskId}');this.closest('.modal-bg').remove()">追加</button>
+    </div>
+  </div>`;
+  document.body.appendChild(sel);
+}
+
+function execAddExtraVehicle(taskId){
+  const vId=document.getElementById('extra-v-sel')?.value;
+  if(!vId)return;
+  const t=mailTasks.find(x=>x.id===taskId);
+  if(!t)return;
+  const v=vehicles.find(x=>x.id==vId)||companies.flatMap(c=>c.vehicles||[]).find(x=>x.id==vId);
+  if(!v)return;
+  const newFiles=(v.attachedFiles||[]).map(f=>({name:f.name,fileId:f.fileId||'',url:f.url||''}));
+  t.vehicleFiles=[...(t.vehicleFiles||[]),...newFiles];
+  t.vehiclePlate=(t.vehiclePlate?t.vehiclePlate+', ':'')+v.plate;
+  saveMailTasks();
+  // 送信モーダルを閉じて再度開く
+  document.querySelectorAll('.modal-bg').forEach(m=>m.remove());
+  openMailSendModal(taskId);
+}
+
+function addGenPdfToMail(taskId, pdfType){
+  const t=mailTasks.find(x=>x.id===taskId);
+  if(!t)return;
+  if(!t.genPdfs)t.genPdfs=[];
+  t.genPdfs.push({name:pdfType+'_'+t.office+'.pdf',type:pdfType,office:t.office});
+  saveMailTasks();
+  document.querySelectorAll('.modal-bg').forEach(m=>m.remove());
+  openMailSendModal(taskId);
+}
+
+async function execMailSend(taskId){
+  const t=mailTasks.find(x=>x.id===taskId);
+  if(!t)return;
+  const to=document.getElementById('ms-to')?.value?.trim();
+  if(!to){alert('宛先を入力してください');return;}
+  const cc=document.getElementById('ms-cc')?.value?.trim()||'';
+  const subject=document.getElementById('ms-subject')?.value||'';
+  const body=document.getElementById('ms-body')?.value||'';
+
+  // 選択されたファイルを収集
+  const checkedFiles=[];
+  document.querySelectorAll('.ms-file:checked').forEach(el=>{
+    const src=el.dataset.src;
+    const idx=Number(el.dataset.idx);
+    if(src==='driver'&&t.driverFiles[idx]) checkedFiles.push(t.driverFiles[idx]);
+    if(src==='vehicle'&&t.vehicleFiles[idx]) checkedFiles.push(t.vehicleFiles[idx]);
+    if(src==='pdf'&&t.genPdfs[idx]) checkedFiles.push({...t.genPdfs[idx],isPdf:true});
+  });
+
+  const attachments=checkedFiles.filter(f=>f.fileId).map(f=>f.fileId);
+  const genPdfTypes=checkedFiles.filter(f=>f.isPdf).map(f=>({type:f.type,office:f.office}));
+
+  try{
+    const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({
+      action:'sendMail',
+      to, cc, subject, body,
+      attachments,
+      genPdfTypes,
+      office:t.office
+    })});
+    const json=await res.json();
+    if(json.ok){
+      t.status='sent';t.sentAt=new Date().toISOString();
+      saveMailTasks();renderMailTasks();
+      alert('✅ メールを送信しました');
+    } else {
+      alert('❌ 送信エラー: '+(json.error||'不明なエラー'));
+    }
+  }catch(e){
+    alert('❌ 通信エラー: '+e.message);
+  }
+}
+
 // ====== 提出履歴 ======
 let submitHistory = JSON.parse(localStorage.getItem('fleet_history')||'[]');
 
@@ -1924,6 +2290,7 @@ function showPage(name,el){
   if(name==='drivers')renderDrivers(null);
   if(name==='documents'){setTodayDate();renderDocPage();}
   if(name==='print'){rebuildPrintSelect();renderPrint();}
+  if(name==='mail')renderMailTasks();
   if(name==='history')renderHistory();
   if(name==='filemgr')renderFileMgr();
   if(name==='storage')renderStorage();
@@ -2109,7 +2476,14 @@ function saveDriver(){
     })();
   }
   saveLocal();closeModal('driver-modal');renderDrivers(currentOfficeFilter);renderDashboard();renderDocPage();
-  if(status==='退職'||status==='休止')renderArchive();
+  if(status==='退職'||status==='休止'){
+    renderArchive();
+    // ★ 退職メールタスク自動生成（既存ドライバーのステータス変更時のみ）
+    if(editingDriverId){
+      const prevDriver=drivers.find(d=>d.id==obj.id);
+      createMailTask('退職', obj.id, obj.name, obj.type||'', obj.offices?.[0]||obj.office||'');
+    }
+  }
 }
 function closeModal(id){document.getElementById(id).style.display='none';}
 function closeBg(e,id){if(e.target===document.getElementById(id))closeModal(id);}
@@ -3939,6 +4313,10 @@ function execRegisterFromInbox(id){
 
   const where = isCompany ? item.companyName : selectedOffice+'営業所';
   const files = (item.files||[]).filter(f=>typeof f==='object'&&(f.url||f.fileId||f.dataUrl));
+
+  // ★ 入社メールタスクを自動生成
+  createMailTask('入社', newId, item.name, isCompany?'委託':selectedType, selectedOffice, newVehicleId);
+
   let msg = `✅ 「${item.name}」を${where}のドライバーとして登録しました。`;
   if(newVehicleId){
     msg += `\n🚗 車両「${regPlate}」も同時に登録しました。`;
@@ -4815,6 +5193,10 @@ function renderAll(){
   renderOfficeNav();
   try{renderCompanyNav();}catch(e){console.error('renderCompanyNav error:',e);}
   renderDashboard();renderVehicles(null);renderDrivers(null);renderDocPage();renderArchive();
+  // メールバッジ更新
+  const mailPending=mailTasks.filter(t=>t.status==='pending').length;
+  const mailBadge=document.getElementById('mail-badge');
+  if(mailBadge) mailBadge.textContent=mailPending?String(mailPending):'';
 }
 function renderSettingsAll(){renderSettingsOffices();generateQR();renderInbox();loadAiSettings();renderMailSettings();}
 setTodayDate();
