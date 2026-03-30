@@ -489,9 +489,10 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
         <div class="content">
           <div class="sync-bar">
             <span>📡 Googleスプレッドシートと同期</span>
+            <button class="btn btn-sm" onclick="syncToSheet()">💾 保存</button>
             <button class="btn btn-sm" onclick="syncFromSheet()">🔄 読み込み</button>
             <button class="btn btn-sm" onclick="syncInboxFromSheet().then(()=>alert('✅ 受信ボックスを更新しました'))">📥 受信更新</button>
-            <button class="btn btn-sm btn-primary" onclick="syncToSheet()">💾 保存</button>
+            <button class="btn btn-sm btn-primary" onclick="syncAll()" id="sync-all-btn">⚡ 一括同期</button>
             <span class="sync-status" id="sync-status"></span>
           </div>
           <div class="stats" id="dash-stats"></div>
@@ -627,12 +628,6 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
               <option value="driver">ドライバー</option>
               <option value="vehicle">車両</option>
             </select>
-            <select id="filemgr-status" style="padding:5px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px" onchange="renderFileMgr()">
-              <option value="">在籍状況：すべて</option>
-              <option value="在籍">在籍のみ</option>
-              <option value="休止">休止</option>
-              <option value="退職">退職・アーカイブ</option>
-            </select>
             <select id="filemgr-office" style="padding:5px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px" onchange="renderFileMgr()">
               <option value="">営業所：すべて</option>
             </select>
@@ -662,7 +657,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
         <div class="topbar"><h1>アーカイブ</h1><span style="font-size:11px;color:#888">休止・退職者の管理</span></div>
         <div class="content">
           <div style="font-size:12px;color:#888;margin-bottom:12px;padding:10px 14px;background:#fff3e0;border-radius:8px;border:1px solid #ffcc80">
-            ⚠️ アーカイブされたドライバーは書類生成・期限アラートから除外されます。復帰も可能です。
+            ⚠️ アーカイブされたドライバーは書類生成・書類管理・期限アラートから除外されます。「在籍に戻す」で復帰、「削除」で完全削除が可能です。
           </div>
           <div class="filter-bar" id="archive-filters"></div>
           <div id="archive-list"></div>
@@ -1102,6 +1097,35 @@ async function syncToSheet(){
   catch(e){setSyncStatus('⚠️ 保存エラー','sync-err');}
 }
 function setSyncStatus(msg,cls){const el=document.getElementById('sync-status');el.textContent=msg;el.className='sync-status '+(cls||'');}
+
+async function syncAll(){
+  const btn=document.getElementById('sync-all-btn');
+  if(btn){btn.disabled=true;btn.textContent='同期中...';}
+  try{
+    // Step1: 保存
+    setSyncStatus('💾 保存中...','');
+    const saveRes=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'saveAll',drivers,vehicles})});
+    const saveJson=await saveRes.json();
+    if(!saveJson.ok) throw new Error('保存エラー');
+    // Step2: 読み込み
+    setSyncStatus('🔄 読み込み中...','');
+    const res=await fetch(API_URL+'?action=getAll');
+    const json=await res.json();
+    if(json.ok){
+      if(json.data.drivers?.length){drivers=json.data.drivers.map(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles'].includes(k)?[]:{};} });if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];if(!Array.isArray(d.offices))d.offices=typeof d.offices==='string'?[d.offices]:[];if(!d.license)d.license={};if(!d.other)d.other={};if(!d.sub)d.sub={};return d;});}
+      if(json.data.vehicles?.length){vehicles=json.data.vehicles.map(v=>{['shaken','jibai','nin','attachedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=k==='attachedFiles'?[]:{};} });if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];if(!v.shaken)v.shaken={};if(!v.jibai)v.jibai={};if(!v.nin)v.nin={};return v;});}
+      saveLocal();renderAll();
+    }
+    // Step3: 受信更新
+    setSyncStatus('📥 受信更新中...','');
+    await syncInboxFromSheet();
+    setSyncStatus('✅ 一括同期完了 '+new Date().toLocaleTimeString(),'sync-ok');
+  }catch(e){
+    setSyncStatus('⚠️ 同期エラー: '+e.message,'sync-err');
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='🔄 一括同期';}
+  }
+}
 
 // ====== ヘルパー ======
 function daysUntil(s){if(!s)return null;return Math.floor((new Date(s)-new Date(TODAY_STR))/86400000);}
@@ -1758,13 +1782,27 @@ function renderArchive(){
           ${d.leave?.date?`${d.leave.date.replace(/-/g,'/')} ${d.leave.reason||''}`:''}
           ${d.leave?.note?`　${d.leave.note}`:''}
           　免許: ${d.license?.exp?d.license.exp.replace(/-/g,'/'):'-'}
+          　書類: ${(d.attachedFiles||[]).length}件
         </div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0">
         <button class="btn btn-sm" onclick="restoreDriver(${d.id})">在籍に戻す</button>
         <button class="btn btn-sm" onclick="openDriverModal(${d.id})">編集</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteArchivedDriver(${d.id})">削除</button>
       </div>
     </div>`).join('');
+}
+
+function deleteArchivedDriver(id){
+  const d=drivers.find(x=>x.id==id);
+  if(!d)return;
+  const fileCount=(d.attachedFiles||[]).length;
+  const msg=`「${d.name}」を完全に削除しますか？\n\nこの操作は元に戻せません。`+(fileCount?`\n添付ファイル ${fileCount}件も削除されます。`:'');
+  if(!confirm(msg))return;
+  drivers=drivers.filter(x=>x.id!=id);
+  // 紐づいている車両のドライバー参照もクリア
+  vehicles.forEach(v=>{if(v.driverId==id){v.driver='';v.driverId=null;}});
+  saveLocal();renderArchive();renderDrivers(currentOfficeFilter);renderVehicles(currentOfficeFilter);renderDashboard();renderDocPage();
 }
 
 function restoreDriver(id){
@@ -2609,7 +2647,7 @@ function renderStorage(){
   // ドライバー
   if(!typeFilter || typeFilter === 'driver'){
     let allDrivers = [
-      ...drivers.map(d => ({...d, _src:'自社'})),
+      ...drivers.filter(d=>!d.status||d.status==='在籍').map(d => ({...d, _src:'自社'})),
       ...companies.flatMap(co => (co.drivers||[]).map(d => ({...d, _src:co.name})))
     ];
     if(search) allDrivers = allDrivers.filter(d => d.name?.toLowerCase().includes(search));
@@ -2683,7 +2721,6 @@ function renderStorage(){
 function renderFileMgr(){
   const search = (document.getElementById('filemgr-search')?.value || '').toLowerCase();
   const typeFilter = document.getElementById('filemgr-type')?.value || '';
-  const statusFilter = document.getElementById('filemgr-status')?.value || '';
   const officeFilter = document.getElementById('filemgr-office')?.value || '';
   const el = document.getElementById('filemgr-content');
   if(!el) return;
@@ -2706,15 +2743,12 @@ function renderFileMgr(){
       ...drivers.map(d => ({...d, _kind:'driver', _office: d.office || (Array.isArray(d.offices) ? d.offices : (typeof d.offices==='string' ? (function(){try{return JSON.parse(d.offices)}catch(e){return[]}}()) : [])).join('・')})),
       ...companies.flatMap(c => (c.drivers||[]).map(d => ({...d, _kind:'driver', _company:c.name, _office:(d.offices||[]).join('・')})))
     ];
-    // フィルター適用
-    if(search) allDrivers = allDrivers.filter(d => d.name?.toLowerCase().includes(search));
-    if(statusFilter) allDrivers = allDrivers.filter(d => {
+    // フィルター適用（休止・退職はアーカイブにのみ表示）
+    allDrivers = allDrivers.filter(d => {
       const s = d.status || '在籍';
-      if(statusFilter === '在籍') return s === '在籍';
-      if(statusFilter === '休止') return s === '休止';
-      if(statusFilter === '退職') return s === '退職';
-      return true;
+      return s === '在籍';
     });
+    if(search) allDrivers = allDrivers.filter(d => d.name?.toLowerCase().includes(search));
     if(officeFilter) allDrivers = allDrivers.filter(d =>
       d.office === officeFilter || (Array.isArray(d.offices) ? d.offices : []).includes(officeFilter)
     );
