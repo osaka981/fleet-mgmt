@@ -30,9 +30,10 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f
 .nav-group-arrow{font-size:10px;color:#4a90e2;font-weight:700;margin-left:auto}
 .nav-group-body{overflow:hidden;transition:max-height .2s ease}
 .nav-group-body.collapsed{max-height:0!important;overflow:hidden}
-.storage-grid{display:grid;grid-template-columns:1fr;gap:6px}
+.storage-grid{display:grid;grid-template-columns:1fr;gap:6px;align-items:stretch;grid-auto-rows:1fr}
 @media(min-width:900px){.storage-grid{grid-template-columns:repeat(2,1fr)}}
 @media(min-width:1300px){.storage-grid{grid-template-columns:repeat(3,1fr)}}
+.storage-grid>div{height:100%}
 .storage-card-expanded{grid-column:1/-1}
 .nav-add-btn{width:20px;height:20px;border:1px solid #ddd;border-radius:4px;background:transparent;cursor:pointer;color:#888;font-size:14px;display:flex;align-items:center;justify-content:center}
 .nav-add-btn:hover{background:#f5f5f5}
@@ -478,8 +479,11 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
           <div class="nav-item" onclick="showPage('contractors',this)" data-page="contractors"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="12" height="9" rx="1.5"/><path d="M5 3V2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1"/><path d="M4 7h6M4 9.5h4"/></svg>委託会社管理</div>
         </div>
 
-        <div class="nav-item" onclick="showPage('documents',this)" data-page="documents"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="10" height="12" rx="1.5"/><path d="M4 5h6M4 8h6M4 11h4"/></svg>書類生成</div>
-        <div class="nav-item" onclick="showPage('mail',this)" data-page="mail"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="12" height="8" rx="1.5"/><path d="M1 4l6 4 6-4"/></svg>メール <span id="mail-badge" style="background:#e53935;color:#fff;border-radius:99px;padding:0 5px;font-size:9px;margin-left:2px"></span><span id="inbox-nav-badge" style="background:#fb8c00;color:#fff;border-radius:99px;padding:0 5px;font-size:9px;margin-left:2px"></span></div>
+        <div class="nav-group-header" onclick="toggleNavGroup('nav-grp-docs')">書類・メール <span class="nav-group-arrow" id="nav-grp-docs-arrow">▼</span></div>
+        <div class="nav-group-body" id="nav-grp-docs" style="max-height:200px">
+          <div class="nav-item" onclick="showPage('documents',this)" data-page="documents"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="10" height="12" rx="1.5"/><path d="M4 5h6M4 8h6M4 11h4"/></svg>書類生成</div>
+          <div class="nav-item" onclick="showPage('mail',this)" data-page="mail"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="12" height="8" rx="1.5"/><path d="M1 4l6 4 6-4"/></svg>メール <span id="mail-badge" style="background:#e53935;color:#fff;border-radius:99px;padding:0 5px;font-size:9px;margin-left:2px"></span><span id="inbox-nav-badge" style="background:#fb8c00;color:#fff;border-radius:99px;padding:0 5px;font-size:9px;margin-left:2px"></span></div>
+        </div>
 
         <div class="nav-group-header" onclick="toggleNavGroup('nav-grp-other')">その他 <span class="nav-group-arrow" id="nav-grp-other-arrow">▶</span></div>
         <div class="nav-group-body collapsed" id="nav-grp-other" style="max-height:0">
@@ -783,7 +787,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
       <div class="form-group"><label>再委託先名（外注の場合）</label><input type="text" id="v-sub" placeholder="山田 太郎"></div>
       <div class="form-group"><label>メモ</label><input type="text" id="v-note"></div>
       <div class="section-title">書類登録</div>
-      <div class="doc-section"><div class="doc-section-header"><div class="doc-section-title">🚗 車検証</div></div><div class="doc-fields"><div class="form-group"><label>有効期限</label><input type="date" id="v-shaken-exp"></div><div class="form-group"><label>車台番号</label><input type="text" id="v-shaken-chassis"></div><div class="form-group"><label>型式</label><input type="text" id="v-shaken-type"></div></div></div>
+      <div class="doc-section"><div class="doc-section-header"><div class="doc-section-title">車検証</div></div><div class="doc-fields"><div class="form-group"><label>有効期限</label><input type="date" id="v-shaken-exp"></div><div class="form-group"><label>車台番号</label><input type="text" id="v-shaken-chassis"></div><div class="form-group"><label>型式</label><input type="text" id="v-shaken-type"></div></div></div>
       <div class="doc-section"><div class="doc-section-header"><div class="doc-section-title">🔵 自賠責保険</div></div><div class="doc-fields"><div class="form-group"><label>満了日</label><input type="date" id="v-jibai-exp"></div><div class="form-group"><label>証券番号</label><input type="text" id="v-jibai-no"></div><div class="form-group"><label>保険会社</label><input type="text" id="v-jibai-company"></div></div></div>
       <div class="doc-section"><div class="doc-section-header"><div class="doc-section-title">🟢 任意保険</div></div><div class="doc-fields"><div class="form-group"><label>満了日</label><input type="date" id="v-nin-exp"></div><div class="form-group"><label>証券番号</label><input type="text" id="v-nin-no"></div><div class="form-group"><label>保険会社</label><input type="text" id="v-nin-company"></div></div></div>
     </div></div>
@@ -944,7 +948,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
       </div>
       <div class="form-group"><label>担当ドライバー</label><select id="cv-driver" class="modal-field"></select></div>
       <div class="section-title">書類登録</div>
-      <div class="doc-section"><div class="doc-section-header"><div class="doc-section-title">🚗 車検証</div></div><div class="doc-fields"><div class="form-group"><label>有効期限</label><input type="date" id="cv-shaken-exp" class="modal-field"></div><div class="form-group"><label>車台番号</label><input type="text" id="cv-shaken-chassis" class="modal-field"></div></div></div>
+      <div class="doc-section"><div class="doc-section-header"><div class="doc-section-title">車検証</div></div><div class="doc-fields"><div class="form-group"><label>有効期限</label><input type="date" id="cv-shaken-exp" class="modal-field"></div><div class="form-group"><label>車台番号</label><input type="text" id="cv-shaken-chassis" class="modal-field"></div></div></div>
       <div class="doc-section"><div class="doc-section-header"><div class="doc-section-title">🔵 自賠責保険</div></div><div class="doc-fields"><div class="form-group"><label>満了日</label><input type="date" id="cv-jibai-exp" class="modal-field"></div><div class="form-group"><label>証券番号</label><input type="text" id="cv-jibai-no" class="modal-field"></div><div class="form-group"><label>保険会社</label><input type="text" id="cv-jibai-company" class="modal-field"></div></div></div>
       <div class="doc-section"><div class="doc-section-header"><div class="doc-section-title">🟢 任意保険</div></div><div class="doc-fields"><div class="form-group"><label>満了日</label><input type="date" id="cv-nin-exp" class="modal-field"></div><div class="form-group"><label>証券番号</label><input type="text" id="cv-nin-no" class="modal-field"></div><div class="form-group"><label>保険会社</label><input type="text" id="cv-nin-company" class="modal-field"></div></div></div>
     </div></div>
@@ -1574,7 +1578,7 @@ function openAssignDriver(vehicleId){
   const modal=document.createElement('div');
   modal.className='modal-bg';modal.style.display='flex';
   modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'+
-    '<div class="modal-header"><span class="modal-title">🚗 担当ドライバーを割り当て</span><button class="modal-close" onclick="this.closest(\'.modal-bg\').remove()">✕</button></div>'+
+    '<div class="modal-header"><span class="modal-title">担当ドライバーを割り当て</span><button class="modal-close" onclick="this.closest(\'.modal-bg\').remove()">✕</button></div>'+
     '<div class="modal-body">'+
       '<div style="font-size:12px;margin-bottom:10px">車両：<strong>'+esc(v.plate)+'</strong> '+(v.model||'')+'</div>'+
       '<div class="form-group" style="margin-bottom:12px">'+
@@ -2135,12 +2139,12 @@ function openMailSendModal(taskId){
   // 添付ファイルセクション組み立て
   let attachHtml='';
   if(dFilesHtml){
-    attachHtml+='<div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #eee"><div style="font-size:10px;color:#888;margin-bottom:4px">👤 ドライバー書類</div>'+dFilesHtml+'</div>';
+    attachHtml+='<div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #eee"><div style="font-size:10px;color:#888;margin-bottom:4px">ドライバー書類</div>'+dFilesHtml+'</div>';
   } else {
     attachHtml+='<div style="font-size:11px;color:#e65100;margin-bottom:6px">⚠️ ドライバーの添付ファイルがありません</div>';
   }
   if(vFilesHtml){
-    attachHtml+='<div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #eee"><div style="font-size:10px;color:#888;margin-bottom:4px">🚗 車両書類'+vPlateLabel+'</div>'+vFilesHtml+'</div>';
+    attachHtml+='<div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #eee"><div style="font-size:10px;color:#888;margin-bottom:4px">車両書類'+vPlateLabel+'</div>'+vFilesHtml+'</div>';
   } else {
     attachHtml+='<div style="font-size:11px;color:#e65100;margin-bottom:6px">⚠️ 車両の添付ファイルがありません</div>';
   }
@@ -2192,7 +2196,7 @@ function addExtraVehicleToMail(taskId){
   const sel=document.createElement('div');
   sel.className='modal-bg';sel.style.display='flex';
   sel.innerHTML=`<div class="modal modal-sm" onclick="event.stopPropagation()">
-    <div class="modal-header"><span class="modal-title">🚗 車両を追加</span><button class="modal-close" onclick="this.closest('.modal-bg').remove()">✕</button></div>
+    <div class="modal-header"><span class="modal-title">車両を追加</span><button class="modal-close" onclick="this.closest('.modal-bg').remove()">✕</button></div>
     <div class="modal-body">
       <select id="extra-v-sel" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px">
         <option value="">選択してください</option>${opts}
@@ -3483,10 +3487,10 @@ function buildCascadeHTML(prefix, defaultVal){
   return `<div style="display:flex;flex-direction:column;gap:6px" id="${prefix}-wrap">
     <select id="${prefix}-cat" style="${selS}" onchange="cascadeCatChange('${prefix}')">
       <option value="">① カテゴリを選択</option>
-      <option value="ドライバー（自社）">👤 ドライバー（自社）</option>
-      <option value="車両（自社）">🚗 車両（自社）</option>
-      <option value="委託ドライバー">👤 委託ドライバー</option>
-      <option value="委託車両">🚗 委託車両</option>
+      <option value="ドライバー（自社）">ドライバー（自社）</option>
+      <option value="車両（自社）">車両（自社）</option>
+      <option value="委託ドライバー">委託ドライバー</option>
+      <option value="委託車両">委託車両</option>
     </select>
     <select id="${prefix}-grp" style="${selS}" onchange="cascadeGrpChange('${prefix}')" disabled>
       <option value="">② 営業所・委託会社を選択</option>
@@ -3526,7 +3530,7 @@ function cascadeGrpChange(prefix){
   data.forEach(d=>{
     const o=document.createElement('option');
     o.value=d.kind+':'+d.id;
-    const icon=d.kind==='driver'?'👤':'🚗';
+    const icon=d.kind==='driver'?'D':'V';
     const extra=d.kind==='vehicle'&&d.driver?' / '+d.driver:'';
     o.textContent=icon+' '+d.name+(d.office!==grp?' ('+d.office+')':'')+extra;
     dtlSel.appendChild(o);
@@ -3562,8 +3566,8 @@ function buildTargetSimpleOpts(selectedVal){
   const data=getCascadeData();
   let html='';
   const cats=[
-    ['ドライバー（自社）','👤'],['車両（自社）','🚗'],
-    ['委託ドライバー','👤'],['委託車両','🚗']
+    ['ドライバー（自社）','D'],['車両（自社）','V'],
+    ['委託ドライバー','D'],['委託車両','V']
   ];
   cats.forEach(([cat,icon])=>{
     const items=data[cat]||[];
@@ -3914,7 +3918,7 @@ function renderStorage(){
       const plateStr=cv?cv.plate:'車両未割当';
 
       if(!expanded){
-        return '<div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:10px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="storageToggleExpand(\''+key+'\')">'+
+        return '<div style="background:#fff;border:2px solid #ccc;border-radius:10px;padding:10px 14px;cursor:pointer;display:flex;align-items:flex-start;justify-content:space-between;height:100%;box-sizing:border-box" onclick="storageToggleExpand(\''+key+'\')">'+
           '<div style="display:flex;align-items:center;gap:10px">'+
             '<div style="width:32px;height:32px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:500;font-size:11px">'+typeIcon+'</div>'+
             '<div><div style="font-weight:500;font-size:14px">'+d.name+'</div>'+
@@ -3929,7 +3933,7 @@ function renderStorage(){
       }
 
       // 展開状態
-      let cardHtml='<div class="storage-card-expanded" style="background:#fff;border:1px solid #d0d0d0;border-radius:10px;padding:14px 16px">';
+      let cardHtml='<div class="storage-card-expanded" style="background:#fff;border:2px solid #aaa;border-radius:10px;padding:14px 16px">';
       cardHtml+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;cursor:pointer" onclick="storageToggleExpand(\''+key+'\')">';
       cardHtml+='<div style="display:flex;align-items:center;gap:10px">';
       cardHtml+='<div style="width:34px;height:34px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:500;font-size:12px">'+typeIcon+'</div>';
@@ -4003,7 +4007,7 @@ function renderStorage(){
     html+='<div class="storage-grid">';
     html+=unassignedVehicles.map(v=>{
       var vaf=v.attachedFiles||[];
-      return '<div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">'+
+      return '<div style="background:#fff;border:2px solid #ccc;border-radius:10px;padding:10px 14px;display:flex;align-items:flex-start;justify-content:space-between;height:100%;box-sizing:border-box">'+
         '<div><strong>'+v.plate+'</strong> <span style="font-size:11px;color:#888">'+(v.model||'')+' ・ '+(v._offices.join('・')||v.office||'未設定')+'</span></div>'+
         '<div style="display:flex;gap:4px;align-items:center">'+
           expBadge(minExp([v.shaken?.exp,v.jibai?.exp,v.nin?.exp]))+
@@ -4036,7 +4040,7 @@ function renderStorageFileView(el, allDrivers, allVehicles){
 
   const driversWithFiles=allDrivers.filter(d=>(d.attachedFiles||[]).length>0);
   if(driversWithFiles.length){
-    html+='<div style="font-size:13px;font-weight:600;color:#1565c0;margin:0 0 10px;padding:6px 0;border-bottom:2px solid #1565c0">👤 ドライバー書類（'+driversWithFiles.length+'名）</div>';
+    html+='<div style="font-size:13px;font-weight:600;color:#1565c0;margin:0 0 10px;padding:6px 0;border-bottom:2px solid #1565c0">ドライバー書類（'+driversWithFiles.length+'名）</div>';
     driversWithFiles.forEach(d=>{
       const files=d.attachedFiles||[];
       totalFiles+=files.length;
@@ -4056,7 +4060,7 @@ function renderStorageFileView(el, allDrivers, allVehicles){
 
   const vehiclesWithFiles=allVehicles.filter(v=>(v.attachedFiles||[]).length>0);
   if(vehiclesWithFiles.length){
-    html+='<div style="font-size:13px;font-weight:600;color:#e65100;margin:12px 0 10px;padding:6px 0;border-bottom:2px solid #e65100">🚗 車両書類（'+vehiclesWithFiles.length+'台）</div>';
+    html+='<div style="font-size:13px;font-weight:600;color:#e65100;margin:12px 0 10px;padding:6px 0;border-bottom:2px solid #e65100">車両書類（'+vehiclesWithFiles.length+'台）</div>';
     vehiclesWithFiles.forEach(v=>{
       const files=v.attachedFiles||[];
       totalFiles+=files.length;
@@ -4116,7 +4120,7 @@ function renderFileMgr(){
     );
 
     if(allDrivers.length){
-      html += `<div style="font-size:12px;font-weight:600;color:#888;margin:0 0 8px;padding:4px 0;border-bottom:1px solid #e0e0e0">👤 ドライバー（${allDrivers.length}名）</div>`;
+      html += `<div style="font-size:12px;font-weight:600;color:#888;margin:0 0 8px;padding:4px 0;border-bottom:1px solid #e0e0e0">ドライバー（${allDrivers.length}名）</div>`;
       html += allDrivers.map(d => {
         const files = d.attachedFiles || [];
         const dStatus = d.status || '在籍';
@@ -4170,7 +4174,7 @@ function renderFileMgr(){
     );
 
     if(allVehicles.length){
-      html += `<div style="font-size:12px;font-weight:600;color:#888;margin:8px 0;padding:4px 0;border-bottom:1px solid #e0e0e0">🚗 車両（${allVehicles.length}台）</div>`;
+      html += `<div style="font-size:12px;font-weight:600;color:#888;margin:8px 0;padding:4px 0;border-bottom:1px solid #e0e0e0">車両（${allVehicles.length}台）</div>`;
       html += allVehicles.map(v => {
         const files = v.attachedFiles || [];
         const assignedDriver = drivers.find(d=>d.id==v.driverId) || companies.flatMap(c=>c.drivers||[]).find(d=>d.id==v.driverId) || (v.driver ? {name:v.driver} : null);
@@ -5021,13 +5025,13 @@ function registerFromInbox(id){
   modal.className = 'modal-bg';
   modal.style.display = 'flex';
   modal.innerHTML = `<div class="modal" style="max-width:460px" onclick="event.stopPropagation()">
-    <div class="modal-header"><span class="modal-title">👤 ドライバー登録</span><button class="modal-close" onclick="this.closest('.modal-bg').remove()">✕</button></div>
+    <div class="modal-header"><span class="modal-title">ドライバー登録</span><button class="modal-close" onclick="this.closest('.modal-bg').remove()">✕</button></div>
     <div class="modal-body" style="max-height:75vh;overflow-y:auto">
       <div style="padding:10px 14px;background:#e3f2fd;border-radius:8px;margin-bottom:14px;font-size:12px">
         <strong>${esc(item.name)}</strong>
         ${item.birth?'<br>生年月日：'+item.birth:''}
         ${item.tel?'　電話：'+item.tel:''}
-        ${item.plate?'<br>🚗 '+esc(item.plate)+(item.vModel?' '+esc(item.vModel):'')+(item.vColor?' '+esc(item.vColor):''):''}
+        ${item.plate?'<br>'+esc(item.plate)+(item.vModel?' '+esc(item.vModel):'')+(item.vColor?' '+esc(item.vColor):''):''}
         ${hasRegcode?'<br>登録番号：<strong>'+esc(item.regcode)+'</strong>'+(isCompany?' → '+esc(item.companyName):' <span style="color:#e65100">（未照合）</span>'):''}
       </div>
 
@@ -5067,7 +5071,7 @@ function registerFromInbox(id){
       </div>
 
       <div id="reg-vehicle-section" style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:12px;margin-bottom:12px">
-        <div style="font-size:11px;font-weight:600;color:#e65100;margin-bottom:10px">🚗 車両情報</div>
+        <div style="font-size:11px;font-weight:600;color:#e65100;margin-bottom:10px">車両情報</div>
         <div style="font-size:10px;color:#888;margin-bottom:10px">書類の保存先として車両を同時登録できます</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <div class="form-group" style="grid-column:1/-1">
@@ -5243,7 +5247,7 @@ function execRegisterFromInbox(id){
 
   let msg = `✅ 「${item.name}」を${where}のドライバーとして登録しました。`;
   if(newVehicleId){
-    msg += `\n🚗 車両「${regPlate}」も同時に登録しました。`;
+    msg += `\n車両「${regPlate}」も同時に登録しました。`;
   }
   if(files.length){
     msg += `\n\n続けて「保存」ボタンで添付ファイルを振り分けてください。`;
@@ -6069,9 +6073,7 @@ function renderMailAttachments(office){
     });
   });
   const allDrivers = [...offD, ...companyDrivers];
-
-  // 車両も追加
-  const offV = vehicles.filter(v=>belongsToOffice(v,office));
+  const offV = vehicles.filter(v=>belongsToOffice(v,office)&&(!v.status||v.status==='稼働'));
   const companyVehicles = [];
   companies.forEach(c=>{
     (c.vehicles||[]).forEach(v=>{
@@ -6080,49 +6082,62 @@ function renderMailAttachments(office){
   });
   const allVehicles = [...offV, ...companyVehicles];
 
-  let items = [];
+  let html='';
 
-  // ドライバーの添付ファイル
-  allDrivers.forEach(d => {
-    (d.attachedFiles||[]).filter(f => f.fileId).forEach(f => {
-      items.push({label:'👤 '+d.name+' - '+(f.category||f.name), fileId:f.fileId, group:'driver'});
-    });
+  // ドライバーごとにグループ化（チェックボックスで選択）
+  html+='<div style="font-size:10px;color:#888;margin-bottom:4px;display:flex;justify-content:space-between"><span>ドライバー・車両書類（'+allDrivers.length+'名）</span><label style="cursor:pointer;font-size:10px"><input type="checkbox" checked onchange="mailToggleAllDrivers(this.checked)" style="margin-right:3px">全選択</label></div>';
+
+  allDrivers.forEach((d,di)=>{
+    const dFiles=(d.attachedFiles||[]).filter(f=>f.fileId);
+    // 紐づけ車両を探す
+    const cv=allVehicles.find(v=>v.driverId&&String(v.driverId)===String(d.id))||allVehicles.find(v=>v.driver===d.name);
+    const vFiles=cv?(cv.attachedFiles||[]).filter(f=>f.fileId):[];
+    const totalFiles=dFiles.length+vFiles.length;
+    const typeLabel=d._company?'委託('+d._company+')':d.type||'';
+
+    html+='<div style="border:1px solid #eee;border-radius:6px;padding:6px 8px;margin-bottom:4px'+(di%2?';background:#fafafa':'')+'">';
+    html+='<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:500"><input type="checkbox" checked class="mail-driver-check" data-idx="'+di+'" onchange="mailToggleDriver('+di+')"> '+d.name+' <span style="font-size:10px;color:#888;font-weight:400">'+typeLabel+' / 書類'+totalFiles+'件</span></label>';
+
+    // ドライバー書類
+    if(dFiles.length){
+      html+='<div class="mail-driver-files" data-driver="'+di+'" style="padding:2px 0 0 22px">';
+      dFiles.forEach(f=>{
+        html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;padding:1px 0;cursor:pointer"><input type="checkbox" checked class="mail-attach-check" data-file-id="'+f.fileId+'" data-group="driver" data-pdf-type=""> '+(f.category||f.name)+'</label>';
+      });
+      html+='</div>';
+    }
+
+    // 紐づけ車両書類
+    if(cv){
+      html+='<div class="mail-driver-files" data-driver="'+di+'" style="padding:2px 0 0 22px">';
+      html+='<div style="font-size:10px;color:#666;margin:2px 0">搭乗車両: '+cv.plate+'</div>';
+      vFiles.forEach(f=>{
+        html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;padding:1px 0;cursor:pointer"><input type="checkbox" checked class="mail-attach-check" data-file-id="'+f.fileId+'" data-group="vehicle" data-pdf-type=""> '+(f.category||f.name)+'</label>';
+      });
+      html+='</div>';
+    }
+    html+='</div>';
   });
 
-  // 車両の添付ファイル
-  allVehicles.forEach(v => {
-    (v.attachedFiles||[]).filter(f => f.fileId).forEach(f => {
-      items.push({label:'🚗 '+v.plate+' - '+(f.category||f.name), fileId:f.fileId, group:'vehicle'});
-    });
-  });
-
-  // 生成PDF（現況届・雇用証明書）
-  items.push({label:'現況届_'+office+'.pdf', fileId:'', group:'pdf', pdfType:'genkyo'});
-  const hasEmployees = allDrivers.some(d=>d.type==='社員');
-  if(hasEmployees){
-    items.push({label:'📋 雇用証明書_'+office+'.pdf', fileId:'', group:'pdf', pdfType:'koyou'});
+  // 生成PDF
+  html+='<div style="margin:8px 0 4px;font-size:10px;color:#888;border-top:1px solid #eee;padding-top:6px">生成PDF（送信時に自動生成）</div>';
+  html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;padding:2px 0;cursor:pointer"><input type="checkbox" checked class="mail-attach-check" data-file-id="" data-group="pdf" data-pdf-type="genkyo"> 現況届_'+office+'.pdf</label>';
+  if(allDrivers.some(d=>d.type==='社員')){
+    html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;padding:2px 0;cursor:pointer"><input type="checkbox" checked class="mail-attach-check" data-file-id="" data-group="pdf" data-pdf-type="koyou"> 雇用証明書_'+office+'.pdf</label>';
   }
 
-  if(!items.length){
-    el.innerHTML = '<div style="text-align:center;color:#aaa;padding:12px">添付可能なファイルがありません</div>';
-    return;
-  }
+  el.innerHTML=html;
+}
 
-  el.innerHTML = '<div style="margin-bottom:6px;font-size:10px;color:#888">👤 ドライバー書類</div>'+
-    items.filter(x=>x.group==='driver').map((item,i) => 
-      '<div style="display:flex;align-items:center;gap:6px;padding:3px 0"><input type="checkbox" checked class="mail-attach-check" data-file-id="'+item.fileId+'" data-group="'+item.group+'" data-pdf-type="">'+ 
-      '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+item.label+'</span></div>'
-    ).join('')+
-    '<div style="margin:6px 0;font-size:10px;color:#888;border-top:1px solid #eee;padding-top:6px">🚗 車両書類</div>'+
-    items.filter(x=>x.group==='vehicle').map(item =>
-      '<div style="display:flex;align-items:center;gap:6px;padding:3px 0"><input type="checkbox" checked class="mail-attach-check" data-file-id="'+item.fileId+'" data-group="'+item.group+'" data-pdf-type="">'+
-      '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+item.label+'</span></div>'
-    ).join('')+
-    '<div style="margin:6px 0;font-size:10px;color:#888;border-top:1px solid #eee;padding-top:6px">生成PDF（送信時に自動生成）</div>'+
-    items.filter(x=>x.group==='pdf').map(item =>
-      '<div style="display:flex;align-items:center;gap:6px;padding:3px 0"><input type="checkbox" checked class="mail-attach-check" data-file-id="" data-group="pdf" data-pdf-type="'+item.pdfType+'">'+
-      '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+item.label+'</span></div>'
-    ).join('');
+function mailToggleAllDrivers(checked){
+  document.querySelectorAll('.mail-driver-check').forEach(c=>{c.checked=checked;});
+  document.querySelectorAll('.mail-attach-check').forEach(c=>{if(c.dataset.group!=='pdf')c.checked=checked;});
+}
+
+function mailToggleDriver(idx){
+  const main=document.querySelector('.mail-driver-check[data-idx="'+idx+'"]');
+  const checked=main?main.checked:false;
+  document.querySelectorAll('.mail-driver-files[data-driver="'+idx+'"] .mail-attach-check').forEach(c=>{c.checked=checked;});
 }
 
 async function sendMail(){
