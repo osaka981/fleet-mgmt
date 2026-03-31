@@ -1678,43 +1678,53 @@ function renderVehicles(off){
 }
 
 function buildVehicleDetailRow(v, af){
-  let html='<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">';
-  html+='<div><div style="font-size:10px;color:#888;margin-bottom:4px;font-weight:500">車両書類（'+af.length+'件）</div>';
-  if(af.length){
-    html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
-    af.forEach(function(f,i){
-      var fid=f.fileId||(f.url&&f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)?f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1]:'');
-      var isImg=f.name&&f.name.match(/\.(jpg|jpeg|png|gif)$/i);
-      var thumbSrc=f.dataUrl||(fid&&isImg?'https://drive.google.com/thumbnail?id='+fid+'&sz=w120':'');
-      var thumb=thumbSrc&&isImg?'<img src="'+thumbSrc+'" style="width:60px;height:60px;object-fit:cover;display:block">':'<div style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;background:#e8e8e8;font-size:11px;color:#666">'+(f.name&&f.name.match(/\.pdf$/i)?'PDF':'FILE')+'</div>';
-      var cat=f.category||'';
-      html+='<div style="border:1px solid #ccc;border-radius:5px;overflow:hidden;cursor:pointer" onclick="event.stopPropagation();openAttachedFilePreview(\'vehicle\','+v.id+','+i+',\'\')" title="'+(f.name||'')+'">'+thumb+(cat?'<div style="font-size:8px;background:#E65100;color:#fff;padding:1px 3px;text-align:center">'+cat+'</div>':'')+'</div>';
-    });
-    html+='</div>';
-  } else { html+='<div style="font-size:11px;color:#aaa">書類なし</div>'; }
-  html+='</div>';
+  function thumbHtml(f,i,kind,eid){
+    var fid=f.fileId||(f.url&&f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)?f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1]:'');
+    var isImg=f.name&&f.name.match(/\.(jpg|jpeg|png|gif)$/i);
+    var thumbSrc=f.dataUrl||(fid&&isImg?'https://drive.google.com/thumbnail?id='+fid+'&sz=w120':'');
+    var thumb=thumbSrc&&isImg?'<img src="'+thumbSrc+'" style="width:56px;height:56px;object-fit:cover;display:block">':'<div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;background:#e8e8e8;font-size:10px;color:#666">'+(f.name&&f.name.match(/\.pdf$/i)?'PDF':'FILE')+'</div>';
+    return '<div style="border:1px solid #ccc;border-radius:4px;overflow:hidden;cursor:pointer" onclick="event.stopPropagation();openAttachedFilePreview(\''+kind+'\','+eid+','+i+',\'\')" title="'+(f.name||'')+'">'+thumb+'</div>';
+  }
+  var vCats=[{key:'車検証',label:'車検証',color:'#E65100'},{key:'自賠責',label:'自賠責',color:'#E65100'},{key:'任意保険',label:'任意保険',color:'#E65100'}];
+  var dCats=[{key:'免許証（表）',label:'免許証(表)',color:'#1565C0'},{key:'免許証（裏）',label:'免許証(裏)',color:'#1565C0'},{key:'健康診断書',label:'健康診断',color:'#2e7d32'}];
 
-  // 担当ドライバーの書類
+  var html='<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">';
+
+  // 車両書類をカテゴリ別に
+  vCats.forEach(function(cat){
+    var files=af.map(function(f,i){return {f:f,i:i};}).filter(function(x){return (x.f.category||'').includes(cat.key);});
+    html+='<div style="text-align:center"><div style="font-size:9px;color:#fff;background:'+cat.color+';padding:2px 6px;border-radius:4px;margin-bottom:3px">'+cat.label+'</div>';
+    if(files.length){files.forEach(function(x){html+=thumbHtml(x.f,x.i,'vehicle',v.id);});}
+    else{html+='<div style="width:56px;height:56px;border:1px dashed #ccc;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#aaa">なし</div>';}
+    html+='</div>';
+  });
+
+  // 車両その他
+  var vOther=af.map(function(f,i){return {f:f,i:i};}).filter(function(x){return !vCats.some(function(c){return (x.f.category||'').includes(c.key);});});
+  if(vOther.length){
+    html+='<div style="text-align:center"><div style="font-size:9px;color:#fff;background:#888;padding:2px 6px;border-radius:4px;margin-bottom:3px">その他</div>';
+    vOther.forEach(function(x){html+=thumbHtml(x.f,x.i,'vehicle',v.id);});
+    html+='</div>';
+  }
+
+  // 担当ドライバー書類
   if(v.driverId){
     var dr=drivers.find(function(d){return d.id==v.driverId;});
     if(dr){
       var daf=dr.attachedFiles||[];
-      html+='<div><div style="font-size:10px;color:#888;margin-bottom:4px;font-weight:500">担当: '+dr.name+'（'+daf.length+'件）</div>';
-      if(daf.length){
-        html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
-        daf.forEach(function(f,i){
-          var fid=f.fileId||(f.url&&f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)?f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1]:'');
-          var isImg=f.name&&f.name.match(/\.(jpg|jpeg|png|gif)$/i);
-          var thumbSrc=f.dataUrl||(fid&&isImg?'https://drive.google.com/thumbnail?id='+fid+'&sz=w120':'');
-          var thumb=thumbSrc&&isImg?'<img src="'+thumbSrc+'" style="width:60px;height:60px;object-fit:cover;display:block">':'<div style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;background:#e8e8e8;font-size:11px;color:#666">'+(f.name&&f.name.match(/\.pdf$/i)?'PDF':'FILE')+'</div>';
-          var cat=f.category||'';
-          html+='<div style="border:1px solid #ccc;border-radius:5px;overflow:hidden;cursor:pointer" onclick="event.stopPropagation();openAttachedFilePreview(\'driver\','+dr.id+','+i+',\'\')" title="'+(f.name||'')+'">'+thumb+(cat?'<div style="font-size:8px;background:#1565C0;color:#fff;padding:1px 3px;text-align:center">'+cat+'</div>':'')+'</div>';
-        });
+      html+='<div style="border-left:2px solid #ddd;padding-left:12px;display:flex;gap:12px;flex-wrap:wrap">';
+      html+='<div style="width:100%;font-size:9px;color:#888;margin-bottom:-8px">担当: '+dr.name+'</div>';
+      dCats.forEach(function(cat){
+        var files=daf.map(function(f,i){return {f:f,i:i};}).filter(function(x){return (x.f.category||'').includes(cat.key);});
+        html+='<div style="text-align:center"><div style="font-size:9px;color:#fff;background:'+cat.color+';padding:2px 6px;border-radius:4px;margin-bottom:3px">'+cat.label+'</div>';
+        if(files.length){files.forEach(function(x){html+=thumbHtml(x.f,x.i,'driver',dr.id);});}
+        else{html+='<div style="width:56px;height:56px;border:1px dashed #ccc;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#aaa">なし</div>';}
         html+='</div>';
-      } else { html+='<div style="font-size:11px;color:#aaa">書類なし</div>'; }
+      });
       html+='</div>';
     }
   }
+
   html+='</div>';
   return html;
 }
@@ -1768,42 +1778,52 @@ function renderDrivers(off){
 }
 
 function buildDriverDetailRow(d, af){
-  let html='<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">';
-  // ドライバー書類サムネ
-  html+='<div><div style="font-size:10px;color:#888;margin-bottom:4px;font-weight:500">ドライバー書類（'+af.length+'件）</div>';
-  if(af.length){
-    html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
-    af.forEach(function(f,i){
-      var fid=f.fileId||(f.url&&f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)?f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1]:'');
-      var isImg=f.name&&f.name.match(/\.(jpg|jpeg|png|gif)$/i);
-      var thumbSrc=f.dataUrl||(fid&&isImg?'https://drive.google.com/thumbnail?id='+fid+'&sz=w120':'');
-      var thumb=thumbSrc&&isImg?'<img src="'+thumbSrc+'" style="width:60px;height:60px;object-fit:cover;display:block">':'<div style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;background:#e8e8e8;font-size:11px;color:#666">'+(f.name&&f.name.match(/\.pdf$/i)?'PDF':'FILE')+'</div>';
-      var cat=f.category||'';
-      html+='<div style="border:1px solid #ccc;border-radius:5px;overflow:hidden;cursor:pointer" onclick="event.stopPropagation();openAttachedFilePreview(\'driver\','+d.id+','+i+',\'\')" title="'+(f.name||'')+'">'+thumb+(cat?'<div style="font-size:8px;background:#1565C0;color:#fff;padding:1px 3px;text-align:center">'+cat+'</div>':'')+'</div>';
-    });
-    html+='</div>';
-  } else { html+='<div style="font-size:11px;color:#aaa">書類なし</div>'; }
-  html+='</div>';
-
-  // 搭乗車両の書類
+  function thumbHtml(f,i,kind,eid){
+    var fid=f.fileId||(f.url&&f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)?f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1]:'');
+    var isImg=f.name&&f.name.match(/\.(jpg|jpeg|png|gif)$/i);
+    var thumbSrc=f.dataUrl||(fid&&isImg?'https://drive.google.com/thumbnail?id='+fid+'&sz=w120':'');
+    var thumb=thumbSrc&&isImg?'<img src="'+thumbSrc+'" style="width:56px;height:56px;object-fit:cover;display:block">':'<div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;background:#e8e8e8;font-size:10px;color:#666">'+(f.name&&f.name.match(/\.pdf$/i)?'PDF':'FILE')+'</div>';
+    return '<div style="border:1px solid #ccc;border-radius:4px;overflow:hidden;cursor:pointer" onclick="event.stopPropagation();openAttachedFilePreview(\''+kind+'\','+eid+','+i+',\'\')" title="'+(f.name||'')+'">'+thumb+'</div>';
+  }
+  // カテゴリ分類
+  var dCats=[{key:'免許証（表）',label:'免許証(表)',color:'#1565C0'},{key:'免許証（裏）',label:'免許証(裏)',color:'#1565C0'},{key:'健康診断書',label:'健康診断',color:'#2e7d32'}];
   var cv=vehicles.find(function(v){return v.driverId&&String(v.driverId)===String(d.id);})||vehicles.find(function(v){return v.driver===d.name;});
-  if(cv){
-    var vaf=cv.attachedFiles||[];
-    html+='<div><div style="font-size:10px;color:#888;margin-bottom:4px;font-weight:500">搭乗車両: '+cv.plate+'（'+vaf.length+'件）</div>';
-    if(vaf.length){
-      html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
-      vaf.forEach(function(f,i){
-        var fid=f.fileId||(f.url&&f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)?f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1]:'');
-        var isImg=f.name&&f.name.match(/\.(jpg|jpeg|png|gif)$/i);
-        var thumbSrc=f.dataUrl||(fid&&isImg?'https://drive.google.com/thumbnail?id='+fid+'&sz=w120':'');
-        var thumb=thumbSrc&&isImg?'<img src="'+thumbSrc+'" style="width:60px;height:60px;object-fit:cover;display:block">':'<div style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;background:#e8e8e8;font-size:11px;color:#666">'+(f.name&&f.name.match(/\.pdf$/i)?'PDF':'FILE')+'</div>';
-        var cat=f.category||'';
-        html+='<div style="border:1px solid #ccc;border-radius:5px;overflow:hidden;cursor:pointer" onclick="event.stopPropagation();openAttachedFilePreview(\'vehicle\','+cv.id+','+i+',\'\')" title="'+(f.name||'')+'">'+thumb+(cat?'<div style="font-size:8px;background:#E65100;color:#fff;padding:1px 3px;text-align:center">'+cat+'</div>':'')+'</div>';
-      });
-      html+='</div>';
-    } else { html+='<div style="font-size:11px;color:#aaa">書類なし</div>'; }
+  var vCats=[{key:'車検証',label:'車検証',color:'#E65100'},{key:'自賠責',label:'自賠責',color:'#E65100'},{key:'任意保険',label:'任意保険',color:'#E65100'}];
+
+  var html='<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">';
+
+  // ドライバー書類をカテゴリ別に
+  dCats.forEach(function(cat){
+    var files=af.map(function(f,i){return {f:f,i:i};}).filter(function(x){return (x.f.category||'').includes(cat.key);});
+    html+='<div style="text-align:center"><div style="font-size:9px;color:#fff;background:'+cat.color+';padding:2px 6px;border-radius:4px;margin-bottom:3px">'+cat.label+'</div>';
+    if(files.length){files.forEach(function(x){html+=thumbHtml(x.f,x.i,'driver',d.id);});}
+    else{html+='<div style="width:56px;height:56px;border:1px dashed #ccc;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#aaa">なし</div>';}
+    html+='</div>';
+  });
+
+  // その他（未分類含む）
+  var otherFiles=af.map(function(f,i){return {f:f,i:i};}).filter(function(x){return !dCats.some(function(c){return (x.f.category||'').includes(c.key);});});
+  if(otherFiles.length){
+    html+='<div style="text-align:center"><div style="font-size:9px;color:#fff;background:#888;padding:2px 6px;border-radius:4px;margin-bottom:3px">その他</div>';
+    otherFiles.forEach(function(x){html+=thumbHtml(x.f,x.i,'driver',d.id);});
     html+='</div>';
   }
+
+  // 搭乗車両書類
+  if(cv){
+    var vaf=cv.attachedFiles||[];
+    html+='<div style="border-left:2px solid #ddd;padding-left:12px;display:flex;gap:12px;flex-wrap:wrap">';
+    html+='<div style="width:100%;font-size:9px;color:#888;margin-bottom:-8px">搭乗車両: '+cv.plate+'</div>';
+    vCats.forEach(function(cat){
+      var files=vaf.map(function(f,i){return {f:f,i:i};}).filter(function(x){return (x.f.category||'').includes(cat.key);});
+      html+='<div style="text-align:center"><div style="font-size:9px;color:#fff;background:'+cat.color+';padding:2px 6px;border-radius:4px;margin-bottom:3px">'+cat.label+'</div>';
+      if(files.length){files.forEach(function(x){html+=thumbHtml(x.f,x.i,'vehicle',cv.id);});}
+      else{html+='<div style="width:56px;height:56px;border:1px dashed #ccc;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#aaa">なし</div>';}
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+
   html+='</div>';
   return html;
 }
@@ -2906,7 +2926,7 @@ function renderArchive(){
 
   // 種別バッジ
   badgeHtml+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
-  ['全て','ドライバー','車両'].forEach(t=>{
+  ['全て','ドライバー','車両','保管書類'].forEach(t=>{
     const isActive=filterType===t;
     badgeHtml+='<span style="padding:6px 14px;border-radius:20px;cursor:pointer;font-size:11px;font-weight:500;'+(isActive?'background:#4a90e2;color:#fff':'background:#f7f7f7;border:1px solid #ddd;color:#555')+'" onclick="archSetFilter(\'type\',\''+t+'\')">'+t+'</span>';
   });
@@ -2975,6 +2995,50 @@ function renderArchive(){
     }
   }
 
+  // 法定保管書類セクション（全ドライバーの健康診断書等）
+  if(filterType==='全て'||filterType==='保管書類'){
+    const allArchivedFiles=[];
+    let archDrivers=drivers;
+    if(filterOffice!=='全て'){
+      if(filterOffice==='未分類') archDrivers=archDrivers.filter(d=>!offices.some(o=>belongsToOffice(d,o)));
+      else archDrivers=archDrivers.filter(d=>belongsToOffice(d,filterOffice));
+    }
+    archDrivers.forEach(d=>{
+      (d.archivedFiles||[]).forEach((f,i)=>{
+        allArchivedFiles.push({...f, ownerName:f.ownerName||d.name, driverId:d.id, idx:i});
+      });
+    });
+    companies.forEach(c=>{
+      (c.drivers||[]).forEach(d=>{
+        if(filterOffice!=='全て'&&filterOffice!=='未分類'&&!(d.offices||[]).includes(filterOffice)) return;
+        (d.archivedFiles||[]).forEach((f,i)=>{
+          allArchivedFiles.push({...f, ownerName:f.ownerName||d.name+' ['+c.name+']', driverId:d.id, idx:i, isCompany:true, companyId:c.id});
+        });
+      });
+    });
+
+  if(allArchivedFiles.length){
+    html+='<div style="font-size:11px;font-weight:600;color:#888;margin:16px 0 8px;padding:4px 0;border-bottom:1px solid #e0e0e0">法定保管書類（'+allArchivedFiles.length+'件）</div>';
+    html+='<div class="table-wrap"><table><thead><tr><th>ドライバー</th><th>書類</th><th>保管日</th><th>元の登録日</th><th></th></tr></thead><tbody>';
+    allArchivedFiles.sort((a,b)=>(b.archivedAt||'').localeCompare(a.archivedAt||'')).forEach(f=>{
+      const dateStr=f.archivedAt?(f.archivedAt+'').slice(0,10):'—';
+      const uploadStr=f.uploadedAt?(f.uploadedAt+'').slice(0,10):'—';
+      const fid=f.fileId||'';
+      const nameClick=fid?'style="cursor:pointer;color:#4a90e2;text-decoration:underline" onclick="openFilePreview(\'\',\''+esc(f.name)+'\',\'\',\''+fid+'\')"':'';
+      html+='<tr>';
+      html+='<td><strong>'+f.ownerName+'</strong></td>';
+      html+='<td><span '+nameClick+'>'+(f.category||f.name)+'</span></td>';
+      html+='<td>'+dateStr+'</td>';
+      html+='<td style="font-size:11px;color:#888">'+uploadStr+'</td>';
+      html+='<td>';
+      if(fid) html+='<a href="https://drive.google.com/uc?export=download&id='+fid+'" target="_blank" class="btn btn-sm" style="font-size:10px;margin-right:4px">DL</a>';
+      html+='<button class="btn btn-sm btn-danger" style="font-size:10px" onclick="deleteArchiveFileFromList(\''+f.ownerName+'\','+f.driverId+','+f.idx+','+(f.isCompany?'true':'false')+','+(f.companyId||0)+')">削除</button>';
+      html+='</td></tr>';
+    });
+    html+='</tbody></table></div>';
+  }
+  } // end filterType 保管書類
+
   if(!html) html='<div style="padding:24px;text-align:center;color:#888;font-size:12px">アーカイブデータはありません</div>';
   document.getElementById('archive-list').innerHTML=html;
 }
@@ -3010,6 +3074,21 @@ function deleteArchivedVehicle(id){
   if(!confirm(`「${v.plate}」を完全に削除しますか？\nこの操作は元に戻せません。`))return;
   vehicles=vehicles.filter(x=>x.id!=id);
   saveLocal();renderArchive();renderVehicles(currentOfficeFilter);renderDashboard();renderDocPage();
+}
+
+function deleteArchiveFileFromList(ownerName, driverId, idx, isCompany, companyId){
+  if(!confirm(ownerName+'の保管書類を完全に削除しますか？\nこの操作は元に戻せません。')) return;
+  let target=null;
+  if(isCompany){
+    companies.forEach(c=>{
+      if(!target)(c.drivers||[]).forEach(d=>{if(d.id==driverId)target=d;});
+    });
+  } else {
+    target=drivers.find(d=>d.id==driverId);
+  }
+  if(!target||!target.archivedFiles) return;
+  target.archivedFiles.splice(idx,1);
+  saveLocal();saveCompanies();renderArchive();
 }
 
 function toggleArchiveFields(){
@@ -3079,6 +3158,7 @@ function openVehicleModal(id){
   document.getElementById('v-type').value='社有';document.getElementById('v-kind').value='軽四';document.getElementById('v-status').value='稼働';
   if(id){const v=vehicles.find(x=>x.id==id);if(v){document.getElementById('v-plate').value=v.plate||'';document.getElementById('v-model').value=v.model||'';document.getElementById('v-kind').value=v.kind||'軽四';document.getElementById('v-type').value=v.type||'社有';document.getElementById('v-status').value=v.status||'稼働';document.getElementById('v-office').value=v.office||'';document.getElementById('v-driver').value=v.driverId||'';document.getElementById('v-color').value=v.color||'';document.getElementById('v-owner').value=v.owner||'';document.getElementById('v-user').value=v.vehicleUser||'';document.getElementById('v-sub').value=v.sub||'';document.getElementById('v-note').value=v.note||'';document.getElementById('v-shaken-exp').value=v.shaken?.exp||'';document.getElementById('v-shaken-chassis').value=v.shaken?.chassis||'';document.getElementById('v-shaken-type').value=v.shaken?.type||'';document.getElementById('v-jibai-exp').value=v.jibai?.exp||'';document.getElementById('v-jibai-no').value=v.jibai?.no||'';document.getElementById('v-jibai-company').value=v.jibai?.company||'';document.getElementById('v-nin-exp').value=v.nin?.exp||'';document.getElementById('v-nin-no').value=v.nin?.no||'';document.getElementById('v-nin-company').value=v.nin?.company||'';}}
   document.getElementById('vehicle-modal').style.display='flex';
+  addWarekiToggle('v-shaken-exp');addWarekiToggle('v-jibai-exp');addWarekiToggle('v-nin-exp');
   modalFiles['v-files']=[];
   renderFilePreview('v-files');
   renderExistingFiles('v-existing-files','vehicle',id);
@@ -3102,7 +3182,7 @@ function saveVehicle(){
   }
 
   const vStatus=document.getElementById('v-status').value;
-  const obj={id:editingVehicleId||Date.now(),plate,status:vStatus,model:document.getElementById('v-model').value,kind:document.getElementById('v-kind').value,type:document.getElementById('v-type').value,office:document.getElementById('v-office').value,driver:(drivers.find(d=>d.id==document.getElementById('v-driver').value)||{name:''}).name,driverId:document.getElementById('v-driver').value||null,color:document.getElementById('v-color').value||'白',owner:document.getElementById('v-owner').value,vehicleUser:document.getElementById('v-user').value,sub:document.getElementById('v-sub').value,note:document.getElementById('v-note').value,shaken:{exp:document.getElementById('v-shaken-exp').value,chassis:document.getElementById('v-shaken-chassis').value,type:document.getElementById('v-shaken-type').value},jibai:{exp:document.getElementById('v-jibai-exp').value,no:document.getElementById('v-jibai-no').value,company:document.getElementById('v-jibai-company').value},nin:{exp:document.getElementById('v-nin-exp').value,no:document.getElementById('v-nin-no').value,company:document.getElementById('v-nin-company').value}};
+  const obj={id:editingVehicleId||Date.now(),plate,status:vStatus,model:document.getElementById('v-model').value,kind:document.getElementById('v-kind').value,type:document.getElementById('v-type').value,office:document.getElementById('v-office').value,driver:(drivers.find(d=>d.id==document.getElementById('v-driver').value)||{name:''}).name,driverId:document.getElementById('v-driver').value||null,color:document.getElementById('v-color').value||'白',owner:document.getElementById('v-owner').value,vehicleUser:document.getElementById('v-user').value,sub:document.getElementById('v-sub').value,note:document.getElementById('v-note').value,shaken:{exp:normalizeBirthDate(document.getElementById('v-shaken-exp').value),chassis:document.getElementById('v-shaken-chassis').value,type:document.getElementById('v-shaken-type').value},jibai:{exp:normalizeBirthDate(document.getElementById('v-jibai-exp').value),no:document.getElementById('v-jibai-no').value,company:document.getElementById('v-jibai-company').value},nin:{exp:normalizeBirthDate(document.getElementById('v-nin-exp').value),no:document.getElementById('v-nin-no').value,company:document.getElementById('v-nin-company').value}};
   if(editingVehicleId){const i=vehicles.findIndex(v=>v.id==editingVehicleId);if(i>=0)vehicles[i]=obj;else vehicles.push(obj);}else vehicles.push(obj);
   // ★ モーダルの添付ファイルをDriveにアップロード
   const vFiles = modalFiles['v-files'] || [];
@@ -3171,6 +3251,7 @@ function openDriverModal(id){
     }
   }
   document.getElementById('driver-modal').style.display='flex';
+  addWarekiToggle('d-birth');addWarekiToggle('d-license-exp');addWarekiToggle('d-sub-birth');addWarekiToggle('d-leave-date');
   renderExistingFiles('d-existing-files','driver',id);
   setTimeout(()=>initModalKeyNav('driver-modal'),100);
 }
@@ -3246,7 +3327,7 @@ function saveDriver(){
   const obj={id:editingDriverId||Date.now(),name,kana,type,status,
     office: selectedOffices[0]||'',
     offices: selectedOffices,
-    tel:document.getElementById('d-tel').value,birth:document.getElementById('d-birth').value,addr:document.getElementById('d-addr').value,license:{exp:document.getElementById('d-license-exp').value,no:document.getElementById('d-license-no').value,type:document.getElementById('d-license-type').value,cond:document.getElementById('d-license-cond').value},otherDocs,other:otherDocs[0]||{},sub:type==='外注（個人）'?{company:document.getElementById('d-sub-company').value,kana:document.getElementById('d-sub-kana').value,birth:document.getElementById('d-sub-birth').value,area:document.getElementById('d-sub-area').value,count:document.getElementById('d-sub-count').value,tel:document.getElementById('d-sub-tel').value}:{},leave:(status==='退職'||status==='休止')?{date:document.getElementById('d-leave-date').value,reason:document.getElementById('d-leave-reason').value,note:document.getElementById('d-leave-note').value}:{}};
+    tel:document.getElementById('d-tel').value,birth:normalizeBirthDate(document.getElementById('d-birth').value),addr:document.getElementById('d-addr').value,license:{exp:normalizeBirthDate(document.getElementById('d-license-exp').value),no:document.getElementById('d-license-no').value,type:document.getElementById('d-license-type').value,cond:document.getElementById('d-license-cond').value},otherDocs,other:otherDocs[0]||{},sub:type==='外注（個人）'?{company:document.getElementById('d-sub-company').value,kana:document.getElementById('d-sub-kana').value,birth:normalizeBirthDate(document.getElementById('d-sub-birth').value),area:document.getElementById('d-sub-area').value,count:document.getElementById('d-sub-count').value,tel:document.getElementById('d-sub-tel').value}:{},leave:(status==='退職'||status==='休止')?{date:normalizeBirthDate(document.getElementById('d-leave-date').value),reason:document.getElementById('d-leave-reason').value,note:document.getElementById('d-leave-note').value}:{}};
   if(editingDriverId){const i=drivers.findIndex(d=>d.id==editingDriverId);if(i>=0)drivers[i]=obj;else drivers.push(obj);}else drivers.push(obj);
   // ★ モーダルの添付ファイルをDriveにアップロード
   const dFiles = modalFiles['d-files'] || [];
@@ -3416,14 +3497,47 @@ function sfRemoveFile(i){sfFiles.splice(i,1);renderSfPreviews();}
 // 生年月日正規化（手入力対応: 1990/1/23, 1990-1-23, 19900123 等 → YYYY-MM-DD）
 function normalizeBirthDate(input){
   if(!input) return '';
-  const s = input.trim().replace(/[年月]/g,'-').replace(/日/g,'');
+  const s = input.trim().replace(/[年月]/g,'-').replace(/日/g,'').replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
   // YYYY-MM-DD or YYYY/M/D
   let m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
   if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
   // YYYYMMDD
   m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
   if(m) return m[1]+'-'+m[2]+'-'+m[3];
-  return input; // そのまま返す
+  // 和暦変換（S63.1.23 / 昭和63年1月23日 / H1/4/1 等）
+  const warekiMap={'明治':1868,'大正':1912,'昭和':1926,'平成':1989,'令和':2019,'M':1868,'T':1912,'S':1926,'H':1989,'R':2019};
+  m = s.match(/^(明治|大正|昭和|平成|令和|[MTSHR])[\.\s]*(\d{1,2})[\/\-\.\s]*(\d{1,2})[\/\-\.\s]*(\d{1,2})$/i);
+  if(m){const base=warekiMap[m[1]]||warekiMap[m[1].toUpperCase()];if(base){const y=base+parseInt(m[2])-1;return y+'-'+String(m[3]).padStart(2,'0')+'-'+String(m[4]).padStart(2,'0');}}
+  return input;
+}
+
+// 和暦⇔西暦ヘルパー
+function seirekiToWareki(y){y=parseInt(y);if(!y)return'';if(y>=2019)return'令和'+(y-2018);if(y>=1989)return'平成'+(y-1988);if(y>=1926)return'昭和'+(y-1925);if(y>=1912)return'大正'+(y-1911);return String(y);}
+
+function addWarekiToggle(inputId){
+  const input=document.getElementById(inputId);
+  if(!input||input.dataset.warekiInit) return;
+  input.dataset.warekiInit='1';
+  const wrapper=document.createElement('div');
+  wrapper.style.cssText='display:flex;gap:4px;align-items:center';
+  input.parentNode.insertBefore(wrapper,input);
+  wrapper.appendChild(input);
+  const btn=document.createElement('button');
+  btn.type='button';btn.textContent='和暦';
+  btn.style.cssText='font-size:9px;padding:4px 8px;border:1px solid #ccc;border-radius:4px;background:#f5f5f5;color:#666;cursor:pointer;white-space:nowrap';
+  btn.onclick=function(){
+    if(input.type==='date'){
+      const cur=input.value;
+      input.type='text';input.placeholder='S63.1.23 / 昭和63.1.23';
+      if(cur){const y=cur.slice(0,4);input.value=seirekiToWareki(y)+'.'+parseInt(cur.slice(5,7))+'.'+parseInt(cur.slice(8,10));}
+      btn.textContent='西暦';
+    } else {
+      const normalized=normalizeBirthDate(input.value);
+      input.type='date';input.placeholder='';input.value=normalized;
+      btn.textContent='和暦';
+    }
+  };
+  wrapper.appendChild(btn);
 }
 
 function sfLockForm(lock){
@@ -3990,12 +4104,17 @@ function renderExistingFiles(elId, kind, ownerId){
 
   // アーカイブ済み（健康診断書等）
   if(archived.length){
-    html+='<details style="margin-top:8px"><summary style="font-size:10px;color:#888;cursor:pointer">保管済み書類（'+archived.length+'件）- 法定保管</summary>';
+    html+='<details style="margin-top:8px"><summary style="font-size:10px;color:#888;cursor:pointer">保管済み書類（'+archived.length+'件）- 法定保管5年</summary>';
     html+='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">';
     archived.forEach((f,i)=>{
-      html+='<div style="padding:3px 8px;background:#f5f5f5;border:1px solid #ddd;border-radius:4px;font-size:9px;color:#888">';
-      html+=(f.category||f.name)+' <span style="color:#aaa">'+(f.archivedAt?(f.archivedAt+'').slice(0,10):'')+'</span>';
-      html+=' <span style="cursor:pointer;color:#e53935;margin-left:4px" onclick="deleteArchivedFile(\''+kind+'\','+ownerId+','+i+',\''+elId+'\')" title="完全削除">×</span>';
+      const label=(f.ownerName?f.ownerName+' / ':'')+(f.category||f.name);
+      const dateStr=f.archivedAt?(f.archivedAt+'').slice(0,10):'';
+      const fid=f.fileId||'';
+      const clickPart=fid?' style="cursor:pointer;text-decoration:underline" onclick="openFilePreview(\'\',\''+esc(f.name)+'\',\'\',\''+fid+'\')"':'';
+      html+='<div style="padding:4px 8px;background:#f5f5f5;border:1px solid #ddd;border-radius:4px;font-size:10px;color:#555">';
+      html+='<span'+clickPart+'>'+label+'</span>';
+      html+=' <span style="color:#aaa;font-size:9px">'+dateStr+'</span>';
+      html+=' <span style="cursor:pointer;color:#e53935;margin-left:4px;font-size:9px" onclick="deleteArchivedFile(\''+kind+'\','+ownerId+','+i+',\''+elId+'\')" title="完全削除">×</span>';
       html+='</div>';
     });
     html+='</div></details>';
@@ -4014,7 +4133,8 @@ function removeExistingFile(kind,ownerId,idx,elId){
   if(cat.includes('健康診断')){
     if(!confirm('健康診断書は法定保管（5年）が必要です。\n\n「アーカイブ」に移動しますか？\n（完全削除はアーカイブから行えます）')) return;
     if(!target.archivedFiles) target.archivedFiles=[];
-    target.archivedFiles.push({...f, archivedAt:new Date().toISOString()});
+    const ownerName=(kind==='driver'||kind==='cd')?(target.name||''):(target.plate||'');
+    target.archivedFiles.push({...f, archivedAt:new Date().toISOString(), ownerName, ownerKind:kind});
     target.attachedFiles.splice(idx,1);
   } else {
     if(!confirm('この添付ファイルを削除しますか？')) return;
@@ -4042,7 +4162,8 @@ function replaceExistingFile(kind,ownerId,idx,elId){
     // 健康診断書は旧ファイルをアーカイブ
     if(cat.includes('健康診断')){
       if(!target.archivedFiles) target.archivedFiles=[];
-      target.archivedFiles.push({...oldFile, archivedAt:new Date().toISOString()});
+      const ownerName=(kind==='driver'||kind==='cd')?(target.name||''):(target.plate||'');
+      target.archivedFiles.push({...oldFile, archivedAt:new Date().toISOString(), ownerName, ownerKind:kind});
     }
 
     // 新ファイルをDriveにアップロード
@@ -4170,6 +4291,24 @@ async function uploadFilesToDrive(files, folder, subFolder){
 }
 
 // ★ データ管理ページのレンダー
+// データ管理カード内のファイル削除
+function deleteCardFile(kind, ownerId, fileIdx){
+  if(!confirm('このファイルを削除しますか？')) return;
+  var target=findTarget(kind, ownerId);
+  if(!target||!target.attachedFiles||!target.attachedFiles[fileIdx]) return;
+  var f=target.attachedFiles[fileIdx];
+  // 健康診断書はアーカイブ
+  if((f.category||'').includes('健康診断')){
+    if(!target.archivedFiles) target.archivedFiles=[];
+    var ownerName=(kind==='driver')?(target.name||''):(target.plate||'');
+    target.archivedFiles.push({...f, archivedAt:new Date().toISOString(), ownerName:ownerName, ownerKind:kind});
+  }
+  target.attachedFiles.splice(fileIdx,1);
+  saveLocal();saveCompanies();renderStorage();
+  try{renderDrivers(currentOfficeFilter);}catch(e){}
+  try{renderVehicles(currentOfficeFilter);}catch(e){}
+}
+
 // カテゴリ変更ピッカー（クリックUI）
 function openCatPicker(kind, ownerId, fileIdx, labelEl){
   // 既存ピッカーを閉じる
@@ -4352,15 +4491,16 @@ function renderStorage(){
 
       if(!expanded){
         const vaf=cv?(cv.attachedFiles||[]):[];
+        const hasLic=af.some(function(f){return (f.category||'').includes('免許');});
         const fileInfo='<span style="font-size:10px;line-height:1.4;display:inline-block;text-align:right;background:#fff;color:#444;padding:2px 8px;border-radius:6px;border:1px solid #aab">ドライバー '+af.length+'件<br>車両 '+vaf.length+'件</span>';
         return '<div style="background:#d8dce3;border:1.5px solid #888;border-radius:8px;padding:8px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px" onclick="storageToggleExpand(\''+key+'\')">'+
           '<div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">'+
             '<div style="width:28px;height:28px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;flex-shrink:0">'+typeIcon+'</div>'+
-            '<div style="min-width:0"><div style="font-weight:600;font-size:13px;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d.name+'</div>'+
-            '<div style="font-size:10px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(d.type||'')+' ・ '+plateStr+'</div></div>'+
+            '<div style="min-width:0"><div style="font-weight:600;font-size:13px;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d.name+' <span style="font-size:9px;color:#999;font-weight:400">'+(d.kana||'')+'</span></div>'+
+            '<div style="font-size:10px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+plateStr+' ・ '+(d._offices.join('・')||'未設定')+'</div></div>'+
           '</div>'+
           '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+
-            expBadge(d.license?.exp)+
+            expBadge(d.license?.exp,hasLic)+
             fileInfo+
             '<span style="font-size:10px;color:#999;margin-left:2px">▶</span>'+
           '</div>'+
@@ -4368,14 +4508,31 @@ function renderStorage(){
       }
 
       // 展開状態
+      const hasLic=af.some(f=>(f.category||'').includes('免許'));
+      const vaf2=cv?(cv.attachedFiles||[]):[];
+      const hasShaken=vaf2.some(f=>(f.category||'').includes('車検'));
+      const hasJibai=vaf2.some(f=>(f.category||'').includes('自賠'));
+      const hasNin=vaf2.some(f=>(f.category||'').includes('任意'));
+
       let cardHtml='<div style="background:#cfd4dc;border:1.5px solid #777;border-radius:10px;padding:14px 16px;overflow:hidden">';
-      cardHtml+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;cursor:pointer" onclick="storageToggleExpand(\''+key+'\')">';
+      cardHtml+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;cursor:pointer" onclick="storageToggleExpand(\''+key+'\')">';
       cardHtml+='<div style="display:flex;align-items:center;gap:10px">';
       cardHtml+='<div style="width:34px;height:34px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:500;font-size:12px">'+typeIcon+'</div>';
-      cardHtml+='<div><div style="font-weight:600;font-size:15px;color:#222">'+d.name+'</div>';
-      cardHtml+='<div style="font-size:11px;color:#555">'+(d.type||'')+' ・ '+(d._offices.join('・')||'未設定')+'</div></div>';
+      cardHtml+='<div><div style="font-weight:600;font-size:15px;color:#222">'+d.name+' <span style="font-size:10px;color:#999;font-weight:400">'+(d.kana||'')+'</span></div>';
+      cardHtml+='<div style="font-size:11px;color:#555">'+plateStr+' ・ '+(d._offices.join('・')||'未設定')+'</div></div>';
       cardHtml+='</div>';
-      cardHtml+='<div style="display:flex;gap:4px;align-items:center">'+expBadge(d.license?.exp)+'<span style="font-size:10px;color:#666">添付 '+af.length+'</span><span style="color:#999;font-size:11px;margin-left:4px">▼</span></div>';
+      cardHtml+='<span style="color:#999;font-size:11px">▼</span>';
+      cardHtml+='</div>';
+
+      // バッジ行（免許 + 車両書類ステータス + アップロード）
+      cardHtml+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;align-items:center">';
+      cardHtml+='<span style="font-size:10px;padding:3px 8px;border-radius:6px;cursor:pointer;'+(hasLic?'background:#1565C0;color:#fff':'background:#e0e0e0;color:#888')+'" onclick="event.stopPropagation();openQuickUpload(\'driver\','+d.id+',\'license\')" title="免許証をアップロード">免許 '+expBadge(d.license?.exp,hasLic).replace(/<[^>]+>/g,'')+'</span>';
+      if(cv){
+        cardHtml+='<span style="font-size:10px;padding:3px 8px;border-radius:6px;cursor:pointer;'+(hasShaken?'background:#E65100;color:#fff':'background:#e0e0e0;color:#888')+'" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'shaken\')" title="車検証をアップロード">車検 '+(cv.shaken?.exp?cv.shaken.exp.slice(5).replace(/-/g,'/'):'—')+'</span>';
+        cardHtml+='<span style="font-size:10px;padding:3px 8px;border-radius:6px;cursor:pointer;'+(hasJibai?'background:#E65100;color:#fff':'background:#e0e0e0;color:#888')+'" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'jibai\')" title="自賠責をアップロード">自賠 '+(cv.jibai?.exp?cv.jibai.exp.slice(5).replace(/-/g,'/'):'—')+'</span>';
+        cardHtml+='<span style="font-size:10px;padding:3px 8px;border-radius:6px;cursor:pointer;'+(hasNin?'background:#E65100;color:#fff':'background:#e0e0e0;color:#888')+'" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'nin\')" title="任意保険をアップロード">任意 '+(cv.nin?.exp?cv.nin.exp.slice(5).replace(/-/g,'/'):'—')+'</span>';
+      }
+      cardHtml+='<span style="font-size:10px;padding:3px 8px;border-radius:6px;cursor:pointer;background:#4a90e2;color:#fff;margin-left:auto" onclick="event.stopPropagation();openQuickUpload(\'driver\','+d.id+',\'\')">+ 追加</span>';
       cardHtml+='</div>';
 
       // 詳細情報
@@ -4397,8 +4554,9 @@ function renderStorage(){
           var cat=f.category||guessFileCategoryByName(f.name,'driver')||'';
           var catLabel=cat||'未分類';
           var catBg=cat?'#1565C0':'#999';
-          cardHtml+='<div style="border:1px solid #aaa;border-radius:6px;overflow:hidden;background:#fff">';
+          cardHtml+='<div style="border:1px solid #aaa;border-radius:6px;overflow:hidden;background:#fff;position:relative">';
           cardHtml+='<div style="cursor:pointer" onclick="openAttachedFilePreview(\'driver\','+d.id+','+i+',\'\')">'+thumb+'</div>';
+          cardHtml+='<button style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:99px;background:rgba(0,0,0,.5);color:#fff;border:none;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center" onclick="event.stopPropagation();deleteCardFile(\'driver\','+d.id+','+i+')">×</button>';
           cardHtml+='<div style="font-size:9px;background:'+catBg+';color:#fff;padding:3px 4px;text-align:center;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" onclick="event.stopPropagation();openCatPicker(\'driver\','+d.id+','+i+',this)" title="クリックでカテゴリ変更">'+catLabel+'</div>';
           cardHtml+='</div>';
         });
@@ -4427,8 +4585,9 @@ function renderStorage(){
             var cat2=f.category||guessFileCategoryByName(f.name,'vehicle')||'';
             var catLabel2=cat2||'未分類';
             var catBg2=cat2?'#E65100':'#999';
-            cardHtml+='<div style="border:1px solid #999;border-radius:5px;overflow:hidden;background:#fff">';
+            cardHtml+='<div style="border:1px solid #999;border-radius:5px;overflow:hidden;background:#fff;position:relative">';
             cardHtml+='<div style="cursor:pointer" onclick="openAttachedFilePreview(\'vehicle\','+cv.id+','+i+',\'\')">'+thumb2+'</div>';
+            cardHtml+='<button style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:99px;background:rgba(0,0,0,.5);color:#fff;border:none;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center" onclick="event.stopPropagation();deleteCardFile(\'vehicle\','+cv.id+','+i+')">×</button>';
             cardHtml+='<div style="font-size:8px;background:'+catBg2+';color:#fff;padding:2px 3px;text-align:center;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" onclick="event.stopPropagation();openCatPicker(\'vehicle\','+cv.id+','+i+',this)" title="クリックでカテゴリ変更">'+catLabel2+'</div>';
             cardHtml+='</div>';
           });
