@@ -22,7 +22,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f
 .layout{display:flex;min-height:100vh}
 .sidebar{width:200px;background:#fff;border-right:1px solid #e0e0e0;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;z-index:10}
 .logo{padding:14px 16px 12px;border-bottom:1px solid #e0e0e0}
-.logo-title{font-size:13px;font-weight:600}
+.logo-title{font-size:13px;font-weight:600;white-space:nowrap}
 .logo-sub{font-size:10px;color:#888;margin-top:2px}
 .nav-section{padding:12px 10px 4px;font-size:10px;color:#aaa;font-weight:500;display:flex;align-items:center;justify-content:space-between}
 .nav-group-header{padding:6px 10px;font-size:10px;color:#888;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
@@ -61,7 +61,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f
 .stat-label{font-size:11px;color:#888;margin-bottom:4px}
 .stat-value{font-size:22px;font-weight:600}
 .stat-sub{font-size:10px;color:#aaa;margin-top:2px}
-.table-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden}
+.table-wrap{background:#fff;border:1px solid #e0e0e0;border-radius:10px;overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:12px}
 th{padding:8px 12px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #e0e0e0;background:#fafafa;white-space:nowrap;cursor:pointer;user-select:none}
 th .si{display:inline-block;margin-left:3px;opacity:.4;font-size:9px}
@@ -466,7 +466,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
   <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
   <div class="layout">
     <aside class="sidebar">
-      <div class="logo" style="cursor:pointer" onclick="location.reload()"><div class="logo-title" style="display:flex;align-items:center;gap:8px"><img src="" id="sidebar-logo" style="width:28px;height:28px;object-fit:contain">大阪急配 フリート管理</div><div class="logo-sub">車両・書類・人員</div></div>
+      <div class="logo" style="cursor:pointer" onclick="location.reload()"><div class="logo-title" style="display:flex;align-items:center;gap:6px"><img src="" id="sidebar-logo" style="width:22px;height:22px;object-fit:contain">大阪急配 フリート管理</div><div class="logo-sub">車両・書類・人員</div></div>
       <div style="padding:8px 4px 4px;flex:1;overflow-y:auto">
         <div class="nav-item active" onclick="showPage('dashboard',this)" data-page="dashboard"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg>ダッシュボード</div>
 
@@ -1686,9 +1686,9 @@ function renderVehicles(off){
       '<td><span class="badge '+(v.type==='持込'?'badge-info':'badge-gray')+'">'+v.type+'</span></td>'+
       '<td>'+(v.office||'—')+'</td>'+
       '<td style="font-size:11px;color:#888">'+(v.owner||'—')+'</td>'+
-      '<td>'+docBadge(v.shaken?.exp,hasS,'shaken')+'<span style="font-size:13px;color:#222;font-weight:700;cursor:pointer;margin-left:4px;padding:2px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(v.shaken?.exp||'')+'" style="display:none;width:85px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateVehicleExpInline('+vid+',\'shaken\',this.value)" placeholder="和暦/西暦OK"></td>'+
-      '<td>'+docBadge(v.jibai?.exp,hasJ,'jibai')+'<span style="font-size:13px;color:#222;font-weight:700;cursor:pointer;margin-left:4px;padding:2px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(v.jibai?.exp||'')+'" style="display:none;width:85px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateVehicleExpInline('+vid+',\'jibai\',this.value)" placeholder="和暦/西暦OK"></td>'+
-      '<td>'+docBadge(v.nin?.exp,hasN,'nin')+'<span style="font-size:13px;color:#222;font-weight:700;cursor:pointer;margin-left:4px;padding:2px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(v.nin?.exp||'')+'" style="display:none;width:85px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateVehicleExpInline('+vid+',\'nin\',this.value)" placeholder="和暦/西暦OK"></td>'+
+      '<td>'+docBadge(v.shaken?.exp,hasS,'shaken')+'<span style="font-size:10px;color:#555;font-weight:600;cursor:pointer;margin-left:3px;padding:2px 4px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(v.shaken?.exp||'')+'" style="display:none;width:85px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateVehicleExpInline('+vid+',\'shaken\',this.value)" placeholder="和暦/西暦OK"></td>'+
+      '<td>'+docBadge(v.jibai?.exp,hasJ,'jibai')+'<span style="font-size:10px;color:#555;font-weight:600;cursor:pointer;margin-left:3px;padding:2px 4px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(v.jibai?.exp||'')+'" style="display:none;width:85px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateVehicleExpInline('+vid+',\'jibai\',this.value)" placeholder="和暦/西暦OK"></td>'+
+      '<td>'+docBadge(v.nin?.exp,hasN,'nin')+'<span style="font-size:10px;color:#555;font-weight:600;cursor:pointer;margin-left:3px;padding:2px 4px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(v.nin?.exp||'')+'" style="display:none;width:85px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateVehicleExpInline('+vid+',\'nin\',this.value)" placeholder="和暦/西暦OK"></td>'+
       '<td>'+expBadge(minExp([v.shaken?.exp,v.jibai?.exp,v.nin?.exp]))+'</td>'+
       '<td>'+driverHtml+'</td>'+
       '<td><button class="btn btn-sm" onclick="event.stopPropagation();openVehicleModal('+vid+')">編集</button></td></tr>'+
@@ -1783,7 +1783,7 @@ function renderDrivers(off){
       '<td><span style="font-size:9px;color:#aaa;margin-right:4px">▶</span><strong>'+d.name+'</strong></td>'+
       '<td><span class="badge '+(d.type==='外注'||d.type==='外注（個人）'?'badge-info':'badge-gray')+'">'+d.type+'</span></td>'+
       '<td>'+allOffs+'</td>'+
-      '<td>'+licBadgeHtml+'<span style="font-size:13px;color:#222;font-weight:700;cursor:pointer;margin-left:4px;padding:2px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(d.license?.exp||'')+'" style="display:none;width:90px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateDriverExpInline('+did+',this.value)" placeholder="和暦/西暦OK"></td>'+
+      '<td>'+licBadgeHtml+'<span style="font-size:10px;color:#555;font-weight:600;cursor:pointer;margin-left:3px;padding:2px 4px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(d.license?.exp||'')+'" style="display:none;width:90px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateDriverExpInline('+did+',this.value)" placeholder="和暦/西暦OK"></td>'+
       '<td>'+(d.license?.type||'—')+'</td>'+
       '<td style="font-size:11px">'+(d.license?.cond||'—')+'</td>'+
       '<td>'+subHtml+'</td>'+
@@ -4701,8 +4701,9 @@ function renderStorage(){
       cardHtml+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;cursor:pointer" onclick="storageToggleExpand(\''+key+'\')">';
       cardHtml+='<div style="display:flex;align-items:center;gap:10px">';
       cardHtml+='<div style="width:34px;height:34px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:500;font-size:12px">'+typeIcon+'</div>';
-      cardHtml+='<div><div style="font-weight:600;font-size:15px;color:#222">'+d.name+' <span style="font-size:10px;color:#999;font-weight:400">'+(d.kana||'')+'</span></div>';
-      cardHtml+='<div style="font-size:11px;color:#555">'+plateStr+' ・ '+(d._offices.join('・')||'未設定')+'</div></div>';
+      cardHtml+='<div><div style="font-weight:600;font-size:15px;color:#222"><span style="cursor:pointer;color:#222" onclick="event.stopPropagation();navigateToDriver(\''+esc(d.name)+'\')">'+d.name+'</span> <span style="font-size:10px;color:#999;font-weight:400">'+(d.kana||'')+'</span></div>';
+      var plateLink=cv?'<span style="cursor:pointer;color:#4a90e2;text-decoration:underline" onclick="event.stopPropagation();navigateToVehicle(\''+esc(cv.plate)+'\')">'+plateStr+'</span>':plateStr;
+      cardHtml+='<div style="font-size:11px;color:#555">'+plateLink+' ・ '+(d._offices.join('・')||'未設定')+'</div></div>';
       cardHtml+='</div>';
       cardHtml+='<div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end">';
       var isSelf=d._src==='自社';
@@ -4770,7 +4771,7 @@ function renderStorage(){
       if(cv){
         cardHtml+='<div style="padding:10px 12px;background:#b8bfc9;color:#333;border-radius:8px;font-size:11px;margin-top:6px">';
         cardHtml+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
-        cardHtml+='<div><span style="font-size:10px;color:#555">搭乗車両</span> <strong>'+cv.plate+'</strong> <span style="color:#666">'+(cv.model||'')+'</span></div>';
+        cardHtml+='<div><span style="font-size:10px;color:#555">搭乗車両</span> <strong style="cursor:pointer;color:#4a90e2" onclick="event.stopPropagation();navigateToVehicle(\''+esc(cv.plate)+'\')">'+cv.plate+'</strong> <span style="color:#666">'+(cv.model||'')+'</span></div>';
         cardHtml+='<div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end">';
         cardHtml+='<button class="btn btn-sm" style="font-size:10px;padding:2px 10px" onclick="event.stopPropagation();openVehicleModal('+cv.id+')">編集</button>';
         cardHtml+='<span style="font-size:10px;padding:3px 10px;border-radius:20px;cursor:pointer;background:#4a90e2;color:#fff" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'\')">+ 追加</span>';
@@ -6189,7 +6190,7 @@ function renderCompanyPage(companyId, pageId){
     dRows += '<td><span style="font-size:9px;color:#aaa;margin-right:4px">▶</span><strong>' + d.name + '</strong></td>';
     dRows += '<td>' + (d.kana||'—') + '</td>';
     dRows += '<td>' + ((d.offices||[]).join('・')||'—') + '</td>';
-    dRows += '<td>' + licHtml + '<span style="font-size:13px;color:#222;font-weight:700;cursor:pointer;margin-left:4px;padding:2px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(d.license?.exp||'')+'" style="display:none;width:85px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateCompanyDriverExp('+companyId+','+d.id+',this.value)" placeholder="和暦/西暦OK"></td>';
+    dRows += '<td>' + licHtml + '<span style="font-size:10px;color:#555;font-weight:600;cursor:pointer;margin-left:3px;padding:2px 4px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(d.license?.exp||'')+'" style="display:none;width:85px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateCompanyDriverExp('+companyId+','+d.id+',this.value)" placeholder="和暦/西暦OK"></td>';
     dRows += '<td style="display:flex;gap:4px">';
     dRows += '<button class="btn btn-sm" onclick="event.stopPropagation();openCompanyDriverModal(' + companyId + ',' + d.id + ')">編集</button>';
     dRows += '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteCompanyDriver(' + companyId + ',' + d.id + ')">削除</button>';
@@ -6216,9 +6217,9 @@ function renderCompanyPage(companyId, pageId){
     vRows += '<td><span style="font-size:9px;color:#aaa;margin-right:4px">▶</span><strong>' + v.plate + '</strong></td>';
     vRows += '<td>' + (v.model||'—') + '</td>';
     vRows += '<td>' + ((v.offices||[]).join('・')||'—') + '</td>';
-    vRows += '<td>' + cvBadge(v.shaken&&v.shaken.exp?v.shaken.exp:'',hasS,'shaken') + '<span style="font-size:13px;color:#222;font-weight:700;cursor:pointer;margin-left:4px;padding:2px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(v.shaken?.exp||'')+'" style="display:none;width:85px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateCompanyVehicleExp('+companyId+','+v.id+',\'shaken\',this.value)" placeholder="和暦/西暦OK"></td>';
-    vRows += '<td>' + cvBadge(v.jibai&&v.jibai.exp?v.jibai.exp:'',hasJ,'jibai') + '<span style="font-size:13px;color:#222;font-weight:700;cursor:pointer;margin-left:4px;padding:2px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(v.jibai?.exp||'')+'" style="display:none;width:85px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateCompanyVehicleExp('+companyId+','+v.id+',\'jibai\',this.value)" placeholder="和暦/西暦OK"></td>';
-    vRows += '<td>' + cvBadge(v.nin&&v.nin.exp?v.nin.exp:'',hasN,'nin') + '<span style="font-size:13px;color:#222;font-weight:700;cursor:pointer;margin-left:4px;padding:2px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(v.nin?.exp||'')+'" style="display:none;width:85px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateCompanyVehicleExp('+companyId+','+v.id+',\'nin\',this.value)" placeholder="和暦/西暦OK"></td>';
+    vRows += '<td>' + cvBadge(v.shaken&&v.shaken.exp?v.shaken.exp:'',hasS,'shaken') + '<span style="font-size:10px;color:#555;font-weight:600;cursor:pointer;margin-left:3px;padding:2px 4px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(v.shaken?.exp||'')+'" style="display:none;width:85px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateCompanyVehicleExp('+companyId+','+v.id+',\'shaken\',this.value)" placeholder="和暦/西暦OK"></td>';
+    vRows += '<td>' + cvBadge(v.jibai&&v.jibai.exp?v.jibai.exp:'',hasJ,'jibai') + '<span style="font-size:10px;color:#555;font-weight:600;cursor:pointer;margin-left:3px;padding:2px 4px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(v.jibai?.exp||'')+'" style="display:none;width:85px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateCompanyVehicleExp('+companyId+','+v.id+',\'jibai\',this.value)" placeholder="和暦/西暦OK"></td>';
+    vRows += '<td>' + cvBadge(v.nin&&v.nin.exp?v.nin.exp:'',hasN,'nin') + '<span style="font-size:10px;color:#555;font-weight:600;cursor:pointer;margin-left:3px;padding:2px 4px" onclick="event.stopPropagation();var inp=this.nextElementSibling;inp.style.display=inp.style.display===\'none\'?\'block\':\'none\'" title="期限を編集">▼</span><input type="text" value="'+(v.nin?.exp||'')+'" style="display:none;width:85px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;margin-top:2px" onclick="event.stopPropagation()" onchange="updateCompanyVehicleExp('+companyId+','+v.id+',\'nin\',this.value)" placeholder="和暦/西暦OK"></td>';
     vRows += '<td style="display:flex;gap:4px">';
     vRows += '<button class="btn btn-sm" onclick="event.stopPropagation();openCompanyVehicleModal(' + companyId + ',' + v.id + ')">編集</button>';
     vRows += '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteCompanyVehicle(' + companyId + ',' + v.id + ')">削除</button>';
