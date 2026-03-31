@@ -1092,7 +1092,8 @@ function toggleDocExclude(office){
   renderSettingsOffices();renderDocPage();
 }
 
-function saveLocal(){localStorage.setItem('fleet_vehicles',JSON.stringify(vehicles));localStorage.setItem('fleet_drivers',JSON.stringify(drivers));localStorage.setItem('fleet_offices',JSON.stringify(offices));localStorage.setItem('fleet_companies',JSON.stringify(companies));localStorage.setItem('fleet_unassigned',JSON.stringify(unassignedFiles));localStorage.setItem('fleet_doc_exclude',JSON.stringify(docExclude));}
+let isDirty=false;
+function saveLocal(){localStorage.setItem('fleet_vehicles',JSON.stringify(vehicles));localStorage.setItem('fleet_drivers',JSON.stringify(drivers));localStorage.setItem('fleet_offices',JSON.stringify(offices));localStorage.setItem('fleet_companies',JSON.stringify(companies));localStorage.setItem('fleet_unassigned',JSON.stringify(unassignedFiles));localStorage.setItem('fleet_doc_exclude',JSON.stringify(docExclude));isDirty=true;}
 function parsePlate(plate){if(!plate)return{chiiki:'',bunrui:'',kana:'',num:''};const p=plate.trim().replace(/\s+/g,' ').split(' ');if(p.length>=4)return{chiiki:p[0],bunrui:p[1],kana:p[2],num:p[3]};const m=plate.match(/^([^\d]+?)(\d{3})\s*([あ-ん])\s*(\d+)/);if(m)return{chiiki:m[1].trim(),bunrui:m[2],kana:m[3],num:m[4]};return{chiiki:plate,bunrui:'',kana:'',num:''};}
 
 // ====== 同期 ======
@@ -1154,6 +1155,7 @@ async function syncToSheet(){
     const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'saveAll',drivers,vehicles,companies})});
     const json=await res.json();
     if(json.ok){
+      isDirty=false;
       const ts=new Date().toLocaleTimeString();
       localStorage.setItem('fleet_last_sync',ts);
       setSyncStatus('保存完了 '+ts,'sync-ok');
@@ -1192,6 +1194,7 @@ async function syncAll(){
     await syncInboxFromSheet();
     const ts=new Date().toLocaleTimeString();
     localStorage.setItem('fleet_last_sync',ts);
+    isDirty=false;
     setSyncStatus('一括同期完了 '+ts,'sync-ok');
   }catch(e){
     setSyncStatus('同期エラー: '+e.message,'sync-err');
@@ -1218,7 +1221,16 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 
 // ====== ログイン ======
 function doLogin(){const pw=document.getElementById('pw-input').value;if(pw===PASSWORD){sessionStorage.setItem('fleet_session','ok');document.getElementById('login-screen').style.display='none';document.getElementById('app-screen').style.display='block';renderAll();syncAll();}else{document.getElementById('login-err').textContent='パスワードが違います';document.getElementById('pw-input').value='';}}
-function doLogout(){sessionStorage.removeItem('fleet_session');document.getElementById('app-screen').style.display='none';document.getElementById('login-screen').style.display='flex';document.getElementById('pw-input').value='';document.getElementById('login-err').textContent='';}
+async function doLogout(){
+  if(isDirty){
+    setSyncStatus('保存中...','');
+    try{
+      await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'saveAll',drivers,vehicles,companies})});
+      isDirty=false;
+    }catch(e){}
+  }
+  sessionStorage.removeItem('fleet_session');document.getElementById('app-screen').style.display='none';document.getElementById('login-screen').style.display='flex';document.getElementById('pw-input').value='';document.getElementById('login-err').textContent='';
+}
 function changePw(){const o=document.getElementById('pw-old').value,n=document.getElementById('pw-new').value,n2=document.getElementById('pw-new2').value,msg=document.getElementById('pw-msg');if(o!==PASSWORD){msg.style.color='#e53935';msg.textContent='現在のパスワードが違います';return;}if(!n){msg.style.color='#e53935';msg.textContent='新しいパスワードを入力';return;}if(n!==n2){msg.style.color='#e53935';msg.textContent='確認用が一致しません';return;}PASSWORD=n;localStorage.setItem('fleet_pw',n);['pw-old','pw-new','pw-new2'].forEach(id=>document.getElementById(id).value='');msg.style.color='#43a047';msg.textContent='変更しました';}
 
 // ====== 営業所 ======
@@ -5724,7 +5736,7 @@ let editingCompanyDriverId = null;
 let editingCompanyVehicleId = null;
 let currentCompanyId = null;
 
-function saveCompanies(){localStorage.setItem('fleet_companies',JSON.stringify(companies));contractors=companies;}
+function saveCompanies(){localStorage.setItem('fleet_companies',JSON.stringify(companies));contractors=companies;isDirty=true;}
 
 function renderContractorsList(){
   const el=document.getElementById('contractors-list-content');
@@ -6738,6 +6750,42 @@ function renderAll(){
 function renderSettingsAll(){renderSettingsOffices();generateQR();loadAiSettings();renderMailSettings();}
 setTodayDate();
 initSelfForm();
+
+// ====== 自動保存 + ページ離脱時同期 ======
+// 5分ごとに自動保存（変更がある場合のみ）
+setInterval(function(){
+  if(!isDirty) return;
+  if(sessionStorage.getItem('fleet_session')!=='ok') return;
+  fetch(API_URL,{method:'POST',body:JSON.stringify({action:'saveAll',drivers,vehicles,companies})})
+    .then(r=>r.json())
+    .then(j=>{
+      if(j.ok){
+        isDirty=false;
+        const ts=new Date().toLocaleTimeString();
+        localStorage.setItem('fleet_last_sync',ts);
+        setSyncStatus('自動保存 '+ts,'sync-ok');
+      }
+    }).catch(()=>{});
+}, 5*60*1000);
+
+// タブ閉じ/ブラウザ閉じ時にsendBeaconで確実送信
+window.addEventListener('beforeunload', function(){
+  if(!isDirty) return;
+  if(sessionStorage.getItem('fleet_session')!=='ok') return;
+  const payload=JSON.stringify({action:'saveAll',drivers,vehicles,companies});
+  navigator.sendBeacon(API_URL, payload);
+  isDirty=false;
+});
+
+// タブが非表示になった時にも保存（スマホでアプリ切替時など）
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState!=='hidden') return;
+  if(!isDirty) return;
+  if(sessionStorage.getItem('fleet_session')!=='ok') return;
+  const payload=JSON.stringify({action:'saveAll',drivers,vehicles,companies});
+  navigator.sendBeacon(API_URL, payload);
+  isDirty=false;
+});
 
 // ====== 自動ログイン（同一タブ内のリロード時のみセッション維持）======
 // ?form=1 のQRフォームアクセス時は自動ログインしない
