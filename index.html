@@ -7264,6 +7264,7 @@ const TPL_DEFS=[
   {id:'tpl5',name:'再委託承認願',fileName:'マスタ2_4再委託承認願.docx',target:'both',desc:'委託会社+営業所情報を差し込み'}
 ];
 let tplFiles=JSON.parse(localStorage.getItem('fleet_tpl_files')||'{}');
+// tplFiles = { tplId: { fileId, fileName, url } }
 
 function initTemplatesPage(){
   var sel=document.getElementById('tpl-company');
@@ -7280,25 +7281,26 @@ function renderTemplates(){
   var co=coId?companies.find(c=>c.id==coId):null;
 
   var html='';
-  // テンプレートアップロードセクション
   html+='<div style="background:#f7f8fa;border:1px solid #e0e0e0;border-radius:8px;padding:12px 16px;margin-bottom:16px">';
-  html+='<div style="font-size:12px;font-weight:600;margin-bottom:8px">テンプレートファイル管理</div>';
-  html+='<div style="font-size:11px;color:#888;margin-bottom:8px">docxテンプレートをアップロードすると、委託会社情報を差し込んで書類を生成できます。</div>';
+  html+='<div style="font-size:12px;font-weight:600;margin-bottom:8px">テンプレートファイル管理（Google Drive保存）</div>';
+  html+='<div style="font-size:11px;color:#888;margin-bottom:8px">docxテンプレートをアップロードするとDriveに保存され、委託会社情報を差し込んで書類を生成できます。</div>';
   html+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
   TPL_DEFS.forEach(function(t){
     var stored=tplFiles[t.id];
-    var statusColor=stored?'#2e7d32':'#e53935';
-    var statusText=stored?'✓ 登録済':'未登録';
+    var hasDrive=stored&&stored.fileId;
+    var hasLocal=stored&&stored.dataUrl;
+    var statusColor=(hasDrive||hasLocal)?'#2e7d32':'#e53935';
+    var statusText=hasDrive?'✓ Drive保存済':hasLocal?'✓ ローカル保存':'未登録';
     html+='<div style="background:#fff;border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:11px;min-width:180px">';
     html+='<div style="font-weight:600;margin-bottom:2px">'+t.name+'</div>';
     html+='<div style="color:'+statusColor+';font-size:10px;margin-bottom:4px">'+statusText+'</div>';
-    html+='<label style="cursor:pointer;color:#4a90e2;font-size:10px"><input type="file" accept=".docx" style="display:none" onchange="uploadTplFile(\''+t.id+'\',this.files[0])">アップロード</label>';
-    if(stored) html+=' <span style="cursor:pointer;color:#e53935;font-size:10px;margin-left:8px" onclick="deleteTplFile(\''+t.id+'\')">削除</span>';
+    html+='<label style="cursor:pointer;color:#4a90e2;font-size:10px"><input type="file" accept=".docx" style="display:none" onchange="uploadTplFile(\''+t.id+'\',this.files[0])">'+(stored?'差し替え':'アップロード')+'</label>';
+    if(stored) html+=' <span style="cursor:pointer;color:#4a90e2;font-size:10px;margin-left:8px" onclick="previewTplOriginal(\''+t.id+'\')">DL</span>';
+    if(stored) html+=' <span style="cursor:pointer;color:#e53935;font-size:10px;margin-left:4px" onclick="deleteTplFile(\''+t.id+'\')">削除</span>';
     html+='</div>';
   });
   html+='</div></div>';
 
-  // 生成セクション
   if(!co){
     html+='<div style="padding:24px;text-align:center;color:#888;font-size:12px">委託会社を選択すると、テンプレート書類を生成できます。</div>';
     el.innerHTML=html;return;
@@ -7308,7 +7310,7 @@ function renderTemplates(){
   html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">';
   TPL_DEFS.forEach(function(t){
     var stored=tplFiles[t.id];
-    var canGen=!!stored;
+    var canGen=stored&&stored.dataUrl;
     var targetLabel=t.target==='sub'?'<span style="background:#E65100;color:#fff;padding:1px 6px;border-radius:3px;font-size:9px">再委託先</span>':t.target==='self'?'<span style="background:#1565C0;color:#fff;padding:1px 6px;border-radius:3px;font-size:9px">大阪急配</span>':'<span style="background:#6A1B9A;color:#fff;padding:1px 6px;border-radius:3px;font-size:9px">両方</span>';
     html+='<div style="background:#fff;border:1px solid #ddd;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px">';
     html+='<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:600;font-size:12px">'+t.name+'</div>'+targetLabel+'</div>';
@@ -7325,7 +7327,7 @@ function renderTemplates(){
   html+='</div>';
 
   // 一括生成ボタン
-  var allStored=TPL_DEFS.every(function(t){return !!tplFiles[t.id];});
+  var allStored=TPL_DEFS.every(function(t){return tplFiles[t.id]&&tplFiles[t.id].dataUrl;});
   if(allStored){
     html+='<div style="margin-top:12px;text-align:right">';
     html+='<button class="btn btn-primary" onclick="generateAllTemplates('+co.id+')">全テンプレート一括生成</button>';
@@ -7335,33 +7337,56 @@ function renderTemplates(){
   el.innerHTML=html;
 }
 
-function uploadTplFile(tplId, file){
+async function uploadTplFile(tplId, file){
   if(!file) return;
-  var reader=new FileReader();
-  reader.onload=function(e){
-    tplFiles[tplId]=e.target.result; // data URL
+  var tpl=TPL_DEFS.find(t=>t.id===tplId);
+  try{
+    var reader=new FileReader();
+    var dataUrl=await new Promise(function(resolve,reject){
+      reader.onload=function(e){resolve(e.target.result);};
+      reader.onerror=reject;
+      reader.readAsDataURL(file);
+    });
+    // localStorageに保存（生成用）+ Driveにバックアップ
+    var fileId='',url='';
+    try{
+      var res=await fetch(API_URL,{method:'POST',body:JSON.stringify({
+        action:'uploadFile',folder:'テンプレート',subFolder:'マスター',
+        fileName:tpl?tpl.fileName:file.name,
+        mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        dataUrl:dataUrl
+      })});
+      var data=await res.json();
+      if(data.ok){fileId=data.fileId;url=data.url;}
+    }catch(e){console.log('Drive upload optional error:',e);}
+    tplFiles[tplId]={fileId:fileId,fileName:tpl?tpl.fileName:file.name,url:url,dataUrl:dataUrl};
     localStorage.setItem('fleet_tpl_files',JSON.stringify(tplFiles));
+    alert('✓ テンプレートを登録しました'+(fileId?' (Driveにも保存)':''));
     renderTemplates();
-  };
-  reader.readAsDataURL(file);
+  }catch(e){
+    alert('アップロードエラー: '+e.message);
+  }
 }
 
 function deleteTplFile(tplId){
-  if(!confirm('このテンプレートを削除しますか？'))return;
+  if(!confirm('このテンプレートの登録を解除しますか？（Drive上のファイルは残ります）'))return;
   delete tplFiles[tplId];
   localStorage.setItem('fleet_tpl_files',JSON.stringify(tplFiles));
   renderTemplates();
 }
 
 function previewTplOriginal(tplId){
-  var dataUrl=tplFiles[tplId];
-  if(!dataUrl) return;
-  var tpl=TPL_DEFS.find(t=>t.id===tplId);
-  var blob=dataURLtoBlob(dataUrl);
-  var url=URL.createObjectURL(blob);
-  var a=document.createElement('a');
-  a.href=url;a.download=tpl?tpl.fileName:'template.docx';a.click();
-  URL.revokeObjectURL(url);
+  var stored=tplFiles[tplId];
+  if(!stored) return;
+  if(stored.fileId){
+    window.open('https://drive.google.com/uc?export=download&id='+stored.fileId,'_blank');
+  } else if(stored.dataUrl){
+    var tpl=TPL_DEFS.find(t=>t.id===tplId);
+    var blob=dataURLtoBlob(stored.dataUrl);
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');a.href=url;a.download=tpl?tpl.fileName:'template.docx';a.click();
+    URL.revokeObjectURL(url);
+  }
 }
 
 function dataURLtoBlob(dataUrl){
@@ -7374,19 +7399,18 @@ function dataURLtoBlob(dataUrl){
 }
 
 async function generateTemplate(tplId, companyId){
-  var dataUrl=tplFiles[tplId];
-  if(!dataUrl){alert('テンプレートが登録されていません');return;}
+  var stored=tplFiles[tplId];
+  if(!stored||!stored.dataUrl){alert('テンプレートが登録されていません');return;}
   var tpl=TPL_DEFS.find(t=>t.id===tplId);
   var co=companies.find(c=>c.id==companyId);
   if(!co){alert('委託会社が選択されていません');return;}
 
   try{
-    // JSZip読み込み確認
     if(typeof JSZip==='undefined'){
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
     }
 
-    var blob=dataURLtoBlob(dataUrl);
+    var blob=dataURLtoBlob(stored.dataUrl);
     var zip=await JSZip.loadAsync(blob);
     var docXml=await zip.file('word/document.xml').async('string');
 
