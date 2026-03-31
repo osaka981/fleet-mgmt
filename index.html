@@ -4727,7 +4727,7 @@ function renderStorage(){
       cardHtml+='</div>';
 
       // 期限入力行（トグル表示）
-      cardHtml+='<div style="margin-bottom:8px"><span style="font-size:12px;color:#333;font-weight:500;cursor:pointer" onclick="var row=this.nextElementSibling;row.style.display=row.style.display===\'none\'?\'flex\':\'none\';this.textContent=row.style.display===\'none\'?\'期限入力 ▶\':\'期限入力 ▼\'">期限入力 ▶</span>';
+      cardHtml+='<div style="margin-bottom:8px"><span style="font-size:13px;color:#222;font-weight:700;cursor:pointer" onclick="var row=this.nextElementSibling;row.style.display=row.style.display===\'none\'?\'flex\':\'none\';this.textContent=row.style.display===\'none\'?\'期限入力 ▶\':\'期限入力 ▼\'">期限入力 ▶</span>';
       cardHtml+='<div style="display:none;gap:6px;flex-wrap:wrap;margin-top:4px;align-items:center;font-size:10px;color:#666">';
       cardHtml+='<label style="display:flex;align-items:center;gap:3px">免許期限 <input type="text" value="'+(d.license?.exp||'')+'" style="width:90px;font-size:10px;padding:2px 6px;border:1px solid #ccc;border-radius:4px" onchange="updateDriverExpInline('+d.id+',this.value)" placeholder="和暦/西暦OK"></label>';
       if(cv){
