@@ -4302,10 +4302,17 @@ function deleteArchivedFile(kind,ownerId,idx,elId){
 
 function findTarget(kind,ownerId){
   let target=null;
-  if(kind==='driver') target=drivers.find(d=>d.id==ownerId);
-  else if(kind==='vehicle') target=vehicles.find(v=>v.id==ownerId);
-  else if(kind==='cd') companies.forEach(c=>{(c.drivers||[]).forEach(d=>{if(d.id==ownerId)target=d;});});
-  else if(kind==='cv') companies.forEach(c=>{(c.vehicles||[]).forEach(v=>{if(v.id==ownerId)target=v;});});
+  if(kind==='driver'){
+    target=drivers.find(d=>d.id==ownerId);
+    if(!target) companies.forEach(c=>{if(!target)(c.drivers||[]).forEach(d=>{if(d.id==ownerId)target=d;});});
+  } else if(kind==='vehicle'){
+    target=vehicles.find(v=>v.id==ownerId);
+    if(!target) companies.forEach(c=>{if(!target)(c.vehicles||[]).forEach(v=>{if(v.id==ownerId)target=v;});});
+  } else if(kind==='cd'){
+    companies.forEach(c=>{(c.drivers||[]).forEach(d=>{if(d.id==ownerId)target=d;});});
+  } else if(kind==='cv'){
+    companies.forEach(c=>{(c.vehicles||[]).forEach(v=>{if(v.id==ownerId)target=v;});});
+  }
   return target;
 }
 
@@ -4440,16 +4447,27 @@ function renderAssignList(){
 
 function execAssignUnassigned(idx,kind,targetId){
   var f=unassignedFiles[idx];
-  if(!f) return;
+  if(!f){alert('ファイルが見つかりません');return;}
   var target=findTarget(kind,targetId);
   if(!target){alert('振り分け先が見つかりません');return;}
   if(!target.attachedFiles) target.attachedFiles=[];
-  target.attachedFiles.push({name:f.name,type:f.type||'',url:f.url||'',fileId:f.fileId||'',dataUrl:f.dataUrl||'',category:'',uploadedAt:new Date().toISOString()});
+  target.attachedFiles.push({
+    name:f.name||'',
+    type:f.type||'',
+    url:f.url||'',
+    fileId:f.fileId||'',
+    dataUrl:f.dataUrl||'',
+    category:'',
+    uploadedAt:new Date().toISOString()
+  });
   unassignedFiles.splice(idx,1);
-  saveLocal();saveCompanies();renderStorage();
+  saveLocal();saveCompanies();
+  // モーダルを閉じる
+  var modal=document.getElementById('assign-modal');
+  if(modal) modal.remove();
+  renderStorage();
   try{renderDrivers(currentOfficeFilter);}catch(e){}
   try{renderVehicles(currentOfficeFilter);}catch(e){}
-  document.querySelectorAll('.modal-bg').forEach(function(m){m.remove();});
 }
 
 // データ管理カード内のファイル削除
@@ -4605,9 +4623,10 @@ function renderStorage(){
   });
 
   if(badgesEl){
-    const allKeys=[...offices];
-    const uncatTotal=officeCounts['未分類'].d+officeCounts['未分類'].v+unassignedFiles.length;
+    const allKeys=[];
+    const uncatTotal=unassignedFiles.length;
     if(uncatTotal>0) allKeys.push('未分類');
+    allKeys.push(...offices);
     badgesEl.innerHTML=allKeys.map(o=>{
       const cnt=officeCounts[o]||{d:0,v:0};
       const total=cnt.d+cnt.v;
@@ -4615,7 +4634,7 @@ function renderStorage(){
       const isActive=storageOfficeFilter===o;
       const isUncat=o==='未分類';
       const bg=isActive?'background:#4a90e2;color:#fff;border:1px solid #4a90e2':'background:#f7f7f7;border:1px solid '+(isUncat?'#e53935':'#ddd')+';color:'+(isUncat?'#e53935':'#555');
-      const subLabel=isUncat?'D:'+cnt.d+' / V:'+cnt.v+' / ファイル:'+unassignedFiles.length:'ドライバー '+cnt.d+' / 車両 '+cnt.v;
+      const subLabel=isUncat?'ドライバー:'+cnt.d+' / 車両:'+cnt.v+' / ファイル:'+uncatTotal:'ドライバー '+cnt.d+' / 車両 '+cnt.v;
       return '<div style="padding:8px 16px;border-radius:20px;cursor:pointer;text-align:center;min-width:70px;'+bg+'" onclick="storageSetOffice(\''+(isActive?'':o)+'\')">'+
         '<div style="font-size:13px;font-weight:600;margin-bottom:2px">'+o+'</div>'+
         '<div style="font-size:10px;opacity:.7">'+subLabel+'</div>'+
@@ -4684,7 +4703,16 @@ function renderStorage(){
       cardHtml+='<div><div style="font-weight:600;font-size:15px;color:#222">'+d.name+' <span style="font-size:10px;color:#999;font-weight:400">'+(d.kana||'')+'</span></div>';
       cardHtml+='<div style="font-size:11px;color:#555">'+plateStr+' ・ '+(d._offices.join('・')||'未設定')+'</div></div>';
       cardHtml+='</div>';
-      cardHtml+='<span style="color:#999;font-size:11px">▼</span>';
+      cardHtml+='<div style="display:flex;gap:4px;align-items:center">';
+      var isSelf=d._src==='自社';
+      if(isSelf){
+        cardHtml+='<button class="btn btn-sm" style="font-size:10px;padding:2px 8px" onclick="event.stopPropagation();openDriverModal('+d.id+')">編集</button>';
+      } else {
+        var coId=companies.find(function(c){return (c.drivers||[]).some(function(x){return x.id==d.id;});})?.id;
+        if(coId) cardHtml+='<button class="btn btn-sm" style="font-size:10px;padding:2px 8px" onclick="event.stopPropagation();openCompanyDriverModal('+coId+','+d.id+')">編集</button>';
+      }
+      cardHtml+='<span style="color:#999;font-size:11px;cursor:pointer" onclick="storageToggleExpand(\''+key+'\')">▼</span>';
+      cardHtml+='</div>';
       cardHtml+='</div>';
 
       // バッジ行（免許 + 車両書類ステータス + アップロード）
@@ -4740,7 +4768,7 @@ function renderStorage(){
       // 搭乗車両
       if(cv){
         cardHtml+='<div style="padding:8px 10px;background:#b8bfc9;color:#333;border-radius:8px;font-size:11px;margin-top:4px">';
-        cardHtml+='<div style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center"><div><span style="font-size:10px;color:#555">搭乗車両</span> <strong>'+cv.plate+'</strong> <span style="color:#666">'+(cv.model||'')+'</span></div><span style="font-size:10px;padding:3px 10px;border-radius:20px;cursor:pointer;background:#4a90e2;color:#fff" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'\')">+ 追加</span></div>';
+        cardHtml+='<div style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center"><div><span style="font-size:10px;color:#555">搭乗車両</span> <strong>'+cv.plate+'</strong> <span style="color:#666">'+(cv.model||'')+'</span></div><div style="display:flex;gap:4px"><button class="btn btn-sm" style="font-size:10px;padding:2px 8px" onclick="event.stopPropagation();openVehicleModal('+cv.id+')">編集</button><span style="font-size:10px;padding:3px 10px;border-radius:20px;cursor:pointer;background:#4a90e2;color:#fff" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'\')">+ 追加</span></div></div>';
         // 車両書類サムネ
         var vaf=cv.attachedFiles||[];
         if(vaf.length){
@@ -4790,8 +4818,8 @@ function renderStorage(){
     html+='</div>'; // close storage-grid
   }
 
-  // 未分類ファイル（フィルタなし or 未分類選択時）
-  if((!offF || offF==='未分類') && unassignedFiles.length){
+  // 未分類ファイル（未分類選択時のみ表示）
+  if(offF==='未分類' && unassignedFiles.length){
     html+='<div style="font-size:11px;font-weight:500;color:#e53935;margin:12px 0 8px">未分類ファイル（'+unassignedFiles.length+'件）</div>';
     html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px">';
     unassignedFiles.forEach(function(f,i){
