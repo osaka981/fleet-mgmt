@@ -1644,7 +1644,7 @@ function renderVehicles(off){
       driverHtml='<span style="cursor:pointer;color:#e65100;text-decoration:underline" onclick="event.stopPropagation();openAssignDriver('+vid+')" title="担当ドライバーを割り当て">未割当</span>';
     }
 
-    return '<tr class="'+rowCls([v.shaken?.exp,v.jibai?.exp,v.nin?.exp])+'">'+
+    return '<tr class="'+rowCls([v.shaken?.exp,v.jibai?.exp,v.nin?.exp])+'" style="cursor:pointer" onclick="toggleVehicleDetail('+vid+')">'+
       '<td><strong>'+v.plate+'</strong></td>'+
       '<td>'+(v.model||'—')+'</td>'+
       '<td><span class="badge '+(v.type==='持込'?'badge-info':'badge-gray')+'">'+v.type+'</span></td>'+
@@ -1655,8 +1655,56 @@ function renderVehicles(off){
       '<td>'+docBadge(v.nin?.exp,hasN,'nin')+'</td>'+
       '<td>'+expBadge(minExp([v.shaken?.exp,v.jibai?.exp,v.nin?.exp]))+'</td>'+
       '<td>'+driverHtml+'</td>'+
-      '<td><button class="btn btn-sm" onclick="openVehicleModal('+vid+')">編集</button></td></tr>';
+      '<td><button class="btn btn-sm" onclick="event.stopPropagation();openVehicleModal('+vid+')">編集</button></td></tr>'+
+    '<tr id="vehicle-detail-'+vid+'" style="display:none"><td colspan="11" style="background:#f7f8fa;padding:10px 14px">'+buildVehicleDetailRow(v,af)+'</td></tr>';
   }).join('');
+}
+
+function buildVehicleDetailRow(v, af){
+  let html='<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">';
+  html+='<div><div style="font-size:10px;color:#888;margin-bottom:4px;font-weight:500">車両書類（'+af.length+'件）</div>';
+  if(af.length){
+    html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    af.forEach(function(f,i){
+      var fid=f.fileId||(f.url&&f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)?f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1]:'');
+      var isImg=f.name&&f.name.match(/\.(jpg|jpeg|png|gif)$/i);
+      var thumbSrc=f.dataUrl||(fid&&isImg?'https://drive.google.com/thumbnail?id='+fid+'&sz=w120':'');
+      var thumb=thumbSrc&&isImg?'<img src="'+thumbSrc+'" style="width:60px;height:60px;object-fit:cover;display:block">':'<div style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;background:#e8e8e8;font-size:11px;color:#666">'+(f.name&&f.name.match(/\.pdf$/i)?'PDF':'FILE')+'</div>';
+      var cat=f.category||'';
+      html+='<div style="border:1px solid #ccc;border-radius:5px;overflow:hidden;cursor:pointer" onclick="event.stopPropagation();openAttachedFilePreview(\'vehicle\','+v.id+','+i+',\'\')" title="'+(f.name||'')+'">'+thumb+(cat?'<div style="font-size:8px;background:#E65100;color:#fff;padding:1px 3px;text-align:center">'+cat+'</div>':'')+'</div>';
+    });
+    html+='</div>';
+  } else { html+='<div style="font-size:11px;color:#aaa">書類なし</div>'; }
+  html+='</div>';
+
+  // 担当ドライバーの書類
+  if(v.driverId){
+    var dr=drivers.find(function(d){return d.id==v.driverId;});
+    if(dr){
+      var daf=dr.attachedFiles||[];
+      html+='<div><div style="font-size:10px;color:#888;margin-bottom:4px;font-weight:500">担当: '+dr.name+'（'+daf.length+'件）</div>';
+      if(daf.length){
+        html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+        daf.forEach(function(f,i){
+          var fid=f.fileId||(f.url&&f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)?f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1]:'');
+          var isImg=f.name&&f.name.match(/\.(jpg|jpeg|png|gif)$/i);
+          var thumbSrc=f.dataUrl||(fid&&isImg?'https://drive.google.com/thumbnail?id='+fid+'&sz=w120':'');
+          var thumb=thumbSrc&&isImg?'<img src="'+thumbSrc+'" style="width:60px;height:60px;object-fit:cover;display:block">':'<div style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;background:#e8e8e8;font-size:11px;color:#666">'+(f.name&&f.name.match(/\.pdf$/i)?'PDF':'FILE')+'</div>';
+          var cat=f.category||'';
+          html+='<div style="border:1px solid #ccc;border-radius:5px;overflow:hidden;cursor:pointer" onclick="event.stopPropagation();openAttachedFilePreview(\'driver\','+dr.id+','+i+',\'\')" title="'+(f.name||'')+'">'+thumb+(cat?'<div style="font-size:8px;background:#1565C0;color:#fff;padding:1px 3px;text-align:center">'+cat+'</div>':'')+'</div>';
+        });
+        html+='</div>';
+      } else { html+='<div style="font-size:11px;color:#aaa">書類なし</div>'; }
+      html+='</div>';
+    }
+  }
+  html+='</div>';
+  return html;
+}
+
+function toggleVehicleDetail(id){
+  var el=document.getElementById('vehicle-detail-'+id);
+  if(el) el.style.display=el.style.display==='none'?'table-row':'none';
 }
 function renderDrivers(off){
   let data=drivers.filter(d=>!d.status||d.status==='在籍');
@@ -1689,7 +1737,7 @@ function renderDrivers(off){
       subHtml='<span style="font-size:11px;color:#888">—</span>';
     }
 
-    return '<tr class="'+rowCls([d.license?.exp])+'">'+
+    return '<tr class="'+rowCls([d.license?.exp])+'" style="cursor:pointer" onclick="toggleDriverDetail('+did+')">'+
       '<td><strong>'+d.name+'</strong></td>'+
       '<td><span class="badge '+(d.type==='外注'||d.type==='外注（個人）'?'badge-info':'badge-gray')+'">'+d.type+'</span></td>'+
       '<td>'+allOffs+'</td>'+
@@ -1697,8 +1745,55 @@ function renderDrivers(off){
       '<td>'+(d.license?.type||'—')+'</td>'+
       '<td style="font-size:11px">'+(d.license?.cond||'—')+'</td>'+
       '<td>'+subHtml+'</td>'+
-      '<td><button class="btn btn-sm" onclick="openDriverModal('+did+')">編集</button></td></tr>';
+      '<td><button class="btn btn-sm" onclick="event.stopPropagation();openDriverModal('+did+')">編集</button></td></tr>'+
+    '<tr id="driver-detail-'+did+'" style="display:none"><td colspan="8" style="background:#f7f8fa;padding:10px 14px">'+buildDriverDetailRow(d,af)+'</td></tr>';
   }).join('');
+}
+
+function buildDriverDetailRow(d, af){
+  let html='<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">';
+  // ドライバー書類サムネ
+  html+='<div><div style="font-size:10px;color:#888;margin-bottom:4px;font-weight:500">ドライバー書類（'+af.length+'件）</div>';
+  if(af.length){
+    html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    af.forEach(function(f,i){
+      var fid=f.fileId||(f.url&&f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)?f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1]:'');
+      var isImg=f.name&&f.name.match(/\.(jpg|jpeg|png|gif)$/i);
+      var thumbSrc=f.dataUrl||(fid&&isImg?'https://drive.google.com/thumbnail?id='+fid+'&sz=w120':'');
+      var thumb=thumbSrc&&isImg?'<img src="'+thumbSrc+'" style="width:60px;height:60px;object-fit:cover;display:block">':'<div style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;background:#e8e8e8;font-size:11px;color:#666">'+(f.name&&f.name.match(/\.pdf$/i)?'PDF':'FILE')+'</div>';
+      var cat=f.category||'';
+      html+='<div style="border:1px solid #ccc;border-radius:5px;overflow:hidden;cursor:pointer" onclick="event.stopPropagation();openAttachedFilePreview(\'driver\','+d.id+','+i+',\'\')" title="'+(f.name||'')+'">'+thumb+(cat?'<div style="font-size:8px;background:#1565C0;color:#fff;padding:1px 3px;text-align:center">'+cat+'</div>':'')+'</div>';
+    });
+    html+='</div>';
+  } else { html+='<div style="font-size:11px;color:#aaa">書類なし</div>'; }
+  html+='</div>';
+
+  // 搭乗車両の書類
+  var cv=vehicles.find(function(v){return v.driverId&&String(v.driverId)===String(d.id);})||vehicles.find(function(v){return v.driver===d.name;});
+  if(cv){
+    var vaf=cv.attachedFiles||[];
+    html+='<div><div style="font-size:10px;color:#888;margin-bottom:4px;font-weight:500">搭乗車両: '+cv.plate+'（'+vaf.length+'件）</div>';
+    if(vaf.length){
+      html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+      vaf.forEach(function(f,i){
+        var fid=f.fileId||(f.url&&f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)?f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1]:'');
+        var isImg=f.name&&f.name.match(/\.(jpg|jpeg|png|gif)$/i);
+        var thumbSrc=f.dataUrl||(fid&&isImg?'https://drive.google.com/thumbnail?id='+fid+'&sz=w120':'');
+        var thumb=thumbSrc&&isImg?'<img src="'+thumbSrc+'" style="width:60px;height:60px;object-fit:cover;display:block">':'<div style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;background:#e8e8e8;font-size:11px;color:#666">'+(f.name&&f.name.match(/\.pdf$/i)?'PDF':'FILE')+'</div>';
+        var cat=f.category||'';
+        html+='<div style="border:1px solid #ccc;border-radius:5px;overflow:hidden;cursor:pointer" onclick="event.stopPropagation();openAttachedFilePreview(\'vehicle\','+cv.id+','+i+',\'\')" title="'+(f.name||'')+'">'+thumb+(cat?'<div style="font-size:8px;background:#E65100;color:#fff;padding:1px 3px;text-align:center">'+cat+'</div>':'')+'</div>';
+      });
+      html+='</div>';
+    } else { html+='<div style="font-size:11px;color:#aaa">書類なし</div>'; }
+    html+='</div>';
+  }
+  html+='</div>';
+  return html;
+}
+
+function toggleDriverDetail(id){
+  var el=document.getElementById('driver-detail-'+id);
+  if(el) el.style.display=el.style.display==='none'?'table-row':'none';
 }
 
 // ====== ダッシュボード ======
@@ -2079,6 +2174,7 @@ function mtFilterByOffice(){
   const officeVal=document.getElementById('mt-office')?.value||'';
   const allD=window._mtAllDrivers||[];
   const filtered=officeVal?allD.filter(d=>d.office===officeVal):allD;
+  const showOfficeGroups=!officeVal; // すべての営業所の時だけグループ表示
 
   const byOffice={};
   filtered.forEach(d=>{
@@ -2088,15 +2184,23 @@ function mtFilterByOffice(){
   });
 
   let html='<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><label style="font-size:10px;cursor:pointer;color:#888"><input type="checkbox" onchange="mtToggleAll(this.checked)" style="margin-right:3px">全選択</label></div>';
-  Object.keys(byOffice).sort().forEach(o=>{
-    const ds=byOffice[o];
-    html+='<div style="margin-bottom:8px">';
-    html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><label style="font-size:11px;font-weight:600;color:#888;cursor:pointer"><input type="checkbox" onchange="mtToggleOffice(this,\''+o+'\')" style="margin-right:4px">'+o+'（'+ds.length+'名）</label></div>';
-    ds.forEach(d=>{
-      html+='<label style="display:flex;align-items:center;gap:6px;padding:3px 0 3px 16px;font-size:12px;cursor:pointer"><input type="checkbox" class="mt-driver-check" value="'+d.id+'" data-name="'+esc(d.name)+'" data-type="'+esc(d.type)+'" data-office="'+esc(d.office)+'"> '+d.name+' <span style="font-size:10px;color:#888">'+d.type+'</span></label>';
+
+  if(showOfficeGroups){
+    Object.keys(byOffice).sort().forEach(o=>{
+      const ds=byOffice[o];
+      html+='<div style="margin-bottom:8px">';
+      html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><label style="font-size:11px;font-weight:600;color:#888;cursor:pointer"><input type="checkbox" onchange="mtToggleOffice(this,\''+o+'\')" style="margin-right:4px">'+o+'（'+ds.length+'名）</label></div>';
+      ds.forEach(d=>{
+        html+='<label style="display:flex;align-items:center;gap:6px;padding:3px 0 3px 16px;font-size:12px;cursor:pointer"><input type="checkbox" class="mt-driver-check" value="'+d.id+'" data-name="'+esc(d.name)+'" data-type="'+esc(d.type)+'" data-office="'+esc(d.office)+'"> '+d.name+' <span style="font-size:10px;color:#888">'+d.type+'</span></label>';
+      });
+      html+='</div>';
     });
-    html+='</div>';
-  });
+  } else {
+    filtered.forEach(d=>{
+      html+='<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer"><input type="checkbox" class="mt-driver-check" value="'+d.id+'" data-name="'+esc(d.name)+'" data-type="'+esc(d.type)+'" data-office="'+esc(d.office)+'"> '+d.name+' <span style="font-size:10px;color:#888">'+d.type+'</span></label>';
+    });
+  }
+
   if(!filtered.length) html+='<div style="text-align:center;color:#aaa;padding:12px;font-size:12px">該当するドライバーがいません</div>';
   document.getElementById('mt-driver-list').innerHTML=html;
 }
@@ -4010,7 +4114,7 @@ function renderStorage(){
 
       if(!expanded){
         const vaf=cv?(cv.attachedFiles||[]):[];
-        const fileInfo='<span style="font-size:8px;line-height:1.3;display:inline-block;text-align:right">ドライバー '+af.length+'件<br>車両 '+vaf.length+'件</span>';
+        const fileInfo='<span style="font-size:10px;line-height:1.4;display:inline-block;text-align:right;background:#fff;color:#444;padding:2px 8px;border-radius:6px;border:1px solid #aab">ドライバー '+af.length+'件<br>車両 '+vaf.length+'件</span>';
         return '<div style="background:#d8dce3;border:1.5px solid #888;border-radius:8px;padding:8px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px" onclick="storageToggleExpand(\''+key+'\')">'+
           '<div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">'+
             '<div style="width:28px;height:28px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;flex-shrink:0">'+typeIcon+'</div>'+
@@ -4019,7 +4123,7 @@ function renderStorage(){
           '</div>'+
           '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+
             expBadge(d.license?.exp)+
-            '<span style="font-size:9px;color:#666;background:#c0c4cb;padding:1px 6px;border-radius:99px">'+fileInfo+'</span>'+
+            fileInfo+
             '<span style="font-size:10px;color:#999;margin-left:2px">▶</span>'+
           '</div>'+
         '</div>';
