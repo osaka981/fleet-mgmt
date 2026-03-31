@@ -5059,7 +5059,7 @@ function renderUnassignedBox(){
         <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</div>
         <div style="font-size:10px;color:#aaa">${f.docType||'種別未設定'} ${savedDate?'・'+savedDate:''} ${f.note?'・<span style="color:#e65100">'+esc(f.note)+'</span>':''}</div>
       </div>
-      <select onchange="assignUnassignedFile(${i},this.value)" style="font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:5px;min-width:180px">
+      <select onchange="assignUnassignedFileSelect(${i},this.value)" style="font-size:11px;padding:4px 6px;border:1px solid #ddd;border-radius:5px;min-width:180px">
         <option value="">— 紐づけ先を選択 —</option>
         ${targetOpts}
       </select>
@@ -5077,7 +5077,7 @@ function renderUnassignedBox(){
   </div>`;
 }
 
-function assignUnassignedFile(idx, val){
+function assignUnassignedFileSelect(idx, val){
   if(!val) return;
   const [kind, id] = val.split(':');
   const file = unassignedFiles[idx];
@@ -5090,7 +5090,7 @@ function assignUnassignedFile(idx, val){
   if(!target){ alert('紐づけ先が見つかりません'); return; }
 
   if(!target.attachedFiles) target.attachedFiles = [];
-  target.attachedFiles.push({name:file.name, dataUrl:file.dataUrl||'', type:file.type||'', uploadedAt:file.savedAt});
+  target.attachedFiles.push({name:file.name, dataUrl:file.dataUrl||'', type:file.type||'', url:file.url||'', fileId:file.fileId||'', uploadedAt:file.savedAt});
 
   unassignedFiles.splice(idx, 1);
   saveLocal(); saveCompanies();
