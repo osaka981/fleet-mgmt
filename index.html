@@ -33,7 +33,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f
 .storage-grid{display:grid;grid-template-columns:1fr;gap:8px}
 @media(min-width:768px){.storage-grid{grid-template-columns:repeat(2,1fr)}}
 @media(min-width:1200px){.storage-grid{grid-template-columns:repeat(3,1fr)}}
-.storage-grid>div{min-height:220px;min-width:0;overflow:hidden}
+.storage-grid>div{min-width:0}
 .nav-add-btn{width:20px;height:20px;border:1px solid #ddd;border-radius:4px;background:transparent;cursor:pointer;color:#888;font-size:14px;display:flex;align-items:center;justify-content:center}
 .nav-add-btn:hover{background:#f5f5f5}
 .nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;cursor:pointer;color:#666;transition:all .15s;margin:1px 6px;font-size:12px}
@@ -3990,16 +3990,16 @@ function renderStorage(){
       const plateStr=cv?cv.plate:'車両未割当';
 
       if(!expanded){
-        return '<div style="background:#d8dce3;border:1.5px solid #888;border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;min-height:200px;box-sizing:border-box;overflow:hidden" onclick="storageToggleExpand(\''+key+'\')">'+
-          '<div style="display:flex;align-items:center;gap:10px">'+
-            '<div style="width:32px;height:32px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:500;font-size:11px;flex-shrink:0">'+typeIcon+'</div>'+
-            '<div style="min-width:0"><div style="font-weight:600;font-size:14px;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d.name+'</div>'+
-            '<div style="font-size:11px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(d.type||'')+' ・ '+plateStr+'</div></div>'+
+        return '<div style="background:#d8dce3;border:1.5px solid #888;border-radius:8px;padding:8px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px" onclick="storageToggleExpand(\''+key+'\')">'+
+          '<div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">'+
+            '<div style="width:28px;height:28px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;flex-shrink:0">'+typeIcon+'</div>'+
+            '<div style="min-width:0"><div style="font-weight:600;font-size:13px;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d.name+'</div>'+
+            '<div style="font-size:10px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(d.type||'')+' ・ '+plateStr+'</div></div>'+
           '</div>'+
-          '<div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;margin-top:auto">'+
+          '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+
             expBadge(d.license?.exp)+
-            '<span style="font-size:10px;color:'+(af.length?'#666':'#e53935')+'">添付 '+af.length+'</span>'+
-            '<span style="font-size:11px;color:#999;margin-left:4px">▶</span>'+
+            '<span style="font-size:10px;color:'+(af.length?'#666':'#e53935')+'">'+af.length+'件</span>'+
+            '<span style="font-size:10px;color:#999;margin-left:2px">▶</span>'+
           '</div>'+
         '</div>';
       }
@@ -4089,11 +4089,11 @@ function renderStorage(){
     html+='<div class="storage-grid">';
     html+=unassignedVehicles.map(v=>{
       var vaf=v.attachedFiles||[];
-      return '<div style="background:#d8dce3;border:1.5px solid #888;border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;min-height:200px;box-sizing:border-box;overflow:hidden">'+
-        '<div><strong style="font-size:14px">'+v.plate+'</strong> <span style="font-size:11px;color:#777">'+(v.model||'')+'</span><div style="font-size:11px;color:#888;margin-top:2px">'+(v._offices.join('・')||v.office||'未設定')+'</div></div>'+
-        '<div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;margin-top:auto">'+
+      return '<div style="background:#d8dce3;border:1.5px solid #888;border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px">'+
+        '<div style="min-width:0"><strong style="font-size:13px;color:#222">'+v.plate+'</strong> <span style="font-size:10px;color:#555">'+(v.model||'')+'</span> <span style="font-size:10px;color:#888">'+(v._offices.join('・')||v.office||'')+'</span></div>'+
+        '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+
           expBadge(minExp([v.shaken?.exp,v.jibai?.exp,v.nin?.exp]))+
-          '<span style="font-size:10px;color:#888">添付 '+vaf.length+'</span>'+
+          '<span style="font-size:10px;color:#666">'+vaf.length+'件</span>'+
         '</div>'+
       '</div>';
     }).join('');
@@ -6396,10 +6396,8 @@ initSelfForm();
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-screen').style.display='block';
     renderAll();
-    // ★ 自動同期はしない（localStorageのデータをそのまま使う）
-    const lastSync = localStorage.getItem('fleet_last_sync');
-    if(lastSync) setSyncStatus('前回同期: '+lastSync,'');
-    else setSyncStatus('未同期（一括同期を押してください）','sync-err');
+    // ★ 自動でSheetsから最新データを読み込む
+    syncAll();
   }
 })();
 </script>
