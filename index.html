@@ -4703,19 +4703,20 @@ function renderStorage(){
       cardHtml+='<div><div style="font-weight:600;font-size:15px;color:#222">'+d.name+' <span style="font-size:10px;color:#999;font-weight:400">'+(d.kana||'')+'</span></div>';
       cardHtml+='<div style="font-size:11px;color:#555">'+plateStr+' ・ '+(d._offices.join('・')||'未設定')+'</div></div>';
       cardHtml+='</div>';
-      cardHtml+='<div style="display:flex;gap:4px;align-items:center">';
+      cardHtml+='<div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end">';
       var isSelf=d._src==='自社';
       if(isSelf){
-        cardHtml+='<button class="btn btn-sm" style="font-size:10px;padding:2px 8px" onclick="event.stopPropagation();openDriverModal('+d.id+')">編集</button>';
+        cardHtml+='<button class="btn btn-sm" style="font-size:10px;padding:2px 10px" onclick="event.stopPropagation();openDriverModal('+d.id+')">編集</button>';
       } else {
         var coId=companies.find(function(c){return (c.drivers||[]).some(function(x){return x.id==d.id;});})?.id;
-        if(coId) cardHtml+='<button class="btn btn-sm" style="font-size:10px;padding:2px 8px" onclick="event.stopPropagation();openCompanyDriverModal('+coId+','+d.id+')">編集</button>';
+        if(coId) cardHtml+='<button class="btn btn-sm" style="font-size:10px;padding:2px 10px" onclick="event.stopPropagation();openCompanyDriverModal('+coId+','+d.id+')">編集</button>';
       }
+      cardHtml+='<span style="font-size:10px;padding:3px 10px;border-radius:20px;cursor:pointer;background:#4a90e2;color:#fff" onclick="event.stopPropagation();openQuickUpload(\'driver\','+d.id+',\'\')">+ 追加</span>';
       cardHtml+='<span style="color:#999;font-size:11px;cursor:pointer" onclick="storageToggleExpand(\''+key+'\')">▼</span>';
       cardHtml+='</div>';
       cardHtml+='</div>';
 
-      // バッジ行（免許 + 車両書類ステータス + アップロード）
+      // バッジ行（免許 + 車両書類ステータス）
       cardHtml+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">';
       cardHtml+='<span style="font-size:11px;padding:5px 12px;border-radius:20px;cursor:pointer;'+(hasLic?'background:#1565C0;color:#fff':'background:#e0e0e0;color:#888')+'" onclick="event.stopPropagation();openQuickUpload(\'driver\','+d.id+',\'license\')" title="クリックで免許証アップロード">免許 '+expBadge(d.license?.exp,hasLic).replace(/<[^>]+>/g,'')+'</span>';
       if(cv){
@@ -4723,11 +4724,10 @@ function renderStorage(){
         cardHtml+='<span style="font-size:11px;padding:5px 12px;border-radius:20px;cursor:pointer;'+(hasJibai?'background:#E65100;color:#fff':'background:#e0e0e0;color:#888')+'" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'jibai\')" title="クリックで自賠責アップロード">自賠 '+(cv.jibai?.exp?cv.jibai.exp.slice(5).replace(/-/g,'/'):'—')+'</span>';
         cardHtml+='<span style="font-size:11px;padding:5px 12px;border-radius:20px;cursor:pointer;'+(hasNin?'background:#E65100;color:#fff':'background:#e0e0e0;color:#888')+'" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'nin\')" title="クリックで任意保険アップロード">任意 '+(cv.nin?.exp?cv.nin.exp.slice(5).replace(/-/g,'/'):'—')+'</span>';
       }
-      cardHtml+='<span style="font-size:11px;padding:5px 12px;border-radius:20px;cursor:pointer;background:#4a90e2;color:#fff;margin-left:auto" onclick="event.stopPropagation();openQuickUpload(\'driver\','+d.id+',\'\')">+ 追加</span>';
       cardHtml+='</div>';
 
       // 期限入力行（トグル表示）
-      cardHtml+='<div style="margin-bottom:8px"><span style="font-size:10px;color:#888;cursor:pointer" onclick="var row=this.nextElementSibling;row.style.display=row.style.display===\'none\'?\'flex\':\'none\';this.textContent=row.style.display===\'none\'?\'期限入力 ▶\':\'期限入力 ▼\'">期限入力 ▶</span>';
+      cardHtml+='<div style="margin-bottom:8px"><span style="font-size:12px;color:#333;font-weight:500;cursor:pointer" onclick="var row=this.nextElementSibling;row.style.display=row.style.display===\'none\'?\'flex\':\'none\';this.textContent=row.style.display===\'none\'?\'期限入力 ▶\':\'期限入力 ▼\'">期限入力 ▶</span>';
       cardHtml+='<div style="display:none;gap:6px;flex-wrap:wrap;margin-top:4px;align-items:center;font-size:10px;color:#666">';
       cardHtml+='<label style="display:flex;align-items:center;gap:3px">免許期限 <input type="text" value="'+(d.license?.exp||'')+'" style="width:90px;font-size:10px;padding:2px 6px;border:1px solid #ccc;border-radius:4px" onchange="updateDriverExpInline('+d.id+',this.value)" placeholder="和暦/西暦OK"></label>';
       if(cv){
@@ -4767,12 +4767,17 @@ function renderStorage(){
 
       // 搭乗車両
       if(cv){
-        cardHtml+='<div style="padding:8px 10px;background:#b8bfc9;color:#333;border-radius:8px;font-size:11px;margin-top:4px">';
-        cardHtml+='<div style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center"><div><span style="font-size:10px;color:#555">搭乗車両</span> <strong>'+cv.plate+'</strong> <span style="color:#666">'+(cv.model||'')+'</span></div><div style="display:flex;gap:4px"><button class="btn btn-sm" style="font-size:10px;padding:2px 8px" onclick="event.stopPropagation();openVehicleModal('+cv.id+')">編集</button><span style="font-size:10px;padding:3px 10px;border-radius:20px;cursor:pointer;background:#4a90e2;color:#fff" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'\')">+ 追加</span></div></div>';
+        cardHtml+='<div style="padding:10px 12px;background:#b8bfc9;color:#333;border-radius:8px;font-size:11px;margin-top:6px">';
+        cardHtml+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+        cardHtml+='<div><span style="font-size:10px;color:#555">搭乗車両</span> <strong>'+cv.plate+'</strong> <span style="color:#666">'+(cv.model||'')+'</span></div>';
+        cardHtml+='<div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end">';
+        cardHtml+='<button class="btn btn-sm" style="font-size:10px;padding:2px 10px" onclick="event.stopPropagation();openVehicleModal('+cv.id+')">編集</button>';
+        cardHtml+='<span style="font-size:10px;padding:3px 10px;border-radius:20px;cursor:pointer;background:#4a90e2;color:#fff" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'\')">+ 追加</span>';
+        cardHtml+='</div></div>';
         // 車両書類サムネ
         var vaf=cv.attachedFiles||[];
         if(vaf.length){
-          cardHtml+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:6px">';
+          cardHtml+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">';
           vaf.forEach(function(f,i){
             var fid2=f.fileId||(f.url&&f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)?f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1]:'');
             var isImg2=f.name&&f.name.match(/\.(jpg|jpeg|png|gif)$/i);
