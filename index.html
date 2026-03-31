@@ -2042,25 +2042,9 @@ function openCreateMailTask(){
     ...drivers.filter(d=>!d.status||d.status==='在籍').map(d=>({id:d.id,name:d.name,type:d.type||'社員',office:(Array.isArray(d.offices)&&d.offices.length?d.offices[0]:d.office)||''})),
     ...companies.flatMap(c=>(c.drivers||[]).map(d=>({id:d.id,name:d.name,type:'委託('+c.name+')',office:(d.offices||[])[0]||''})))
   ];
+  window._mtAllDrivers=activeDrivers;
 
-  // 営業所ごとにグループ化
-  const byOffice={};
-  activeDrivers.forEach(d=>{
-    const o=d.office||'未設定';
-    if(!byOffice[o]) byOffice[o]=[];
-    byOffice[o].push(d);
-  });
-
-  let driverListHtml='';
-  Object.keys(byOffice).sort().forEach(o=>{
-    const ds=byOffice[o];
-    driverListHtml+='<div style="margin-bottom:8px">';
-    driverListHtml+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><label style="font-size:11px;font-weight:600;color:#888;cursor:pointer"><input type="checkbox" onchange="mtToggleOffice(this,\''+o+'\')" style="margin-right:4px">'+o+'（'+ds.length+'名）</label></div>';
-    ds.forEach(d=>{
-      driverListHtml+='<label style="display:flex;align-items:center;gap:6px;padding:3px 0 3px 16px;font-size:12px;cursor:pointer"><input type="checkbox" class="mt-driver-check" value="'+d.id+'" data-name="'+esc(d.name)+'" data-type="'+esc(d.type)+'" data-office="'+esc(d.office)+'"> '+d.name+' <span style="font-size:10px;color:#888">'+d.type+'</span></label>';
-    });
-    driverListHtml+='</div>';
-  });
+  const officeOpts='<option value="">すべての営業所</option>'+offices.map(o=>'<option value="'+o+'">'+o+'</option>').join('');
 
   const modal=document.createElement('div');
   modal.className='modal-bg';modal.style.display='flex';
@@ -2074,8 +2058,12 @@ function openCreateMailTask(){
         '</select>'+
       '</div>'+
       '<div class="form-group" style="margin-bottom:12px">'+
+        '<label style="font-size:11px;color:#666;font-weight:500">営業所</label>'+
+        '<select id="mt-office" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px" onchange="mtFilterByOffice()">'+officeOpts+'</select>'+
+      '</div>'+
+      '<div class="form-group" style="margin-bottom:12px">'+
         '<label style="font-size:11px;color:#666;font-weight:500">対象ドライバー *（複数選択可）</label>'+
-        '<div style="border:1px solid #ddd;border-radius:6px;padding:8px;max-height:300px;overflow-y:auto;background:#fff">'+driverListHtml+'</div>'+
+        '<div id="mt-driver-list" style="border:1px solid #ddd;border-radius:6px;padding:8px;max-height:300px;overflow-y:auto;background:#fff"></div>'+
       '</div>'+
     '</div>'+
     '<div class="modal-footer">'+
@@ -2084,6 +2072,37 @@ function openCreateMailTask(){
     '</div>'+
   '</div>';
   document.body.appendChild(modal);
+  mtFilterByOffice();
+}
+
+function mtFilterByOffice(){
+  const officeVal=document.getElementById('mt-office')?.value||'';
+  const allD=window._mtAllDrivers||[];
+  const filtered=officeVal?allD.filter(d=>d.office===officeVal):allD;
+
+  const byOffice={};
+  filtered.forEach(d=>{
+    const o=d.office||'未設定';
+    if(!byOffice[o]) byOffice[o]=[];
+    byOffice[o].push(d);
+  });
+
+  let html='<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><label style="font-size:10px;cursor:pointer;color:#888"><input type="checkbox" onchange="mtToggleAll(this.checked)" style="margin-right:3px">全選択</label></div>';
+  Object.keys(byOffice).sort().forEach(o=>{
+    const ds=byOffice[o];
+    html+='<div style="margin-bottom:8px">';
+    html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><label style="font-size:11px;font-weight:600;color:#888;cursor:pointer"><input type="checkbox" onchange="mtToggleOffice(this,\''+o+'\')" style="margin-right:4px">'+o+'（'+ds.length+'名）</label></div>';
+    ds.forEach(d=>{
+      html+='<label style="display:flex;align-items:center;gap:6px;padding:3px 0 3px 16px;font-size:12px;cursor:pointer"><input type="checkbox" class="mt-driver-check" value="'+d.id+'" data-name="'+esc(d.name)+'" data-type="'+esc(d.type)+'" data-office="'+esc(d.office)+'"> '+d.name+' <span style="font-size:10px;color:#888">'+d.type+'</span></label>';
+    });
+    html+='</div>';
+  });
+  if(!filtered.length) html+='<div style="text-align:center;color:#aaa;padding:12px;font-size:12px">該当するドライバーがいません</div>';
+  document.getElementById('mt-driver-list').innerHTML=html;
+}
+
+function mtToggleAll(checked){
+  document.querySelectorAll('.mt-driver-check').forEach(c=>{c.checked=checked;});
 }
 
 function mtToggleOffice(cb, office){
