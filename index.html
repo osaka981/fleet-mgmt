@@ -2588,6 +2588,15 @@ function recordHistory(office, files, tag){
 }
 
 function renderHistory(){
+  // ヘルパー: 履歴ファイルをHTMLに
+  function renderHistFile(f, office){
+    const fid=f.fileId||'';
+    const shortName=(f.name||'').replace(/\.docx$/,'').replace(/\.pdf$/,'').replace(office+'_','');
+    if(fid){
+      return '<span class="hist-tag" style="cursor:pointer;text-decoration:underline" onclick="openFilePreview(\'\',\''+esc(f.name)+'\',\'\',\''+fid+'\')" title="クリックで閲覧・ダウンロード">'+shortName+'</span>';
+    }
+    return '<span class="hist-tag">'+shortName+'</span>';
+  }
   const offSel=document.getElementById('hist-filter-office');
   const yrSel=document.getElementById('hist-filter-year');
   const moSel=document.getElementById('hist-filter-month');
@@ -2625,12 +2634,12 @@ function renderHistory(){
       <div class="hist-row">
         <div class="hist-date">${e.time||''}</div>
         <div class="hist-office">${e.office}</div>
-        <div class="hist-files">${e.files.map(f=>`<span class="hist-tag">${f.name.replace(/\.docx$/,'').replace(e.office+'_','')}</span>`).join('')}</div>
+        <div class="hist-files">${e.files.map(f=>renderHistFile(f,e.office)).join('')}</div>
         <div class="hist-note"><span class="hist-tag ${e.tag==='退入社対応'?'hist-tag-r':''}">${e.tag||''}</span></div>
       </div>`).join('');
     return `<div class="hist-group">
       <div class="hist-group-header">
-        <span>📅 ${date.replace(/-/g,'/')}</span>
+        <span>${date.replace(/-/g,'/')}</span>
         <span style="font-size:11px;color:#666">${entries.map(e=>e.office).filter((v,i,a)=>a.indexOf(v)===i).join('・')}　${totalFiles}ファイル</span>
       </div>
       <div class="hist-group-body">${rowsHtml}</div>
@@ -2702,7 +2711,7 @@ async function generatePdfViaApps(office, docType, dateStr){
   const bytes = Uint8Array.from(atob(json.base64), c=>c.charCodeAt(0));
   const blob = new Blob([bytes], {type:'application/pdf'});
   downloadBlob(blob, json.fileName);
-  return json.fileName;
+  return {fileName:json.fileName, fileId:json.fileId||''};
 }
 
 async function generateDoc(office,type){
@@ -2725,13 +2734,13 @@ async function generateDoc(office,type){
     // 現況届（従事員・車両）1ファイルにまとめて生成
     if(type==='genkyo'){
       prog.textContent='生成中: 現況届（従事員・車両）...';
-      const f1=await generatePdfViaApps(office,'genkyo',dateStr);
-      generatedFiles.push({name:f1,office});
+      const result=await generatePdfViaApps(office,'genkyo',dateStr);
+      generatedFiles.push({name:result.fileName,office,fileId:result.fileId});
     }
     else if(pdfTypes[type]){
       prog.textContent=`生成中: ${pdfTypes[type]}（PDF）...`;
-      const fileName=await generatePdfViaApps(office, type, dateStr);
-      generatedFiles.push({name:fileName, office});
+      const result=await generatePdfViaApps(office, type, dateStr);
+      generatedFiles.push({name:result.fileName, office, fileId:result.fileId});
     }
     // 外注ごとの書類はdocxで継続
     else if(type==='saitaku'){
@@ -6531,7 +6540,7 @@ async function sendMail(){
       alert('✅ メールを送信しました（添付 '+fileIds.length+'件）');
       closeModal('mail-modal');
       const tag = document.getElementById('doc-tag')?.value||'定期（3ヶ月）';
-      recordHistory(office, [{name:'メール送信_'+subject}], tag);
+      recordHistory(office, [{name:'メール送信_'+subject, fileIds:fileIds}], tag);
     } else {
       alert('❌ 送信エラー: '+(json.error||'不明なエラー'));
     }
