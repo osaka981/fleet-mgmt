@@ -4385,8 +4385,14 @@ function autoRenameFile(originalName, category, customName, ownerName){
   const ext=originalName.includes('.')?'.'+originalName.split('.').pop():'';
   let label=category;
   if(category==='その他'&&customName) label=customName;
-  const owner=ownerName?'_'+ownerName.replace(/\s/g,''):'';
-  return label+owner+ext;
+  const owner=ownerName?ownerName.replace(/\s/g,'')+'_':'';
+  return owner+label+ext;
+}
+
+// Driveのファイルをリネーム（非同期、エラーはサイレント）
+function renameFileOnDrive(fileId, newName){
+  if(!fileId||!newName) return;
+  fetch(API_URL,{method:'POST',body:JSON.stringify({action:'renameFile',fileId:fileId,newName:newName})}).catch(e=>console.log('Drive rename error:',e));
 }
 
 function renderFilePreview(bufKey){
@@ -4544,6 +4550,7 @@ function replaceExistingFile(kind,ownerId,idx,elId){
             name:newName, type:file.type, url:json.url||'', fileId:json.fileId||'',
             dataUrl:'', category:cat, uploadedAt:new Date().toISOString()
           };
+          if(cat&&json.fileId) renameFileOnDrive(json.fileId, newName);
         } else {
           target.attachedFiles[idx]={
             name:file.name, type:file.type, url:'', fileId:'',
@@ -4609,7 +4616,10 @@ function changeExistingFileCat(kind,ownerId,idx,newCat,elId){
 
   target.attachedFiles[idx].category=newCat;
   const ownerName=kind==='driver'||kind==='cd'?(target.name||''):(target.plate||'');
-  if(newCat) target.attachedFiles[idx].name=autoRenameFile(target.attachedFiles[idx].name,newCat,'',ownerName);
+  if(newCat){
+    target.attachedFiles[idx].name=autoRenameFile(target.attachedFiles[idx].name,newCat,'',ownerName);
+    renameFileOnDrive(target.attachedFiles[idx].fileId, target.attachedFiles[idx].name);
+  }
   saveLocal();saveCompanies();
   renderExistingFiles(elId,kind,ownerId);
   // 他の画面も連動更新
@@ -4832,6 +4842,7 @@ function applyCatChange(kind,ownerId,fileIdx,newCat){
   const ownerName=kind==='driver'?(target.name||''):(target.plate||'');
   if(newCat){
     target.attachedFiles[fileIdx].name=autoRenameFile(target.attachedFiles[fileIdx].name,newCat,'',ownerName);
+    renameFileOnDrive(target.attachedFiles[fileIdx].fileId, target.attachedFiles[fileIdx].name);
   }
   saveLocal();saveCompanies();renderStorage();
   // 他の画面も連動更新
