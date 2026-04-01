@@ -7555,22 +7555,28 @@ async function uploadTplFile(tplId, file){
 // DriveテンプレートフォルダからfileIdを同期
 async function syncTemplatesFromDrive(){
   try{
-    var res=await fetch(API_URL+'?action=listFolder&subFolder=テンプレート');
-    var data=await res.json();
-    if(!data.ok||!data.files) return 0;
     var changed=false;var cnt=0;
-    data.files.forEach(function(f){
-      var matched=TPL_DEFS.find(function(t){return f.name===t.fileName;});
-      if(matched){
-        if(!tplFiles[matched.id]) tplFiles[matched.id]={};
-        tplFiles[matched.id].fileId=f.id;
-        tplFiles[matched.id].fileName=f.name;
-        changed=true;cnt++;
-      }
-    });
+    // ルートフォルダとテンプレートフォルダの両方を検索
+    var urls=[API_URL+'?action=listFolder',API_URL+'?action=listFolder&subFolder=%E3%83%86%E3%83%B3%E3%83%97%E3%83%AC%E3%83%BC%E3%83%88'];
+    for(var u=0;u<urls.length;u++){
+      try{
+        var res=await fetch(urls[u]);
+        var data=await res.json();
+        if(!data.ok||!data.files) continue;
+        data.files.forEach(function(f){
+          var matched=TPL_DEFS.find(function(t){return f.name===t.fileName;});
+          if(matched&&(!tplFiles[matched.id]||!tplFiles[matched.id].fileId)){
+            if(!tplFiles[matched.id]) tplFiles[matched.id]={};
+            tplFiles[matched.id].fileId=f.id;
+            tplFiles[matched.id].fileName=f.name;
+            changed=true;cnt++;
+          }
+        });
+      }catch(e2){}
+    }
     if(changed){
       localStorage.setItem('fleet_tpl_files',JSON.stringify(tplFiles));
-      _tplCache={};// キャッシュクリア
+      _tplCache={};
     }
     return cnt;
   }catch(e){console.log('テンプレート同期エラー:',e);return 0;}
