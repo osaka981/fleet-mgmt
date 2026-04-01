@@ -3071,19 +3071,32 @@ async function generateFromTemplate(tplId,office,driver,dateStr){
   var outBlob=await zip.generateAsync({type:'blob'});
 
   var driverLabel=driver?(driver.sub?.company||driver.name):'大阪急配';
-  var fileName=office+'_'+tpl.name+'_'+driverLabel+'_'+dateStr+'.docx';
-  downloadBlob(outBlob,fileName);
+  var fileName=office+'_'+tpl.name+'_'+driverLabel+'_'+dateStr;
 
-  // Driveにアップロード
+  // Driveにアップロード→PDF変換→ダウンロード
+  var reader=new FileReader();
+  var outDataUrl=await new Promise(function(resolve){reader.onload=function(e){resolve(e.target.result);};reader.readAsDataURL(outBlob);});
   try{
-    var reader=new FileReader();
-    var outDataUrl=await new Promise(function(resolve){reader.onload=function(e){resolve(e.target.result);};reader.readAsDataURL(outBlob);});
-    fetch(API_URL,{method:'POST',body:JSON.stringify({
+    var upRes=await fetch(API_URL,{method:'POST',body:JSON.stringify({
       action:'uploadFile',folder:office,subFolder:'テンプレート書類/'+driverLabel,
-      fileName:fileName,mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      fileName:fileName+'.docx',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       dataUrl:outDataUrl
     })});
-  }catch(e){console.log('Drive upload optional:',e);}
+    var upJson=await upRes.json();
+    if(upJson.ok&&upJson.fileId){
+      // GASでPDF変換
+      var pdfRes=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'convertToPdf',fileId:upJson.fileId,fileName:fileName})});
+      var pdfJson=await pdfRes.json();
+      if(pdfJson.ok&&pdfJson.base64){
+        var pdfBytes=Uint8Array.from(atob(pdfJson.base64),c=>c.charCodeAt(0));
+        var pdfBlob=new Blob([pdfBytes],{type:'application/pdf'});
+        downloadBlob(pdfBlob,fileName+'.pdf');
+        return;
+      }
+    }
+  }catch(e){console.log('PDF変換エラー、docxでダウンロード:',e);}
+  // フォールバック: PDF変換失敗時はdocxでダウンロード
+  downloadBlob(outBlob,fileName+'.docx');
 }
 
 async function generateAllDocs(office){
