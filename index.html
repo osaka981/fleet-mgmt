@@ -1992,9 +1992,9 @@ function toggleSubAll(office,checked){
 }
 
 function getSelectedSubcons(office){
-  var ids=[];
-  document.querySelectorAll('.sub-check-'+office+':checked').forEach(cb=>{ids.push(Number(cb.value));});
-  return ids;
+  var vals=[];
+  document.querySelectorAll('.sub-check-'+office+':checked').forEach(cb=>{vals.push(cb.value);});
+  return vals;
 }
 
 // ====== docx生成ユーティリティ ======
@@ -2860,9 +2860,13 @@ async function generateDoc(office,type){
   const prog=document.getElementById(`prog-${office}`);
   prog.className='gen-progress show';prog.textContent='生成中...';
   try{
-    const allSubcons=drivers.filter(d=>belongsToOffice(d,office)&&d.type==='外注'&&(!d.status||d.status==='在籍'));
-    const selectedIds=getSelectedSubcons(office);
-    const subcons=allSubcons.filter(d=>selectedIds.includes(d.id));
+    // 外注ドライバー（自社＋委託会社）
+    const ownSubcons=drivers.filter(d=>belongsToOffice(d,office)&&d.type==='外注'&&(!d.status||d.status==='在籍'));
+    const coSubcons=[];
+    companies.forEach(c=>{(c.drivers||[]).forEach(d=>{if((d.offices||[]).includes(office))coSubcons.push({...d,type:'外注',sub:{company:c.name},_coName:c.name});});});
+    const allSubcons=[...ownSubcons,...coSubcons];
+    const selectedVals=getSelectedSubcons(office);
+    const subcons=allSubcons.filter(d=>selectedVals.includes(String(d.id))||selectedVals.includes(d.name));
     const generatedFiles=[];
 
     const pdfTypes={
