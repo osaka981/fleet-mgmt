@@ -1016,7 +1016,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
 <div id="office-modal" style="display:none" class="modal-bg">
   <div class="modal modal-sm" onclick="event.stopPropagation()">
     <div class="modal-header"><span class="modal-title">営業所を追加</span><button class="modal-close" onclick="closeModal('office-modal')">✕</button></div>
-    <div class="modal-body"><div class="form-group"><label>営業所名 *</label><input type="text" id="office-name-input" placeholder="例：梅田" onkeydown="if(event.key==='Enter')saveOffice()"></div></div>
+    <div class="modal-body"><div class="form-group"><label>営業所名 *</label><input type="text" id="office-name-input" placeholder="例：梅田" onkeydown="if(event.key==='Enter')saveOffice()"></div><div class="form-group"><label>受持エリア</label><input type="text" id="office-area-input" placeholder="例：堺市西区・高石市"></div></div>
     <div class="modal-footer"><button class="btn" onclick="closeModal('office-modal')">キャンセル</button><button class="btn btn-primary" onclick="saveOffice()">追加する</button></div>
   </div>
 </div>
@@ -1070,7 +1070,11 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
 <script>
 const API_URL='https://script.google.com/macros/s/AKfycbw6img2X6uLInjioPFUVyfTTVIUiAtiEWpu5Y3_axE0BOrroOKSFMRQL_9quxeuuD0/exec';
 const COMPANY_NAMES=['大阪急配株式会社','大阪急配(株)','(株)大阪急配'];
-const POST_OFFICE_MAP={'西成':'西成郵便局','浜寺':'浜寺郵便局','藤井寺':'藤井寺郵便局','大阪西':'大阪西郵便局'};
+const POST_OFFICE_MAP_DEFAULT={'西成':'西成郵便局','浜寺':'浜寺郵便局','藤井寺':'藤井寺郵便局','大阪西':'大阪西郵便局'};
+let officePostMap=JSON.parse(localStorage.getItem('fleet_office_post')||'{}');
+function POST_OFFICE(o){return officePostMap[o]||POST_OFFICE_MAP_DEFAULT[o]||o+'郵便局';}
+// Legacy compat
+const POST_OFFICE_MAP=new Proxy({},{get:(_,k)=>POST_OFFICE(k)});
 const COMPANY={name:'大阪急配株式会社',repName:'川村　知弘',repKana:'かわむら　ともひろ',repBirth:'1970-01-23',address:'堺市北区常磐町3-12-5',addressFull:'大阪府堺市北区常磐町3-12-5',tel:'072-258-9811',repFull:'大阪急配株式会社　川村　知弘',zip:'〒591-8001',staffCount:'6'};
 const TODAY_STR=new Date().toISOString().slice(0,10);
 let PASSWORD=localStorage.getItem('fleet_pw')||'1234';
@@ -1096,7 +1100,7 @@ function toggleDocExclude(office){
 let isDirty=false;
 function dedup(arr){if(!Array.isArray(arr))return[];const seen={};return arr.filter(x=>{const k=String(x.id);if(seen[k])return false;seen[k]=true;return true;});}
 const LOGO_THUMB='data:image/jpeg;base64,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';
-function saveLocal(){localStorage.setItem('fleet_vehicles',JSON.stringify(vehicles));localStorage.setItem('fleet_drivers',JSON.stringify(drivers));localStorage.setItem('fleet_offices',JSON.stringify(offices));localStorage.setItem('fleet_office_areas',JSON.stringify(officeAreas));localStorage.setItem('fleet_companies',JSON.stringify(companies));localStorage.setItem('fleet_unassigned',JSON.stringify(unassignedFiles));localStorage.setItem('fleet_doc_exclude',JSON.stringify(docExclude));isDirty=true;}
+function saveLocal(){localStorage.setItem('fleet_vehicles',JSON.stringify(vehicles));localStorage.setItem('fleet_drivers',JSON.stringify(drivers));localStorage.setItem('fleet_offices',JSON.stringify(offices));localStorage.setItem('fleet_office_areas',JSON.stringify(officeAreas));localStorage.setItem('fleet_office_post',JSON.stringify(officePostMap));localStorage.setItem('fleet_companies',JSON.stringify(companies));localStorage.setItem('fleet_unassigned',JSON.stringify(unassignedFiles));localStorage.setItem('fleet_doc_exclude',JSON.stringify(docExclude));isDirty=true;}
 function parsePlate(plate){if(!plate)return{chiiki:'',bunrui:'',kana:'',num:''};const p=plate.trim().replace(/\s+/g,' ').split(' ');if(p.length>=4)return{chiiki:p[0],bunrui:p[1],kana:p[2],num:p[3]};const m=plate.match(/^([^\d]+?)(\d{3})\s*([あ-ん])\s*(\d+)/);if(m)return{chiiki:m[1].trim(),bunrui:m[2],kana:m[3],num:m[4]};return{chiiki:plate,bunrui:'',kana:'',num:''};}
 
 // ====== 同期 ======
@@ -1273,6 +1277,10 @@ function renderSettingsOffices(){
           <span style="color:#888;font-weight:500;white-space:nowrap">受持エリア：</span>
           <input type="text" value="${esc(officeAreas[o]||'')}" placeholder="例: 堺市西区・高石市" style="flex:1;padding:4px 8px;font-size:11px;border:1px solid #ddd;border-radius:4px" onblur="saveOfficeArea('${o}',this.value)">
         </div>
+        <div style="margin-bottom:6px;display:flex;gap:6px;align-items:center">
+          <span style="color:#888;font-weight:500;white-space:nowrap">郵便局名：</span>
+          <input type="text" value="${esc(officePostMap[o]||POST_OFFICE_MAP_DEFAULT[o]||o+'郵便局')}" placeholder="例: 浜寺郵便局" style="flex:1;padding:4px 8px;font-size:11px;border:1px solid #ddd;border-radius:4px" onblur="saveOfficePost('${o}',this.value)">
+        </div>
         ${dNames.length?'<div style="margin-bottom:4px"><span style="color:#888;font-weight:500">ドライバー：</span>'+dNames.join('、 ')+'</div>':''}
         ${vNames.length?'<div><span style="color:#888;font-weight:500">車両：</span>'+vNames.join('、 ')+'</div>':''}
         ${!dNames.length&&!vNames.length?'<div style="color:#aaa">登録なし</div>':''}
@@ -1338,9 +1346,10 @@ function migrateOrphan(oldName, selId){
   saveLocal();saveCompanies();renderAll();renderSettingsOffices();
   alert(`「${oldName}」→「${newOffice||'(解除)'}」に${count}件移行しました。`);
 }
-function openOfficeModal(){document.getElementById('office-name-input').value='';document.getElementById('office-modal').style.display='flex';setTimeout(()=>document.getElementById('office-name-input').focus(),50);}
-function saveOffice(){const n=document.getElementById('office-name-input').value.trim();if(!n||offices.includes(n)){alert(n?'既に存在します':'営業所名を入力');return;}offices.push(n);saveLocal();closeModal('office-modal');renderOfficeNav();renderSettingsOffices();rebuildOfficeSelects();renderDocPage();}
+function openOfficeModal(){document.getElementById('office-name-input').value='';document.getElementById('office-area-input').value='';document.getElementById('office-modal').style.display='flex';setTimeout(()=>document.getElementById('office-name-input').focus(),50);}
+function saveOffice(){const n=document.getElementById('office-name-input').value.trim();if(!n||offices.includes(n)){alert(n?'既に存在します':'営業所名を入力');return;}offices.push(n);const area=document.getElementById('office-area-input').value.trim();if(area)officeAreas[n]=area;saveLocal();closeModal('office-modal');renderOfficeNav();renderSettingsOffices();rebuildOfficeSelects();renderDocPage();}
 function saveOfficeArea(officeName,area){officeAreas[officeName]=area.trim();saveLocal();}
+function saveOfficePost(officeName,post){officePostMap[officeName]=post.trim();saveLocal();}
 function deleteOffice(name){
   // 車両・ドライバーの紐づきを確認
   const affectedD=drivers.filter(d=>belongsToOffice(d,name));
@@ -2851,7 +2860,7 @@ async function generateDoc(office,type){
     };
 
     if(type==='genkyo'){
-      if(tplFiles['tpl6']&&tplFiles['tpl6'].dataUrl){
+      if(tplFiles['tpl6']&&tplFiles['tpl6'].fileId){
         prog.textContent='生成中: 現況届（テンプレート）...';
         await generateFromTemplate('tpl6',office,null,dateStr);
         generatedFiles.push({name:'各種現況届',office});
@@ -2864,7 +2873,7 @@ async function generateDoc(office,type){
     else if(pdfTypes[type]){
       // 大阪急配テンプレートがあればテンプレート使用
       var tplId=type==='seiyaku_osaka'?'tpl2':type==='tekigo_osaka'?'tpl4':null;
-      if(tplId&&tplFiles[tplId]&&tplFiles[tplId].dataUrl){
+      if(tplId&&tplFiles[tplId]&&tplFiles[tplId].fileId){
         prog.textContent=`生成中: ${pdfTypes[type]}（テンプレート）...`;
         await generateFromTemplate(tplId,office,null,dateStr);
         generatedFiles.push({name:pdfTypes[type],office});
@@ -2876,7 +2885,7 @@ async function generateDoc(office,type){
     }
     else if(type==='saitaku'){
       if(!subcons.length){prog.textContent='外注ドライバーが選択されていません';return;}
-      var tplId5=tplFiles['tpl5']&&tplFiles['tpl5'].dataUrl?'tpl5':null;
+      var tplId5=tplFiles['tpl5']&&tplFiles['tpl5'].fileId?'tpl5':null;
       for(const d of subcons){
         prog.textContent=`生成中: 再委託承認願（${d.name}）`;
         if(tplId5){
@@ -2892,7 +2901,7 @@ async function generateDoc(office,type){
     }
     else if(type==='seiyaku_sub'){
       if(!subcons.length){prog.textContent='外注ドライバーが選択されていません';return;}
-      var tplId1=tplFiles['tpl1']&&tplFiles['tpl1'].dataUrl?'tpl1':null;
+      var tplId1=tplFiles['tpl1']&&tplFiles['tpl1'].fileId?'tpl1':null;
       for(const d of subcons){
         prog.textContent=`生成中: 誓約書（${d.sub?.company||d.name}）`;
         if(tplId1){
@@ -2908,7 +2917,7 @@ async function generateDoc(office,type){
     }
     else if(type==='tekigo_sub'){
       if(!subcons.length){prog.textContent='外注ドライバーが選択されていません';return;}
-      var tplId3=tplFiles['tpl3']&&tplFiles['tpl3'].dataUrl?'tpl3':null;
+      var tplId3=tplFiles['tpl3']&&tplFiles['tpl3'].fileId?'tpl3':null;
       for(const d of subcons){
         prog.textContent=`生成中: 適合証明書（${d.sub?.company||d.name}）`;
         if(tplId3){
