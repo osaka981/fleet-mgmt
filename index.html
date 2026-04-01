@@ -215,7 +215,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
   .main{margin-left:0}
   .topbar{padding:10px 14px 10px 52px}
   .topbar h1{font-size:14px}
-  .content{padding:12px 14px}
+  .content{padding:10px 10px}
   .stats{grid-template-columns:repeat(2,1fr);gap:8px}
   .doc-gen-grid{grid-template-columns:1fr}
   .form-grid{grid-template-columns:1fr}
@@ -223,13 +223,43 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
   .subcon-grid{grid-template-columns:1fr}
   .filter-bar{gap:6px}
   .filter-chip{font-size:10px;padding:3px 8px}
-  table{font-size:11px}
-  th,td{padding:6px 8px}
-  .modal{max-height:95vh}
+  table{font-size:10px}
+  th,td{padding:5px 6px}
+  .modal{max-height:95vh;width:calc(100% - 16px)!important;max-width:100%!important;margin:8px}
+  .modal-body{max-height:70vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
   .login-card{width:calc(100% - 32px);padding:28px 20px}
   .doc-date-bar{flex-wrap:wrap;gap:7px}
   .sync-bar{flex-wrap:wrap;gap:6px}
   .topbar{flex-wrap:wrap;gap:6px}
+  /* 書類生成カード */
+  .doc-card{padding:10px}
+  .doc-card-btns{gap:4px}
+  .doc-card-btns .btn{font-size:10px;padding:4px 8px}
+  .doc-tab{padding:5px 8px;font-size:10px}
+  /* メール送信モーダル */
+  #mail-attachments{max-height:250px;font-size:10px}
+  .mail-badge{font-size:9px;padding:2px 6px}
+  .mail-driver-row{padding:3px 6px;font-size:10px}
+  /* データ管理 */
+  .storage-grid{grid-template-columns:1fr!important}
+  .office-row{padding:8px 10px}
+  /* 設定 */
+  .settings-section{padding:10px}
+  /* ドロップボックス */
+  .top-drop{min-height:80px;padding:20px 14px}
+  /* btn全般 */
+  .btn{font-size:11px;padding:5px 10px}
+  .btn-sm{font-size:10px;padding:3px 7px}
+  /* タッチ操作改善 */
+  input,select,textarea{font-size:16px!important;-webkit-appearance:none}
+  input[type="checkbox"],input[type="radio"]{width:18px;height:18px;min-width:18px}
+  label{min-height:32px;display:flex;align-items:center}
+  /* メールページ */
+  #mail-task-list .btn{font-size:10px;padding:3px 6px}
+  /* モーダルフッター固定 */
+  .modal-footer{position:sticky;bottom:0;background:#fff;z-index:1;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+  /* セーフエリア（ノッチ対応）*/
+  .content{padding-bottom:max(12px,env(safe-area-inset-bottom))}
 }
 /* ===== セルフ入力フォーム（スマホ専用ページ） ===== */
 #self-form-screen{display:none;min-height:100vh;background:#f0f4ff;padding:16px;padding-bottom:calc(env(safe-area-inset-bottom,20px) + 60px);position:fixed;inset:0;z-index:999;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
@@ -275,7 +305,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
 .company-tab.active{color:#4a90e2;border-bottom-color:#4a90e2;font-weight:500}
 .company-tab-content{display:none;padding:12px 16px}
 .company-tab-content.active{display:block}
-.file-drop-zone{border:2px dashed #90caf9;border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:all .15s;background:#f8fbff;position:relative}
+.file-drop-zone{border:2px dashed #90caf9;border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:all .15s;background:#f8fbff;position:relative;overflow:hidden}
 .file-drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 .file-drop-zone.dragover{border-color:#4a90e2;background:#e3f2fd}
 .file-thumb{position:relative;width:70px;border-radius:6px;overflow:visible;border:1px solid #e0e0e0;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font-size:10px;color:#888;flex-direction:column;gap:0}
@@ -568,13 +598,13 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
       <div id="page-storage" class="page">
         <div class="topbar">
           <h1>データ管理</h1>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <input type="text" id="storage-search" placeholder="氏名・車両番号で検索..." style="padding:5px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px;width:200px" oninput="renderStorage()">
-            <button class="btn btn-sm" onclick="toggleStorageView()" id="storage-view-btn">ファイル一覧</button>
-            <button class="btn btn-sm btn-primary" onclick="openFileMgrUploadGeneral()">ファイル追加</button>
-          </div>
         </div>
         <div class="content">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+            <button class="btn btn-primary" onclick="openFileMgrUploadGeneral()" style="white-space:nowrap;min-height:38px;padding:8px 16px;font-size:13px">＋ ファイル追加</button>
+            <button class="btn btn-sm" onclick="toggleStorageView()" id="storage-view-btn" style="white-space:nowrap;min-height:34px">一覧</button>
+            <input type="text" id="storage-search" placeholder="検索..." style="padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:6px;flex:1;min-width:80px;max-width:200px" oninput="renderStorage()">
+          </div>
           <div id="storage-office-badges" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap"></div>
           <div id="storage-content"></div>
         </div>
@@ -779,13 +809,9 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
       <div class="form-group"><label>ステータス</label><select id="v-status"><option value="稼働">稼働中</option><option value="廃車">廃車</option></select></div>
       <div class="form-group"><label>営業所</label><select id="v-office"></select></div>
       <div class="form-group"><label>担当ドライバー</label><select id="v-driver"><option value="">未割当</option></select></div>
-      <div class="form-group"><label>車体色</label><input type="text" id="v-color" placeholder="白"></div>
-      <div class="form-group"><label>登録名義</label><input type="text" id="v-owner" placeholder="大阪急配株式会社"></div>
-      <div class="form-group"><label>使用者</label><input type="text" id="v-user" placeholder="大阪急配株式会社"></div>
-      <div class="form-group"><label>再委託先名（外注の場合）</label><input type="text" id="v-sub" placeholder="山田 太郎"></div>
       <div class="form-group"><label>メモ</label><input type="text" id="v-note"></div>
       <div class="section-title">書類登録</div>
-      <div class="doc-section"><div class="doc-section-header"><div class="doc-section-title">車検証</div></div><div class="doc-fields"><div class="form-group"><label>有効期限</label><input type="date" id="v-shaken-exp"></div><div class="form-group"><label>車台番号</label><input type="text" id="v-shaken-chassis"></div><div class="form-group"><label>型式</label><input type="text" id="v-shaken-type"></div></div></div>
+      <div class="doc-section"><div class="doc-section-header"><div class="doc-section-title">車検証</div></div><div class="doc-fields"><div class="form-group"><label>有効期限</label><input type="date" id="v-shaken-exp"></div><div class="form-group"><label>車台番号</label><input type="text" id="v-shaken-chassis"></div><div class="form-group"><label>型式</label><input type="text" id="v-shaken-type"></div><div class="form-group"><label>車体色</label><input type="text" id="v-color" placeholder="白"></div><div class="form-group"><label>登録名義</label><input type="text" id="v-owner" placeholder="大阪急配株式会社"></div><div class="form-group"><label>使用者</label><input type="text" id="v-user" placeholder="大阪急配株式会社"></div><div class="form-group"><label>再委託先名（外注の場合）</label><input type="text" id="v-sub" placeholder="山田 太郎"></div></div></div>
       <div class="doc-section"><div class="doc-section-header"><div class="doc-section-title">🔵 自賠責保険</div></div><div class="doc-fields"><div class="form-group"><label>満了日</label><input type="date" id="v-jibai-exp"></div><div class="form-group"><label>証券番号</label><input type="text" id="v-jibai-no"></div><div class="form-group"><label>保険会社</label><input type="text" id="v-jibai-company"></div></div></div>
       <div class="doc-section"><div class="doc-section-header"><div class="doc-section-title">🟢 任意保険</div></div><div class="doc-fields"><div class="form-group"><label>満了日</label><input type="date" id="v-nin-exp"></div><div class="form-group"><label>証券番号</label><input type="text" id="v-nin-no"></div><div class="form-group"><label>保険会社</label><input type="text" id="v-nin-company"></div></div></div>
     </div></div>
@@ -2942,7 +2968,7 @@ async function generatePdfViaApps(office, docType, dateStr){
         companyDrivers.push({
           ...d,
           type:'外注',
-          subCompany: c.name,  // 再委託先名=会社名
+          subCompany: c.name,
         });
       }
     });
@@ -2950,7 +2976,7 @@ async function generatePdfViaApps(office, docType, dateStr){
       if((v.offices||[]).includes(office)){
         companyVehicles.push({
           ...v,
-          sub: c.name,  // 再委託先名=会社名
+          sub: c.name,
         });
       }
     });
@@ -3138,7 +3164,7 @@ async function generateFromTemplate(tplId,office,driver,dateStr){
   }
 
   if(tplId==='tpl4'){
-    // 適合証明書（大阪急配）: 社員数＝外注を除いた人数
+    // 適合証明書（大阪急配）: 社員数＝使用者が大阪急配の車両ドライバーも含む
     var empCount=drivers.filter(d=>belongsToOffice(d,office)&&d.type==='社員'&&(!d.status||d.status==='在籍')).length;
     replacements['社員数']=String(empCount||1);
   }
@@ -3583,7 +3609,9 @@ function openVehicleModal(id){
   editingVehicleId=id||null;
   document.getElementById('vm-title').textContent=id?'車両 編集':'車両 登録';
   document.getElementById('v-office').innerHTML=offices.map(o=>`<option>${o}</option>`).join('');
-  document.getElementById('v-driver').innerHTML='<option value="">未割当</option>'+drivers.map(d=>`<option value="${d.id}">${d.name}（${d.office}）</option>`).join('');
+  var allDriverOpts=drivers.filter(d=>!d.status||d.status==='在籍').map(d=>`<option value="${d.id}">${d.name}（${d.type||'社員'}/${Array.isArray(d.offices)?d.offices[0]:d.office||''}）</option>`);
+  companies.forEach(c=>{(c.drivers||[]).forEach(d=>{allDriverOpts.push(`<option value="cd:${d.name}">${d.name}（${c.name}）</option>`);});});
+  document.getElementById('v-driver').innerHTML='<option value="">未割当</option>'+allDriverOpts.join('');
   ['v-plate','v-model','v-color','v-owner','v-user','v-sub','v-note','v-shaken-exp','v-shaken-chassis','v-shaken-type','v-jibai-exp','v-jibai-no','v-jibai-company','v-nin-exp','v-nin-no','v-nin-company'].forEach(f=>document.getElementById(f).value='');
   document.getElementById('v-type').value='社有';document.getElementById('v-kind').value='軽四';document.getElementById('v-status').value='稼働';
   if(id){const v=vehicles.find(x=>x.id==id);if(v){document.getElementById('v-plate').value=v.plate||'';document.getElementById('v-model').value=v.model||'';document.getElementById('v-kind').value=v.kind||'軽四';document.getElementById('v-type').value=v.type||'社有';document.getElementById('v-status').value=v.status||'稼働';document.getElementById('v-office').value=v.office||'';document.getElementById('v-driver').value=v.driverId||'';document.getElementById('v-color').value=v.color||'';document.getElementById('v-owner').value=v.owner||'';document.getElementById('v-user').value=v.vehicleUser||'';document.getElementById('v-sub').value=v.sub||'';document.getElementById('v-note').value=v.note||'';document.getElementById('v-shaken-exp').value=v.shaken?.exp||'';document.getElementById('v-shaken-chassis').value=v.shaken?.chassis||'';document.getElementById('v-shaken-type').value=v.shaken?.type||'';document.getElementById('v-jibai-exp').value=v.jibai?.exp||'';document.getElementById('v-jibai-no').value=v.jibai?.no||'';document.getElementById('v-jibai-company').value=v.jibai?.company||'';document.getElementById('v-nin-exp').value=v.nin?.exp||'';document.getElementById('v-nin-no').value=v.nin?.no||'';document.getElementById('v-nin-company').value=v.nin?.company||'';}}
