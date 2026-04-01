@@ -1920,30 +1920,48 @@ function renderDocPage(){
     const offV=vehicles.filter(v=>belongsToOffice(v,office));
     const employees=offD.filter(d=>d.type==='社員');
     const subcons=offD.filter(d=>d.type==='外注');
-    // 委託会社ドライバーも外注として含む
-    const coSubcons=[];
-    companies.forEach(c=>{(c.drivers||[]).forEach(d=>{if((d.offices||[]).includes(office))coSubcons.push({...d,type:'外注',sub:{company:c.name},_coName:c.name});});});
-    const allSubs=[...subcons,...coSubcons];
+    // 委託会社情報を構築
+    const coCompanies=[];
+    companies.forEach(c=>{
+      const cDrivers=(c.drivers||[]).filter(d=>(d.offices||[]).includes(office));
+      if(cDrivers.length) coCompanies.push({name:c.name,addr:c.addr||'',tel:c.tel||'',cDrivers:cDrivers});
+    });
     const tabId='tab-'+office.replace(/[^a-zA-Z0-9]/g,'');
-    // 外注チェックボックス
+    // 外注チェックボックス（会社/個人を分離）
     var subCheckHtml='';
-    if(allSubs.length){
+    if(subcons.length||coCompanies.length){
       subCheckHtml='<div style="padding:6px 0">';
-      subCheckHtml+='<div style="font-size:10px;font-weight:600;color:#E65100;margin-bottom:4px">対象ドライバー選択 <label style="font-size:9px;color:#888;font-weight:400;cursor:pointer;margin-left:8px"><input type="checkbox" checked onchange="toggleSubAll(\''+office+'\',this.checked)"> 全選択</label></div>';
-      subCheckHtml+=allSubs.map(d=>{
-        var coName=d._coName||d.sub?.company||d.name;
-        return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:11px;margin-right:10px;cursor:pointer"><input type="checkbox" class="sub-check-'+office+'" value="'+(d.id||d.name)+'" checked>'+coName+(d._coName?'('+d.name+')':'')+'</label>';
-      }).join('');
+      subCheckHtml+='<div style="font-size:10px;font-weight:600;color:#E65100;margin-bottom:4px">対象選択 <label style="font-size:9px;color:#888;font-weight:400;cursor:pointer;margin-left:8px"><input type="checkbox" checked onchange="toggleSubAll(\''+office+'\',this.checked)"> 全選択</label></div>';
+      // 外注（個人）
+      if(subcons.length){
+        subCheckHtml+='<div style="margin-bottom:4px">';
+        subcons.forEach(d=>{
+          var label=d.sub?.company||d.name;
+          subCheckHtml+='<label style="display:inline-flex;align-items:center;gap:3px;font-size:11px;margin-right:10px;cursor:pointer"><input type="checkbox" class="sub-check-'+office+'" data-mode="person" value="'+d.id+'" checked>'+label+'</label>';
+        });
+        subCheckHtml+='</div>';
+      }
+      // 委託会社（会社単位＋ドライバー個人）
+      coCompanies.forEach(co=>{
+        subCheckHtml+='<div style="margin-bottom:3px;padding:3px 6px;background:#f5f0ff;border-radius:4px">';
+        subCheckHtml+='<label style="display:inline-flex;align-items:center;gap:3px;font-size:11px;margin-right:8px;cursor:pointer;font-weight:500"><input type="checkbox" class="sub-check-'+office+'" data-mode="company" value="co:'+co.name+'" checked>'+co.name+'（会社）</label>';
+        co.cDrivers.forEach(d=>{
+          subCheckHtml+='<label style="display:inline-flex;align-items:center;gap:3px;font-size:11px;margin-right:8px;cursor:pointer;color:#666"><input type="checkbox" class="sub-check-'+office+'" data-mode="person" value="cd:'+d.name+'" >'+d.name+'（個人）</label>';
+        });
+        subCheckHtml+='</div>';
+      });
+      // 社員数入力
+      subCheckHtml+='<div style="margin-top:6px;display:flex;gap:6px;align-items:center"><span style="font-size:10px;color:#888;font-weight:500">社員数（適合証明書用）:</span><input type="number" id="staff-count-'+office+'" value="1" min="1" style="width:50px;padding:2px 6px;font-size:11px;border:1px solid #ddd;border-radius:4px"></div>';
       subCheckHtml+='</div>';
     }
     return `<div class="doc-card">
       <div class="doc-card-name">${office}営業所 <span class="badge badge-info" style="font-size:10px">${POST_OFFICE(office)}宛</span></div>
-      <div class="doc-card-info">社員 ${employees.length}名 / 外注 ${allSubs.length}名 / 車両 ${offV.length}台</div>
+      <div class="doc-card-info">社員 ${employees.length}名 / 外注 ${subcons.length+coCompanies.length}件 / 車両 ${offV.length}台</div>
       <div style="display:flex;gap:0;border-bottom:2px solid #e0e0e0;margin:6px 0 8px">
         <button class="doc-tab active" data-tab="${tabId}" data-idx="0" onclick="switchDocTab('${tabId}',0)">現況届</button>
         <button class="doc-tab" data-tab="${tabId}" data-idx="1" onclick="switchDocTab('${tabId}',1)">雇用証明書</button>
         <button class="doc-tab" data-tab="${tabId}" data-idx="2" onclick="switchDocTab('${tabId}',2)">報告書</button>
-        <button class="doc-tab" data-tab="${tabId}" data-idx="3" onclick="switchDocTab('${tabId}',3)" style="color:#E65100">再委託先書類${allSubs.length?' ('+allSubs.length+')':''}</button>
+        <button class="doc-tab" data-tab="${tabId}" data-idx="3" onclick="switchDocTab('${tabId}',3)" style="color:#E65100">再委託先書類${(subcons.length+coCompanies.length)?' ('+(subcons.length+coCompanies.length)+')':''}</button>
       </div>
       <div class="doc-tab-content" data-tab="${tabId}" data-idx="0">
         <div class="doc-card-btns" style="margin-bottom:6px">
@@ -1965,7 +1983,7 @@ function renderDocPage(){
         </div>
       </div>
       <div class="doc-tab-content" data-tab="${tabId}" data-idx="3" style="display:none">
-        ${allSubs.length?`
+        ${(subcons.length||coCompanies.length)?`
         ${subCheckHtml}
         <div class="doc-card-btns" style="margin-bottom:6px">
           <button class="btn btn-sm" style="background:#FFF3E0;border-color:#FFCC80;color:#E65100" onclick="generateDoc('${office}','saitaku')">再委託承認願</button>
@@ -1992,9 +2010,15 @@ function toggleSubAll(office,checked){
 }
 
 function getSelectedSubcons(office){
-  var vals=[];
-  document.querySelectorAll('.sub-check-'+office+':checked').forEach(cb=>{vals.push(cb.value);});
-  return vals;
+  var results=[];
+  document.querySelectorAll('.sub-check-'+office+':checked').forEach(cb=>{
+    results.push({value:cb.value, mode:cb.dataset.mode||'person'});
+  });
+  return results;
+}
+function getStaffCount(office){
+  var el=document.getElementById('staff-count-'+office);
+  return el?el.value:'1';
 }
 
 // ====== docx生成ユーティリティ ======
@@ -2860,13 +2884,34 @@ async function generateDoc(office,type){
   const prog=document.getElementById(`prog-${office}`);
   prog.className='gen-progress show';prog.textContent='生成中...';
   try{
-    // 外注ドライバー（自社＋委託会社）
-    const ownSubcons=drivers.filter(d=>belongsToOffice(d,office)&&d.type==='外注'&&(!d.status||d.status==='在籍'));
-    const coSubcons=[];
-    companies.forEach(c=>{(c.drivers||[]).forEach(d=>{if((d.offices||[]).includes(office))coSubcons.push({...d,type:'外注',sub:{company:c.name},_coName:c.name});});});
-    const allSubcons=[...ownSubcons,...coSubcons];
-    const selectedVals=getSelectedSubcons(office);
-    const subcons=allSubcons.filter(d=>selectedVals.includes(String(d.id))||selectedVals.includes(d.name));
+    // 選択された対象を取得
+    const selections=getSelectedSubcons(office);
+    const staffCount=getStaffCount(office);
+    // 選択から生成対象のドライバーオブジェクトリストを構築
+    const subcons=[];
+    selections.forEach(sel=>{
+      if(sel.mode==='company'){
+        // 会社選択: co:会社名 → 会社情報で生成
+        var coName=sel.value.replace('co:','');
+        var co=companies.find(c=>c.name===coName);
+        if(co) subcons.push({name:coName,type:'外注',sub:{company:coName},addr:co.addr||'',tel:co.tel||'',kana:'',_isCompany:true,_staffCount:staffCount});
+      } else {
+        // 個人選択
+        if(sel.value.startsWith('cd:')){
+          // 委託会社ドライバー個人: cd:ドライバー名
+          var dName=sel.value.replace('cd:','');
+          companies.forEach(c=>{(c.drivers||[]).forEach(d=>{
+            if(d.name===dName&&(d.offices||[]).includes(office)){
+              subcons.push({...d,type:'外注',sub:{company:d.name},addr:d.addr||'',tel:d.tel||'',kana:d.kana||'',_staffCount:staffCount});
+            }
+          });});
+        } else {
+          // 通常の外注個人: ID
+          var dr=drivers.find(d=>String(d.id)===sel.value);
+          if(dr) subcons.push({...dr,_staffCount:staffCount});
+        }
+      }
+    });
     const generatedFiles=[];
 
     const pdfTypes={
@@ -2988,9 +3033,9 @@ async function generateFromTemplate(tplId,office,driver,dateStr){
     var sub=driver.sub||{};
     replacements['住所']=driver.addr||'';
     replacements['会社名']=sub.company||driver.name;
-    replacements['代表者名']=driver.name;
+    replacements['代表者名']=driver._isCompany?(driver.name):(driver.name);
     replacements['ふりがな']=driver.kana||'';
-    replacements['社員数']='1';
+    replacements['社員数']=driver._staffCount||'1';
     var birth=sub.birth||driver.birth||'';
     if(birth){var bp=birth.split('-');if(bp.length===3) replacements['生年月日']=bp[0]+'年'+parseInt(bp[1])+'月'+parseInt(bp[2])+'日';}
     else replacements['生年月日']='';
@@ -3074,7 +3119,7 @@ async function generateFromTemplate(tplId,office,driver,dateStr){
   zip.file('word/document.xml',docXml);
   var outBlob=await zip.generateAsync({type:'blob'});
 
-  var driverLabel=driver?(driver.sub?.company||driver.name):'大阪急配';
+  var driverLabel=driver?driver.name:'大阪急配';
   var fileName=office+'_'+tpl.name+'_'+driverLabel+'_'+dateStr;
 
   // Driveにアップロード→PDF変換→ダウンロード
