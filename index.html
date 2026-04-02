@@ -213,53 +213,115 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
   .sidebar.open{transform:translateX(0)}
   .sidebar-overlay.open{display:block}
   .main{margin-left:0}
-  .topbar{padding:10px 14px 10px 52px}
-  .topbar h1{font-size:14px}
-  .content{padding:10px 10px}
-  .stats{grid-template-columns:repeat(2,1fr);gap:8px}
+
+  /* ===== topbar ===== */
+  .topbar{padding:8px 12px 8px 48px;flex-wrap:wrap;gap:4px;min-height:44px}
+  .topbar h1{font-size:14px;white-space:nowrap}
+  .topbar .btn{font-size:10px;padding:4px 8px}
+
+  /* ===== content ===== */
+  .content{padding:8px 8px;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+
+  /* ===== 統計カード ===== */
+  .stats{grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:10px}
+  .stats>div{padding:10px!important;font-size:11px!important}
+
+  /* ===== グリッドレイアウト ===== */
   .doc-gen-grid{grid-template-columns:1fr}
   .form-grid{grid-template-columns:1fr}
-  .doc-fields{grid-template-columns:1fr 1fr}
+  .doc-fields{grid-template-columns:1fr}
   .subcon-grid{grid-template-columns:1fr}
-  .filter-bar{gap:6px}
-  .filter-chip{font-size:10px;padding:3px 8px}
-  table{font-size:10px}
-  th,td{padding:5px 6px}
-  .modal{max-height:95vh;width:calc(100% - 16px)!important;max-width:100%!important;margin:8px}
-  .modal-body{max-height:70vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
-  .login-card{width:calc(100% - 32px);padding:28px 20px}
-  .doc-date-bar{flex-wrap:wrap;gap:7px}
-  .sync-bar{flex-wrap:wrap;gap:6px}
-  .topbar{flex-wrap:wrap;gap:6px}
-  /* 書類生成カード */
-  .doc-card{padding:10px}
-  .doc-card-btns{gap:4px}
-  .doc-card-btns .btn{font-size:10px;padding:4px 8px}
-  .doc-tab{padding:5px 8px;font-size:10px}
-  /* メール送信モーダル */
-  #mail-attachments{max-height:250px;font-size:10px}
-  .mail-badge{font-size:9px;padding:2px 6px}
-  .mail-driver-row{padding:3px 6px;font-size:10px}
-  /* データ管理 */
   .storage-grid{grid-template-columns:1fr!important}
-  .office-row{padding:8px 10px}
-  /* 設定 */
+
+  /* ===== テーブル ===== */
+  .table-wrap{border-radius:6px;-webkit-overflow-scrolling:touch}
+  table{font-size:10px;min-width:500px}
+  th,td{padding:5px 6px;white-space:nowrap}
+
+  /* ===== ボタン ===== */
+  .btn{font-size:11px;padding:6px 10px;min-height:32px}
+  .btn-sm{font-size:10px;padding:4px 8px;min-height:28px}
+  .btn-primary{font-size:12px}
+
+  /* ===== フォーム入力 ===== */
+  input,select,textarea{font-size:16px!important;-webkit-appearance:none;border-radius:6px!important}
+  input[type="checkbox"],input[type="radio"]{width:20px;height:20px;min-width:20px;flex-shrink:0}
+  input[type="date"]{min-height:36px}
+  label{min-height:36px;display:flex;align-items:center;gap:6px}
+  .form-group label{font-size:11px;min-height:auto;margin-bottom:2px}
+  .form-group input,.form-group select,.form-group textarea{padding:8px 10px}
+
+  /* ===== フィルター ===== */
+  .filter-bar{gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;padding-bottom:4px}
+  .filter-chip{font-size:10px;padding:4px 10px;white-space:nowrap;min-height:28px}
+
+  /* ===== モーダル ===== */
+  .modal-bg{padding:4px;align-items:flex-end}
+  .modal{max-height:92vh;width:100%!important;max-width:100%!important;margin:0;border-radius:16px 16px 0 0}
+  .modal-header{padding:12px 14px;position:sticky;top:0;background:#fff;z-index:2;border-radius:16px 16px 0 0}
+  .modal-body{max-height:calc(92vh - 110px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px}
+  .modal-footer{position:sticky;bottom:0;background:#fff;z-index:2;padding:10px 14px;padding-bottom:max(10px,env(safe-area-inset-bottom));border-top:1px solid #e0e0e0}
+  .modal-close{width:32px;height:32px;font-size:18px}
+
+  /* ===== ログイン ===== */
+  .login-card{width:calc(100% - 24px);padding:24px 18px}
+
+  /* ===== 書類生成 ===== */
+  .doc-date-bar{flex-direction:column;gap:6px;padding:8px 10px;align-items:stretch}
+  .doc-date-bar>*{width:100%}
+  .doc-card{padding:10px;border-radius:8px}
+  .doc-card-name{font-size:13px}
+  .doc-card-info{font-size:10px;margin-bottom:6px}
+  .doc-card-btns{gap:4px}
+  .doc-card-btns .btn{font-size:10px;padding:4px 6px;flex:1;text-align:center;min-height:30px}
+  .doc-tab{padding:6px 8px;font-size:10px}
+
+  /* ===== メール送信モーダル ===== */
+  #mail-attachments{max-height:40vh;font-size:10px}
+  .mail-badge{font-size:9px;padding:3px 8px;min-height:26px}
+  .mail-driver-row{padding:4px 6px;font-size:10px}
+
+  /* ===== データ管理 ===== */
+  .office-row{padding:8px 10px;flex-wrap:wrap;gap:6px}
+  .office-row .btn{font-size:10px}
+
+  /* ===== 設定 ===== */
   .settings-section{padding:10px}
-  /* ドロップボックス */
-  .top-drop{min-height:80px;padding:20px 14px}
-  /* btn全般 */
-  .btn{font-size:11px;padding:5px 10px}
-  .btn-sm{font-size:10px;padding:3px 7px}
-  /* タッチ操作改善 */
-  input,select,textarea{font-size:16px!important;-webkit-appearance:none}
-  input[type="checkbox"],input[type="radio"]{width:18px;height:18px;min-width:18px}
-  label{min-height:32px;display:flex;align-items:center}
-  /* メールページ */
-  #mail-task-list .btn{font-size:10px;padding:3px 6px}
-  /* モーダルフッター固定 */
-  .modal-footer{position:sticky;bottom:0;background:#fff;z-index:1;padding-bottom:max(12px,env(safe-area-inset-bottom))}
-  /* セーフエリア（ノッチ対応）*/
-  .content{padding-bottom:max(12px,env(safe-area-inset-bottom))}
+
+  /* ===== 同期バー ===== */
+  .sync-bar{flex-wrap:wrap;gap:4px;padding:6px 10px;font-size:10px}
+  .sync-bar .btn{font-size:10px;padding:3px 8px}
+
+  /* ===== ドロップボックス ===== */
+  .top-drop{min-height:80px;padding:16px 12px}
+
+  /* ===== ファイルドロップ ===== */
+  .file-drop-zone{padding:16px 10px}
+
+  /* ===== セクション ===== */
+  .section-title{font-size:12px;margin:8px 0 4px}
+  .doc-section{padding:8px}
+  .doc-section-title{font-size:12px}
+
+  /* ===== メールページ ===== */
+  #mail-task-list .btn{font-size:10px;padding:4px 8px}
+
+  /* ===== 書類カード内チェックボックス ===== */
+  .sub-check-label{font-size:11px;gap:4px}
+
+  /* ===== 受信ボックス ===== */
+  .inbox-card{padding:8px!important}
+}
+@media(max-width:400px){
+  .topbar{padding:8px 8px 8px 44px}
+  .content{padding:6px 6px}
+  .stats{grid-template-columns:1fr 1fr;gap:4px}
+  .stats>div{padding:8px!important}
+  .doc-card-btns .btn{font-size:9px;padding:3px 5px}
+  .doc-tab{font-size:9px;padding:4px 6px}
+  .btn{font-size:10px;padding:5px 8px}
+  .modal-body{padding:10px}
+  .hamburger{left:6px;top:6px;width:32px;height:32px}
 }
 /* ===== セルフ入力フォーム（スマホ専用ページ） ===== */
 #self-form-screen{display:none;min-height:100vh;background:#f0f4ff;padding:16px;padding-bottom:calc(env(safe-area-inset-bottom,20px) + 60px);position:fixed;inset:0;z-index:999;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
@@ -3016,7 +3078,7 @@ async function generateDoc(office,type){
         // 会社選択: co:会社名 → 会社情報で生成
         var coName=sel.value.replace('co:','');
         var co=companies.find(c=>c.name===coName);
-        if(co) subcons.push({name:coName,type:'外注',sub:{company:coName},addr:co.addr||'',tel:co.tel||'',kana:'',_isCompany:true,_staffCount:staffCount});
+        if(co) subcons.push({name:coName,type:'外注',sub:{company:coName},addr:co.addr||'',tel:co.tel||'',kana:co.repKana||'',rep:co.rep||'',repBirth:co.repBirth||'',_isCompany:true,_staffCount:staffCount});
       } else {
         // 個人選択
         if(sel.value.startsWith('cd:')){
@@ -3092,15 +3154,15 @@ async function generateDoc(office,type){
       if(!subcons.length){prog.textContent='外注ドライバーが選択されていません';return;}
       var tplId1=tplFiles['tpl1']&&tplFiles['tpl1'].fileId?'tpl1':null;
       for(const d of subcons){
-        prog.textContent=`生成中: 誓約書（${d.sub?.company||d.name}）`;
+        prog.textContent=`生成中: 誓約書（${d.name}）`;
         if(tplId1){
           await generateFromTemplate('tpl1',office,d,dateStr);
         } else {
           const xml=genSeiyakuSubXml(dateStr,d);
-          const name=`${office}_誓約書（${d.sub?.company||d.name}）_${dateStr}.docx`;
+          const name=`${office}_誓約書_${d.name}_${dateStr}.docx`;
           downloadBlob(await buildDocx(xml),name);
         }
-        generatedFiles.push({name:`誓約書_${d.sub?.company||d.name}`,office});
+        generatedFiles.push({name:`誓約書_${d.name}`,office});
         await new Promise(r=>setTimeout(r,200));
       }
     }
@@ -3108,15 +3170,15 @@ async function generateDoc(office,type){
       if(!subcons.length){prog.textContent='外注ドライバーが選択されていません';return;}
       var tplId3=tplFiles['tpl3']&&tplFiles['tpl3'].fileId?'tpl3':null;
       for(const d of subcons){
-        prog.textContent=`生成中: 適合証明書（${d.sub?.company||d.name}）`;
+        prog.textContent=`生成中: 適合証明書（${d.name}）`;
         if(tplId3){
           await generateFromTemplate('tpl3',office,d,dateStr);
         } else {
           const xml=genTekigoSubXml(dateStr,d);
-          const name=`${office}_適合証明書（${d.sub?.company||d.name}）_${dateStr}.docx`;
+          const name=`${office}_適合証明書_${d.name}_${dateStr}.docx`;
           downloadBlob(await buildDocx(xml),name);
         }
-        generatedFiles.push({name:`適合証明書_${d.sub?.company||d.name}`,office});
+        generatedFiles.push({name:`適合証明書_${d.name}`,office});
         await new Promise(r=>setTimeout(r,200));
       }
     }
@@ -3155,10 +3217,11 @@ async function generateFromTemplate(tplId,office,driver,dateStr){
     var sub=driver.sub||{};
     replacements['住所']=driver.addr||'';
     replacements['会社名']=sub.company||driver.name;
-    replacements['代表者名']=driver._isCompany?(driver.name):(driver.name);
+    // 会社選択: 代表者名=co.rep、個人選択: 代表者名=driver.name
+    replacements['代表者名']=driver._isCompany?(driver.rep||driver.name):driver.name;
     replacements['ふりがな']=driver.kana||'';
     replacements['社員数']=driver._staffCount||'1';
-    var birth=sub.birth||driver.birth||'';
+    var birth=driver._isCompany?(driver.repBirth||''):(sub.birth||driver.birth||'');
     if(birth){var bp=birth.split('-');if(bp.length===3) replacements['生年月日']=bp[0]+'年'+parseInt(bp[1])+'月'+parseInt(bp[2])+'日';}
     else replacements['生年月日']='';
   }
@@ -3172,10 +3235,13 @@ async function generateFromTemplate(tplId,office,driver,dateStr){
   if(tplId==='tpl5'&&driver){
     // 再委託承認願
     var sub5=driver.sub||{};
-    var birth5=sub5.birth||driver.birth||'';
+    var birth5=driver._isCompany?(driver.repBirth||''):(sub5.birth||driver.birth||'');
     var birthStr5='';
     if(birth5){var bp5=birth5.split('-');if(bp5.length===3) birthStr5=bp5[0]+'年'+parseInt(bp5[1])+'月'+parseInt(bp5[2])+'日';}
-    var nameKana5=driver.name+'（'+(driver.kana||'')+'）　'+birthStr5;
+    // 会社選択: 法人名＋代表者名、個人選択: 氏名
+    var dispName5=driver._isCompany?(driver.name+'　代表　'+(driver.rep||'')):driver.name;
+    var dispKana5=driver.kana||'';
+    var nameKana5=dispName5+'（'+dispKana5+'）　'+birthStr5;
     replacements['氏名ふりがな生年月日']=nameKana5;
     replacements['住所']=driver.addr||'';
     replacements['連絡先']=driver.tel||sub5.tel||'';
@@ -3242,7 +3308,9 @@ async function generateFromTemplate(tplId,office,driver,dateStr){
   var outBlob=await zip.generateAsync({type:'blob'});
 
   var driverLabel=driver?driver.name:'大阪急配';
-  var fileName=office+'_'+tpl.name+'_'+driverLabel+'_'+dateStr;
+  // テンプレート名から（再委託先様）（大阪急配様）を除去してクリーンな名前に
+  var cleanTplName=tpl.name.replace(/（[^）]*）/g,'').trim();
+  var fileName=office+'_'+cleanTplName+'_'+driverLabel+'_'+dateStr;
 
   // Driveにアップロード→PDF変換→ダウンロード
   var reader=new FileReader();
