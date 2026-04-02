@@ -925,8 +925,8 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
       <div class="section-title">基本情報</div>
       <div class="form-group"><label>姓（漢字）*</label><input type="text" id="d-sei" placeholder="山田" class="modal-field"></div>
       <div class="form-group"><label>名（漢字）*</label><input type="text" id="d-mei" placeholder="太郎" class="modal-field"></div>
-      <div class="form-group"><label>姓（フリガナ）</label><input type="text" id="d-sei-kana" class="kana-input" placeholder="ひらがな可" class="modal-field"></div>
-      <div class="form-group"><label>名（フリガナ）</label><input type="text" id="d-mei-kana" class="kana-input" placeholder="ひらがな可" class="modal-field"></div>
+      <div class="form-group"><label>姓（フリガナ）</label><input type="text" id="d-sei-kana" class="kana-input modal-field" placeholder="ひらがな可"></div>
+      <div class="form-group"><label>名（フリガナ）</label><input type="text" id="d-mei-kana" class="kana-input modal-field" placeholder="ひらがな可"></div>
       <div class="form-group"><label>区分</label><select id="d-type" onchange="toggleSubconFields();toggleContractorField()" class="modal-field"><option value="社員">社員</option><option value="外注">外注（個人）</option><option value="委託会社">委託会社所属</option></select></div>
       <div class="form-group" id="d-contractor-group" style="display:none"><label>所属委託会社</label><select id="d-contractor" class="modal-field"><option value="">選択してください</option></select></div>
       <div class="form-group" style="grid-column:1/-1"><label>担当営業所（複数選択可）</label><div id="d-office-checks" class="office-checkboxes"></div></div>
@@ -948,7 +948,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
         <div class="subcon-title">🏢 外注情報（再委託承認願・誓約書・適合証明書に使用）</div>
         <div class="subcon-grid">
           <div class="form-group"><label>外注先会社名（法人の場合）</label><input type="text" id="d-sub-company" placeholder="〇〇運送株式会社（個人は空欄）" class="modal-field"></div>
-          <div class="form-group"><label>代表者ふりがな</label><input type="text" id="d-sub-kana" class="kana-input" placeholder="ひらがな可" class="modal-field"></div>
+          <div class="form-group"><label>代表者ふりがな</label><input type="text" id="d-sub-kana" class="kana-input modal-field" placeholder="ひらがな可"></div>
           <div class="form-group"><label>代表者生年月日</label><input type="date" id="d-sub-birth" class="modal-field"></div>
           <div class="form-group"><label>受持地域</label><input type="text" id="d-sub-area" placeholder="西成区全域" class="modal-field"></div>
           <div class="form-group"><label>社員数（個人は1）</label><input type="number" id="d-sub-count" placeholder="1" min="1" value="1" class="modal-field"></div>
@@ -1012,8 +1012,8 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
       <div class="section-title">基本情報</div>
       <div class="form-group"><label>姓（漢字）*</label><input type="text" id="cd-sei" placeholder="山田" class="modal-field"></div>
       <div class="form-group"><label>名（漢字）*</label><input type="text" id="cd-mei" placeholder="太郎" class="modal-field"></div>
-      <div class="form-group"><label>姓（フリガナ）</label><input type="text" id="cd-sei-kana" class="kana-input" placeholder="ひらがな可" class="modal-field"></div>
-      <div class="form-group"><label>名（フリガナ）</label><input type="text" id="cd-mei-kana" class="kana-input" placeholder="ひらがな可" class="modal-field"></div>
+      <div class="form-group"><label>姓（フリガナ）</label><input type="text" id="cd-sei-kana" class="kana-input modal-field" placeholder="ひらがな可"></div>
+      <div class="form-group"><label>名（フリガナ）</label><input type="text" id="cd-mei-kana" class="kana-input modal-field" placeholder="ひらがな可"></div>
       <div class="form-group" style="grid-column:1/-1">
         <label>担当営業所（複数選択可）*</label>
         <div id="cd-offices" class="office-multi-select"></div>
@@ -8812,16 +8812,24 @@ document.addEventListener('visibilitychange', function(){
 });
 
 // ====== フリガナ自動カタカナ変換 ======
-document.addEventListener('input',function(e){
-  if(!e.target.classList.contains('kana-input')) return;
-  var v=e.target.value;
-  var converted=v.replace(/[\u3041-\u3096]/g,function(c){return String.fromCharCode(c.charCodeAt(0)+96);});
-  if(converted!==v){
-    var pos=e.target.selectionStart;
-    e.target.value=converted;
-    e.target.setSelectionRange(pos,pos);
+(function(){
+  var composing=false;
+  document.addEventListener('compositionstart',function(e){if(e.target.classList.contains('kana-input'))composing=true;});
+  document.addEventListener('compositionend',function(e){
+    if(!e.target.classList.contains('kana-input'))return;
+    composing=false;
+    convertKana(e.target);
+  });
+  document.addEventListener('input',function(e){
+    if(!e.target.classList.contains('kana-input')||composing||e.isComposing)return;
+    convertKana(e.target);
+  });
+  function convertKana(el){
+    var v=el.value;
+    var converted=v.replace(/[\u3041-\u3096]/g,function(c){return String.fromCharCode(c.charCodeAt(0)+96);});
+    if(converted!==v){var pos=el.selectionStart;el.value=converted;el.setSelectionRange(pos,pos);}
   }
-});
+})();
 
 // タイトルクリック → ダッシュボードに移動
 document.addEventListener('click',function(e){
