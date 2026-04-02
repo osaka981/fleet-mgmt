@@ -1414,7 +1414,7 @@ function minExp(exps){const v=exps.filter(e=>e);return v.length?v.sort()[0]:'999
 function fmtDate(s){if(!s)return '';const d=new Date(s);return`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;}
 function fmtDateY(s){if(!s)return{y:'',m:'',d:''};const d=new Date(s);return{y:d.getFullYear(),m:d.getMonth()+1,d:d.getDate()};}
 function isOsakaVehicle(v){const o=v.owner||'',u=v.vehicleUser||'';return COMPANY_NAMES.some(n=>o.includes(n)||u.includes(n));}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 // ====== ログイン ======
 function doLogin(){const pw=document.getElementById('pw-input').value;if(pw===PASSWORD){sessionStorage.setItem('fleet_session','ok');document.getElementById('login-screen').style.display='none';document.getElementById('app-screen').style.display='block';renderAll();syncAll(false);}else{document.getElementById('login-err').textContent='パスワードが違います';document.getElementById('pw-input').value='';}}
@@ -4139,8 +4139,12 @@ function saveDriver(){
     renderArchive();
     // ★ 退職メールタスク自動生成（既存ドライバーのステータス変更時のみ）
     if(editingDriverId){
-      const prevDriver=drivers.find(d=>d.id==obj.id);
       createMailTask('退職', obj.id, obj.name, obj.type||'', obj.offices?.[0]||obj.office||'');
+      // ★ ユーザーに通知
+      setTimeout(function(){
+        var offices=(obj.offices||[obj.office]).filter(Boolean).join('・');
+        alert('📧 退職メールタスクを自動作成しました\n\n対象: '+obj.name+'\n営業所: '+(offices||'未設定')+'\n\nメール送信ページの「未送信」タブで確認・送信できます。');
+      },200);
     }
   }
 }
@@ -5908,7 +5912,7 @@ function renderStorage(){
       html+='<div style="border:1px solid #e53935;border-radius:6px;background:#fff;position:relative">';
       html+='<div style="cursor:pointer;border-radius:6px 6px 0 0;overflow:hidden" onclick="openUnassignedPreview('+i+')">'+thumb+'</div>';
       html+='<button style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:99px;background:rgba(0,0,0,.55);color:#fff;border:none;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center" onclick="event.stopPropagation();deleteUnassignedFile('+i+')">×</button>';
-      html+='<div style="font-size:9px;color:#555;padding:4px 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-top:1px solid #eee" title="'+(f.name||'')+'">'+(f.name||'未分類')+'</div>';
+      html+='<div style="font-size:9px;color:#555;padding:4px 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-top:1px solid #eee" title="'+esc(f.name||'')+'">'+esc(f.name||'未分類')+'</div>';
       html+='<div style="padding:4px 6px 6px">';
       html+='<button style="width:100%;font-size:11px;padding:6px 4px;border:1px solid #4a90e2;border-radius:4px;background:#EBF3FF;color:#1565C0;cursor:pointer;font-weight:500" onclick="event.stopPropagation();assignUnassignedFile('+i+')">振り分け</button>';
       html+='</div>';
