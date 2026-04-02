@@ -5714,14 +5714,72 @@ function renderStorage(){
     html+='<div style="font-size:11px;font-weight:500;color:#888;margin:12px 0 8px">未割当車両（'+unassignedVehicles.length+'台）</div>';
     html+='<div class="storage-grid">';
     html+=unassignedVehicles.map(v=>{
+      var key='v-'+v.id;
+      var expanded=storageExpandedIds[key];
       var vaf=v.attachedFiles||[];
-      return '<div style="background:#d8dce3;border:1.5px solid #888;border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px">'+
-        '<div style="min-width:0"><strong style="font-size:13px;color:#222">'+v.plate+'</strong> <span style="font-size:10px;color:#555">'+(v.model||'')+'</span> <span style="font-size:10px;color:#888">'+(v._offices.join('・')||v.office||'')+'</span></div>'+
-        '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+
-          expBadge(minExp([v.shaken?.exp,v.jibai?.exp,v.nin?.exp]))+
-          '<span style="font-size:10px;color:#666">'+vaf.length+'件</span>'+
-        '</div>'+
-      '</div>';
+      var hasShaken=vaf.some(f=>(f.category||'').includes('車検'));
+      var hasJibai=vaf.some(f=>(f.category||'').includes('自賠'));
+      var hasNin=vaf.some(f=>(f.category||'').includes('任意'));
+
+      if(!expanded){
+        return '<div style="background:#d8dce3;border:1.5px solid #888;border-radius:8px;padding:8px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px" onclick="storageToggleExpand(\''+key+'\')">'+
+          '<div style="min-width:0;display:flex;align-items:center;gap:8px">'+
+            '<div style="width:28px;height:28px;border-radius:50%;background:#546E7A;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;flex-shrink:0">車</div>'+
+            '<div><div style="font-weight:600;font-size:13px;color:#222">'+v.plate+' <span style="font-size:10px;color:#555;font-weight:400">'+(v.model||'')+'</span></div>'+
+            '<div style="font-size:10px;color:#555">'+(v._offices.join('・')||v.office||'未設定')+'</div></div>'+
+          '</div>'+
+          '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+
+            expBadge(minExp([v.shaken?.exp,v.jibai?.exp,v.nin?.exp]))+
+            '<span style="font-size:10px;background:#fff;color:#444;padding:2px 8px;border-radius:6px;border:1px solid #aab">'+vaf.length+'件</span>'+
+            '<span style="font-size:10px;color:#999">▶</span>'+
+          '</div>'+
+        '</div>';
+      }
+
+      // 展開状態
+      var cardHtml='<div style="background:#cfd4dc;border:1.5px solid #777;border-radius:10px;padding:4px 16px 14px;overflow:hidden;grid-column:1/-1">';
+      cardHtml+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;cursor:pointer" onclick="storageToggleExpand(\''+key+'\')">';
+      cardHtml+='<div style="display:flex;align-items:center;gap:10px">';
+      cardHtml+='<div style="width:34px;height:34px;border-radius:50%;background:#546E7A;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:12px">車</div>';
+      cardHtml+='<div><div style="font-weight:600;font-size:15px;color:#222"><span class="storage-link" onclick="event.stopPropagation();navigateToVehicle(\''+esc(v.plate)+'\')">'+v.plate+'</span> <span style="font-size:10px;color:#555;font-weight:400">'+(v.model||'')+'</span></div>';
+      cardHtml+='<div style="font-size:11px;color:#555">'+(v._offices.join('・')||v.office||'未設定')+'</div></div>';
+      cardHtml+='</div>';
+      cardHtml+='<div style="display:flex;gap:6px;align-items:center">';
+      cardHtml+='<button class="btn btn-sm" style="font-size:10px;padding:3px 10px" onclick="event.stopPropagation();openVehicleModal('+v.id+')">編集</button>';
+      cardHtml+='<span style="font-size:10px;padding:3px 10px;border-radius:20px;cursor:pointer;background:#4a90e2;color:#fff" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+v.id+',\'\')">+ 追加</span>';
+      cardHtml+='<span style="color:#999;font-size:11px;cursor:pointer" onclick="storageToggleExpand(\''+key+'\')">▼</span>';
+      cardHtml+='</div></div>';
+
+      // 期限バッジ
+      cardHtml+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">';
+      cardHtml+=expBadge(v.shaken?.exp,hasShaken,'車検');
+      cardHtml+=expBadge(v.jibai?.exp,hasJibai,'自賠責');
+      cardHtml+=expBadge(v.nin?.exp,hasNin,'任意保険');
+      cardHtml+='</div>';
+
+      // ファイルサムネ
+      if(vaf.length){
+        cardHtml+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">';
+        vaf.forEach(function(f,i){
+          var fid=f.fileId||(f.url&&f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)?f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1]:'');
+          var thumbSrc=f.dataUrl||(fid?'https://drive.google.com/thumbnail?id='+fid+'&sz=w160':'');
+          var thumb=thumbSrc?'<img src="'+thumbSrc+'" style="width:100%;aspect-ratio:1;object-fit:cover;display:block">':'<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:#e0e0e0;font-size:12px;color:#666"><img src="'+LOGO_THUMB+'" style="width:60%;height:60%;object-fit:contain"></div>';
+          var cat=f.category||guessFileCategoryByName(f.name,'vehicle')||'';
+          var catLabel=cat||'未分類';
+          var catBg=cat?'#E65100':'#999';
+          cardHtml+='<div style="border:1px solid #999;border-radius:5px;overflow:hidden;background:#fff;position:relative">';
+          cardHtml+='<div style="cursor:pointer" onclick="openAttachedFilePreview(\'vehicle\','+v.id+','+i+',\'\')">'+thumb+'</div>';
+          cardHtml+='<button style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:99px;background:rgba(0,0,0,.5);color:#fff;border:none;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center" onclick="event.stopPropagation();deleteCardFile(\'vehicle\','+v.id+','+i+')">×</button>';
+          cardHtml+='<div style="font-size:8px;background:'+catBg+';color:#fff;padding:2px 3px;text-align:center;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" onclick="event.stopPropagation();openCatPicker(\'vehicle\','+v.id+','+i+',this)" title="カテゴリ変更">'+catLabel+'</div>';
+          cardHtml+='</div>';
+        });
+        cardHtml+='</div>';
+      } else {
+        cardHtml+='<div style="font-size:11px;color:#888;padding:4px 0">書類・写真が登録されていません</div>';
+      }
+
+      cardHtml+='</div>';
+      return cardHtml;
     }).join('');
     html+='</div>'; // close storage-grid
   }
@@ -7886,11 +7944,18 @@ function renderMailAttachments(office){
   html+='<span style="font-size:9px;color:#4a90e2;cursor:pointer;margin-left:auto" onclick="mailExpandAll(true)">全展開</span>';
   html+='<span style="font-size:9px;color:#4a90e2;cursor:pointer" onclick="mailExpandAll(false)">全折畳</span>';
   html+='</div>';
-  // 委託会社チェックリスト（ドライバーリストの上に）
+  // 委託会社チェックリスト（会社書類＋ドライバー個別の再委託先/添付）
   if(companyEntries.length){
     companyEntries.forEach(co=>{
-      html+='<div style="margin-bottom:4px;padding:4px 8px;background:#f5f0ff;border:1px solid #e0d5f5;border-radius:6px">';
-      html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;font-weight:600;color:#7B1FA2"><input type="checkbox" class="mail-co-check" data-co="'+co.name+'" onchange="mailToggleCompanyDrivers(this,\''+office+'\')"> '+co.name+'</label>';
+      html+='<div style="margin-bottom:4px;padding:5px 8px;background:#f5f0ff;border:1px solid #e0d5f5;border-radius:6px">';
+      html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;font-weight:600;color:#7B1FA2"><input type="checkbox" class="mail-co-check" data-co="'+co.name+'"> '+co.name+' <span style="font-size:9px;color:#999;font-weight:400">— 再委託先書類を生成</span></label>';
+      co.drivers.forEach(cd=>{
+        html+='<div style="padding:2px 0 0 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+        html+='<span style="font-size:10px;color:#555;min-width:70px">'+cd.name+'</span>';
+        html+='<label style="display:flex;align-items:center;gap:3px;font-size:9px;cursor:pointer;color:#7B1FA2;padding:1px 6px;background:#fff;border:1px solid #e0d5f5;border-radius:4px"><input type="checkbox" class="mail-co-driver-sub" data-co="'+co.name+'" data-driver-name="'+cd.name+'"> 再委託先書類</label>';
+        html+='<label style="display:flex;align-items:center;gap:3px;font-size:9px;cursor:pointer;color:#1565C0;padding:1px 6px;background:#fff;border:1px solid #BBDEFB;border-radius:4px"><input type="checkbox" class="mail-co-driver-check" data-co="'+co.name+'" data-driver-name="'+cd.name+'" onchange="mailToggleSingleCoDriver(this,\''+office+'\')"> 添付ファイル</label>';
+        html+='</div>';
+      });
       html+='</div>';
     });
   }
@@ -7965,12 +8030,15 @@ function mailToggleBadge(badge,office){
   });
 }
 
-function mailToggleCompanyDrivers(checkbox,office){
-  var coName=checkbox.dataset.co;
+// 委託会社ドライバー個別チェック（添付ファイル送信用）
+function mailToggleSingleCoDriver(checkbox,office){
+  var driverName=checkbox.dataset.driverName;
   var checked=checkbox.checked;
-  document.querySelectorAll('.mail-driver-row[data-co="'+coName+'"]').forEach(row=>{
-    var cb=row.querySelector('.mail-driver-check');
-    if(cb){cb.checked=checked;mailToggleDriver(cb.dataset.idx);}
+  document.querySelectorAll('.mail-driver-row[data-co="'+checkbox.dataset.co+'"]').forEach(row=>{
+    if(row.textContent.includes(driverName)){
+      var cb=row.querySelector('.mail-driver-check');
+      if(cb){cb.checked=checked;mailToggleDriver(cb.dataset.idx);}
+    }
   });
 }
 
