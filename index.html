@@ -1336,6 +1336,7 @@ async function syncAll(saveFirst){
             if(parsed.unassignedFiles&&Array.isArray(parsed.unassignedFiles)){unassignedFiles=parsed.unassignedFiles;}
             if(parsed.docExclude&&Array.isArray(parsed.docExclude)){docExclude=parsed.docExclude;}
             if(parsed.mailSettings&&typeof parsed.mailSettings==='object'){localStorage.setItem('fleet_mail_settings',JSON.stringify(parsed.mailSettings));}
+            if(parsed.password){PASSWORD=parsed.password;localStorage.setItem('fleet_pw',PASSWORD);}
           }catch(e){}
         }
       }
@@ -1361,7 +1362,8 @@ function buildSavePayload(){
   return {action:'saveAll',drivers,vehicles,companies,settings:{
     mailTasks:mailTasks,officeAreas:officeAreas,officePostMap:officePostMap,
     unassignedFiles:unassignedFiles,docExclude:docExclude,
-    mailSettings:JSON.parse(localStorage.getItem('fleet_mail_settings')||'{}')
+    mailSettings:JSON.parse(localStorage.getItem('fleet_mail_settings')||'{}'),
+    password:PASSWORD
   }};
 }
 // 空データでシートを上書きしない安全ガード
@@ -3787,8 +3789,7 @@ function showPage(name,el){
   if(name==='filemgr')renderFileMgr();
   if(name==='storage')renderStorage();
   if(name==='settings'){renderSettingsAll();}
-  if(name==='contractors'&&currentCompanyId)renderCompanyPage(currentCompanyId);
-  else if(name==='contractors')renderContractorsList();
+  if(name==='contractors'){currentCompanyId=null;renderContractorsList();}
 }
 function rebuildPrintSelect(){
   const sel=document.getElementById('print-office');
@@ -7912,7 +7913,7 @@ function renderMailAttachments(office){
   companies.forEach(c=>{
     const cds=(c.drivers||[]).filter(d=>(d.offices||[]).includes(office));
     if(cds.length){
-      companyEntries.push({name:c.name,drivers:cds});
+      companyEntries.push({name:c.name,drivers:cds,id:c.id,addr:c.addr||'',tel:c.tel||'',rep:c.rep||'',repKana:c.repKana||'',repBirth:c.repBirth||'',count:c.count||1});
       cds.forEach(d=>companyDrivers.push({...d,_company:c.name,type:'外注'}));
     }
   });
@@ -7999,18 +8000,45 @@ function renderMailAttachments(office){
     html+='</div></div>';
   });
 
-  // 4. 再委託先書類カード（外注・委託会社がある場合は常に表示）
-  var hasSubs=subPersons.length>0||companyEntries.length>0;
-  if(hasSubs){
-    html+='<div style="margin-top:6px;padding:6px 8px;background:#f5f0ff;border:1px solid #e0d5f5;border-radius:6px">';
-    html+='<div style="font-size:10px;font-weight:600;color:#7B1FA2;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between">再委託先書類（送信時に自動生成）<label style="font-size:9px;cursor:pointer;color:#888;font-weight:400"><input type="checkbox" onchange="mailToggleSubDocs(this.checked)"> 全選択</label></div>';
-    html+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
-    var subDocs=['再委託承認願','誓約書（大阪急配）','誓約書（再委託先）','適合証明書（大阪急配）','適合証明書（再委託先）'];
-    subDocs.forEach(doc=>{
-      html+='<label style="display:flex;align-items:center;gap:3px;font-size:10px;cursor:pointer;padding:2px 6px;background:#fff;border:1px solid #e0d5f5;border-radius:4px"><input type="checkbox" class="mail-sub-doc-check" data-doc="'+doc+'"> '+doc+'</label>';
+  // 4. 再委託先書類セクション（★常に表示）
+  html+='<div style="margin-top:6px;padding:6px 8px;background:#f5f0ff;border:1px solid #e0d5f5;border-radius:6px">';
+  html+='<div style="font-size:10px;font-weight:600;color:#7B1FA2;margin-bottom:6px">再委託先書類（送信時に自動生成）</div>';
+
+  // --- 対象選択 ---
+  html+='<div style="margin-bottom:6px;padding:4px 6px;background:#fff;border:1px solid #e0d5f5;border-radius:4px">';
+  html+='<div style="font-size:9px;font-weight:600;color:#7B1FA2;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between">対象選択 <label style="font-size:9px;cursor:pointer;color:#888;font-weight:400"><input type="checkbox" onchange="mailToggleSubTargets(this.checked)"> 全選択</label></div>';
+
+  // 外注（個人）
+  subPersons.forEach(d=>{
+    var label=d.sub&&d.sub.company?d.sub.company:d.name;
+    html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:2px 0"><input type="checkbox" class="mail-sub-target" data-target-type="person" data-driver-id="'+d.id+'" data-driver-name="'+esc(d.name)+'"> '+esc(label)+'<span style="font-size:9px;color:#888;margin-left:2px">（外注個人）</span></label>';
+  });
+
+  // 委託会社（会社 + ドライバー個人）
+  companyEntries.forEach(co=>{
+    html+='<div style="margin:4px 0 2px;padding:4px 6px;background:#f0ebff;border-radius:4px">';
+    html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;font-weight:600;color:#7B1FA2;padding:2px 0"><input type="checkbox" class="mail-sub-target" data-target-type="company" data-company-id="'+(co.id||'')+'" data-company-name="'+esc(co.name)+'" data-addr="'+esc(co.addr||'')+'" data-tel="'+esc(co.tel||'')+'" data-rep="'+esc(co.rep||'')+'" data-rep-kana="'+esc(co.repKana||'')+'" data-rep-birth="'+esc(co.repBirth||'')+'" data-count="'+(co.count||1)+'"> '+esc(co.name)+'</label>';
+    co.drivers.forEach(cd=>{
+      html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:2px 0 2px 16px;color:#555"><input type="checkbox" class="mail-sub-target" data-target-type="co-driver" data-driver-id="'+(cd.id||'')+'" data-driver-name="'+esc(cd.name)+'" data-company-id="'+(co.id||'')+'" data-company-name="'+esc(co.name)+'"> '+esc(cd.name)+'（'+esc(co.name)+'）</label>';
     });
-    html+='</div></div>';
+    html+='</div>';
+  });
+
+  if(!subPersons.length&&!companyEntries.length){
+    html+='<div style="font-size:10px;color:#888;padding:4px 0">該当する外注・委託会社ドライバーはこの営業所にいません</div>';
   }
+  html+='</div>';
+
+  // --- 書類選択 ---
+  html+='<div style="font-size:9px;font-weight:600;color:#7B1FA2;margin:6px 0 4px;display:flex;align-items:center;justify-content:space-between">書類選択 <label style="font-size:9px;cursor:pointer;color:#888;font-weight:400"><input type="checkbox" onchange="mailToggleSubDocs(this.checked)"> 全選択</label></div>';
+  html+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+  var subDocs=['再委託承認願','誓約書（大阪急配）','誓約書（再委託先）','適合証明書（大阪急配）','適合証明書（再委託先）'];
+  subDocs.forEach(doc=>{
+    html+='<label style="display:flex;align-items:center;gap:3px;font-size:10px;cursor:pointer;padding:2px 6px;background:#fff;border:1px solid #e0d5f5;border-radius:4px"><input type="checkbox" class="mail-sub-doc-check" data-doc="'+doc+'"> '+doc+'</label>';
+  });
+  html+='</div>';
+
+  html+='</div>'; // 再委託先セクション閉じ
 
   el.innerHTML=html;
 }
@@ -8044,6 +8072,9 @@ function mailToggleSingleCoDriver(checkbox,office){
 
 function mailToggleSubDocs(checked){
   document.querySelectorAll('.mail-sub-doc-check').forEach(c=>{c.checked=checked;});
+}
+function mailToggleSubTargets(checked){
+  document.querySelectorAll('.mail-sub-target').forEach(c=>{c.checked=checked;});
 }
 
 function mailToggleAllDrivers(checked){
@@ -8138,7 +8169,108 @@ async function sendMail(){
     }
   }
 
-  // Step2: 分割送信（10ファイルずつ）
+  // Step2: 再委託先書類の対象別生成
+  var subTargets=[];
+  document.querySelectorAll('.mail-sub-target:checked').forEach(cb=>{
+    subTargets.push({
+      type:cb.dataset.targetType,
+      driverId:cb.dataset.driverId||'',
+      driverName:cb.dataset.driverName||'',
+      companyId:cb.dataset.companyId||'',
+      companyName:cb.dataset.companyName||'',
+      addr:cb.dataset.addr||'',tel:cb.dataset.tel||'',
+      rep:cb.dataset.rep||'',repKana:cb.dataset.repKana||'',
+      repBirth:cb.dataset.repBirth||'',count:cb.dataset.count||'1'
+    });
+  });
+  var subDocTypes=[];
+  document.querySelectorAll('.mail-sub-doc-check:checked').forEach(cb=>{
+    subDocTypes.push(cb.dataset.doc);
+  });
+
+  if(subTargets.length && subDocTypes.length){
+    btn.textContent = '再委託先書類生成中...';
+    for(var si=0;si<subTargets.length;si++){
+      var st=subTargets[si];
+      btn.textContent='再委託先書類 ('+(si+1)+'/'+subTargets.length+') '+st.driverName+'...';
+
+      var targetDriver=null;
+      if(st.type==='person'){
+        targetDriver=drivers.find(d=>String(d.id)===st.driverId);
+      } else if(st.type==='company'){
+        var co=companies.find(c=>String(c.id)===st.companyId||c.name===st.companyName);
+        if(co){
+          targetDriver={
+            name:co.name,type:'外注',_isCompany:true,
+            sub:{company:co.name},
+            addr:st.addr||co.addr||'',tel:st.tel||co.tel||'',
+            kana:st.repKana||co.repKana||'',rep:st.rep||co.rep||'',
+            repBirth:st.repBirth||co.repBirth||'',
+            _staffCount:String(st.count||co.count||1)
+          };
+        }
+      } else if(st.type==='co-driver'){
+        var co2=companies.find(c=>String(c.id)===st.companyId||c.name===st.companyName);
+        if(co2){
+          var cd=(co2.drivers||[]).find(d=>String(d.id)===st.driverId||d.name===st.driverName);
+          if(cd){
+            targetDriver={
+              ...cd,type:'外注',_isCompany:false,
+              sub:{company:st.companyName},
+              addr:cd.addr||co2.addr||'',
+              tel:cd.tel||co2.tel||'',
+              kana:cd.kana||'',
+              _staffCount:'1'
+            };
+          }
+        }
+      }
+      if(!targetDriver) continue;
+
+      var tplMap={
+        '再委託承認願':'tpl5',
+        '誓約書（大阪急配）':'tpl2',
+        '誓約書（再委託先）':'tpl1',
+        '適合証明書（大阪急配）':'tpl4',
+        '適合証明書（再委託先）':'tpl3'
+      };
+
+      for(var di2=0;di2<subDocTypes.length;di2++){
+        var docName=subDocTypes[di2];
+        var tplId=tplMap[docName];
+        if(!tplId) continue;
+        try{
+          if(tplFiles[tplId]&&tplFiles[tplId].fileId){
+            var result=await generateFromTemplate(tplId,office,targetDriver,dateStr);
+            if(result&&result.fileId) fileIds.push(result.fileId);
+          } else {
+            var xml=null,fname='';
+            if(docName==='再委託承認願'){
+              xml=genSaitakuXml(office,dateStr,targetDriver);
+              fname=office+'_再委託承認願_'+targetDriver.name+'_'+dateStr+'.docx';
+            } else if(docName==='誓約書（再委託先）'){
+              xml=genSeiyakuSubXml(dateStr,targetDriver);
+              fname=office+'_誓約書_'+targetDriver.name+'_'+dateStr+'.docx';
+            } else if(docName==='誓約書（大阪急配）'){
+              xml=genSeiyakuOsakaXml(office,dateStr);
+              fname=office+'_誓約書_大阪急配_'+dateStr+'.docx';
+            } else if(docName==='適合証明書（再委託先）'){
+              xml=genTekigoSubXml(dateStr,targetDriver);
+              fname=office+'_適合証明書_'+targetDriver.name+'_'+dateStr+'.docx';
+            } else if(docName==='適合証明書（大阪急配）'){
+              xml=genTekigoOsakaXml(office,dateStr);
+              fname=office+'_適合証明書_大阪急配_'+dateStr+'.docx';
+            }
+            if(xml) downloadBlob(await buildDocx(xml),fname);
+          }
+        }catch(e){
+          console.error('再委託先書類エラー:',docName,targetDriver.name,e);
+        }
+      }
+    }
+  }
+
+  // Step3: 分割送信（10ファイルずつ）
   const MAX_PER_MAIL = 10;
   const totalParts = Math.ceil(fileIds.length / MAX_PER_MAIL) || 1;
   let successCount = 0;
@@ -8481,6 +8613,7 @@ setInterval(function(){
             if(parsed.unassignedFiles&&Array.isArray(parsed.unassignedFiles)){unassignedFiles=parsed.unassignedFiles;}
             if(parsed.docExclude&&Array.isArray(parsed.docExclude)){docExclude=parsed.docExclude;}
             if(parsed.mailSettings&&typeof parsed.mailSettings==='object'){localStorage.setItem('fleet_mail_settings',JSON.stringify(parsed.mailSettings));}
+            if(parsed.password){PASSWORD=parsed.password;localStorage.setItem('fleet_pw',PASSWORD);}
           }
         }catch(e){}
       }
