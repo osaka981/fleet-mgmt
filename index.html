@@ -1026,6 +1026,8 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
       <div class="form-group"><label>免許番号</label><input type="text" id="cd-license-no" class="modal-field"></div>
       <div class="form-group"><label>免許種別</label><select id="cd-license-type" class="modal-field"><option>普通自動車</option><option>準中型</option><option>中型</option><option>大型</option><option>普通自動二輪</option></select></div>
       <div class="form-group"><label>免許の条件等</label><input type="text" id="cd-license-cond" placeholder="眼鏡等 / なし" class="modal-field"></div>
+      <div class="section-title">搭乗車両</div>
+      <div class="form-group" style="grid-column:1/-1"><label>搭乗車両（同委託会社内）</label><select id="cd-vehicle" class="modal-field"><option value="">未割当</option></select></div>
     </div></div>
     <div class="modal-footer"><button class="btn" onclick="closeModal('company-driver-modal')">キャンセル</button><button class="btn btn-primary" onclick="saveCompanyDriver()">保存する</button></div>
   </div>
@@ -5320,10 +5322,10 @@ function assignUnassignedFile(idx){
     suggestHtml+='「'+(hints.driverName||hints.vehiclePlate)+'」に一致する登録データがありません。<br>下の新規登録で追加できます。</div>';
   }
 
-  // 新規登録ボタン
-  var newRegHtml='<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #eee">';
-  newRegHtml+='<button class="btn btn-sm" style="flex:1;font-size:11px" onclick="assignNewDriver('+idx+')">＋ 新規ドライバー登録</button>';
-  newRegHtml+='<button class="btn btn-sm" style="flex:1;font-size:11px" onclick="assignNewVehicle('+idx+')">＋ 新規車両登録</button>';
+  // 新規登録ボタン（リスト上部に配置）
+  var newRegHtml='<div style="display:flex;gap:6px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #eee">';
+  newRegHtml+='<button class="btn btn-sm" style="flex:1;font-size:11px;padding:8px 6px;background:#E3F2FD;border:1px solid #90CAF9;color:#1565C0" onclick="assignNewDriver('+idx+')">＋ 新規ドライバー登録</button>';
+  newRegHtml+='<button class="btn btn-sm" style="flex:1;font-size:11px;padding:8px 6px;background:#E8F5E9;border:1px solid #A5D6A7;color:#2E7D32" onclick="assignNewVehicle('+idx+')">＋ 新規車両登録</button>';
   newRegHtml+='</div>';
 
   const modal=document.createElement('div');
@@ -5332,13 +5334,13 @@ function assignUnassignedFile(idx){
     '<div class="modal-header"><span class="modal-title">振り分け先を選択</span><button class="modal-close" onclick="this.closest(\'.modal-bg\').remove()">✕</button></div>'+
     '<div class="modal-body" style="padding:8px 12px;max-height:65vh;overflow-y:auto">'+
       '<div style="font-size:11px;color:#888;margin-bottom:6px;padding:4px 0;border-bottom:1px solid #eee">ファイル: '+(f.name||'未分類')+'</div>'+
+      newRegHtml+
       suggestHtml+
       '<div style="display:flex;gap:6px;margin-bottom:8px">'+
         '<select id="assign-office" style="flex:1;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:5px" onchange="renderAssignList()">'+officeOpts+'</select>'+
         '<input type="text" id="assign-search" placeholder="名前・番号で検索" style="flex:1;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:5px" oninput="renderAssignList()">'+
       '</div>'+
       '<div id="assign-list"></div>'+
-      newRegHtml+
     '</div>'+
   '</div>';
   document.body.appendChild(modal);
@@ -5635,15 +5637,9 @@ function renderStorage(){
   let html='';
 
   if(allDrivers.length){
-    // 展開中のカードを先頭にソート
-    var sortedDrivers=[...allDrivers].sort((a,b)=>{
-      var ea=storageExpandedIds['d-'+a.id]?0:1;
-      var eb=storageExpandedIds['d-'+b.id]?0:1;
-      return ea-eb;
-    });
     html+='<div style="font-size:11px;font-weight:500;color:#888;margin-bottom:8px">ドライバー（'+allDrivers.length+'名）</div>';
     html+='<div class="storage-grid">';
-    html+=sortedDrivers.map(d=>{
+    html+=allDrivers.map(d=>{
       const key='d-'+d.id;
       const expanded=storageExpandedIds[key];
       const af=d.attachedFiles||[];
@@ -5677,7 +5673,7 @@ function renderStorage(){
       const hasJibai=vaf2.some(f=>(f.category||'').includes('自賠'));
       const hasNin=vaf2.some(f=>(f.category||'').includes('任意'));
 
-      let cardHtml='<div style="background:#cfd4dc;border:1.5px solid #777;border-radius:10px;padding:4px 16px 14px;overflow:hidden">';
+      let cardHtml='<div style="background:#cfd4dc;border:1.5px solid #777;border-radius:10px;padding:10px 16px 14px;overflow:hidden">';
       cardHtml+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;cursor:pointer" onclick="storageToggleExpand(\''+key+'\')">';
       cardHtml+='<div style="display:flex;align-items:center;gap:10px">';
       cardHtml+='<div style="width:34px;height:34px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:500;font-size:12px">'+typeIcon+'</div>';
@@ -5797,12 +5793,7 @@ function renderStorage(){
   if(unassignedVehicles.length){
     html+='<div style="font-size:11px;font-weight:500;color:#888;margin:12px 0 8px">未割当車両（'+unassignedVehicles.length+'台）</div>';
     html+='<div class="storage-grid">';
-    var sortedVehicles=[...unassignedVehicles].sort((a,b)=>{
-      var ea=storageExpandedIds['v-'+a.id]?0:1;
-      var eb=storageExpandedIds['v-'+b.id]?0:1;
-      return ea-eb;
-    });
-    html+=sortedVehicles.map(v=>{
+    html+=unassignedVehicles.map(v=>{
       var key='v-'+v.id;
       var expanded=storageExpandedIds[key];
       var vaf=v.attachedFiles||[];
@@ -5834,7 +5825,7 @@ function renderStorage(){
       cardHtml+='<div style="font-size:11px;color:#555">'+(v._offices.join('・')||v.office||'未設定')+'</div></div>';
       cardHtml+='</div>';
       cardHtml+='<div style="display:flex;gap:6px;align-items:center">';
-      cardHtml+='<button class="btn btn-sm" style="font-size:10px;padding:3px 10px" onclick="event.stopPropagation();openVehicleModal('+v.id+')">編集</button>';
+      cardHtml+='<button class="btn btn-sm" style="font-size:10px;padding:2px 10px" onclick="event.stopPropagation();openVehicleModal('+v.id+')">編集</button>';
       cardHtml+='<span style="font-size:10px;padding:3px 10px;border-radius:20px;cursor:pointer;background:#4a90e2;color:#fff" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+v.id+',\'\')">+ 追加</span>';
       cardHtml+='<span style="color:#999;font-size:11px;cursor:pointer" onclick="event.stopPropagation();storageToggleExpand(\''+key+'\')">▼</span>';
       cardHtml+='</div></div>';
@@ -7549,9 +7540,13 @@ function openCompanyDriverModal(companyId, driverId){
   ['cd-sei','cd-mei','cd-sei-kana','cd-mei-kana','cd-tel','cd-birth','cd-zip','cd-addr','cd-license-exp','cd-license-no','cd-license-cond'].forEach(f=>document.getElementById(f).value='');
   // 営業所複数選択
   renderOfficeMultiSelect('cd-offices', []);
+  // 搭乗車両（同委託会社内の車両リスト）
+  var co=companies.find(x=>x.id==companyId);
+  var coVehicles=(co?.vehicles||[]);
+  var vSel=document.getElementById('cd-vehicle');
+  vSel.innerHTML='<option value="">未割当</option>'+coVehicles.map(v=>'<option value="'+v.id+'">'+v.plate+(v.model?' '+v.model:'')+'</option>').join('');
   if(driverId){
-    const c=companies.find(x=>x.id==companyId);
-    const d=c?.drivers?.find(x=>x.id==driverId);
+    const d=co?.drivers?.find(x=>x.id==driverId);
     if(d){
       const np=(d.name||'').split(' ');
       const kp=(d.kana||'').split(' ');
@@ -7568,6 +7563,9 @@ function openCompanyDriverModal(companyId, driverId){
       document.getElementById('cd-license-type').value=d.license?.type||'普通自動車';
       document.getElementById('cd-license-cond').value=d.license?.cond||'';
       renderOfficeMultiSelect('cd-offices', d.offices||[]);
+      // 搭乗車両の割り当て
+      var assignedV=coVehicles.find(v=>String(v.driverId)===String(driverId)||v.driver===d.name);
+      if(assignedV) vSel.value=assignedV.id;
     }
   }
   document.getElementById('company-driver-modal').style.display='flex';
@@ -7633,6 +7631,14 @@ function saveCompanyDriver(){
   if(!c.drivers) c.drivers=[];
   if(editingCompanyDriverId){const i=c.drivers.findIndex(x=>x.id==editingCompanyDriverId);if(i>=0)c.drivers[i]=obj;else c.drivers.push(obj);}
   else c.drivers.push(obj);
+  // 搭乗車両の割り当て更新
+  var selVehicleId=document.getElementById('cd-vehicle').value;
+  if(c.vehicles){
+    // まず既存の割り当てをクリア
+    c.vehicles.forEach(v=>{if(String(v.driverId)===String(obj.id)||v.driver===obj.name){v.driverId=null;v.driver='';}});
+    // 新しい割り当て
+    if(selVehicleId){var sv=c.vehicles.find(v=>v.id==selVehicleId);if(sv){sv.driverId=obj.id;sv.driver=obj.name;}}
+  }
   // ★ ファイルをDriveにアップロード
   const cdFiles = modalFiles['cd-files'] || [];
   if(cdFiles.length > 0){
@@ -7711,7 +7717,8 @@ function saveCompanyVehicle(){
     color:document.getElementById('cv-color').value||'白',
     owner:document.getElementById('cv-owner').value,
     vehicleUser:document.getElementById('cv-user').value,
-    driverId:document.getElementById('cv-driver').value,
+    driverId:document.getElementById('cv-driver').value||null,
+    driver:(function(){var did=document.getElementById('cv-driver').value;if(!did)return '';var co=companies.find(x=>x.id==currentCompanyId);var d=(co?.drivers||[]).find(x=>x.id==did);return d?d.name:'';})(),
     offices:getSelectedOffices('cv-offices'),
     shaken:{exp:document.getElementById('cv-shaken-exp').value,chassis:document.getElementById('cv-shaken-chassis').value},
     jibai:{exp:document.getElementById('cv-jibai-exp').value,no:document.getElementById('cv-jibai-no').value,company:document.getElementById('cv-jibai-company').value},
