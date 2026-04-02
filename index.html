@@ -383,7 +383,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
     <div class="login-logo" style="display:flex;align-items:center;justify-content:center;gap:10px"><img src="" id="login-logo-img" style="width:36px;height:36px;object-fit:contain">大阪急配 フリート管理</div>
     <div class="login-sub">車両・書類・人員管理システム</div>
     <label class="login-label">パスワード</label>
-    <input class="login-input" type="password" id="pw-input" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <input class="login-input" type="password" id="pw-input" inputmode="numeric" pattern="[0-9]*" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="login-btn" onclick="doLogin()">ログイン</button>
     <div class="login-err" id="login-err"></div>
   </div>
