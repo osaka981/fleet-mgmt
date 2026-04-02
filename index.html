@@ -5677,14 +5677,9 @@ function renderStorage(){
       cardHtml+='</div>';
       cardHtml+='</div>';
 
-      // バッジ行（免許 + 車両書類ステータス）
+      // バッジ行（ドライバー：免許のみ）
       cardHtml+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;align-items:center">';
       cardHtml+='<span style="font-size:10px;padding:3px 8px;border-radius:20px;white-space:nowrap;cursor:pointer;'+(hasLic?'background:#1565C0;color:#fff':'background:#e0e0e0;color:#888')+'" onclick="event.stopPropagation();openQuickUpload(\'driver\','+d.id+',\'license\')" title="クリックで免許証アップロード">免許 '+expBadge(d.license?.exp,hasLic).replace(/<[^>]+>/g,'')+'</span>';
-      if(cv){
-        cardHtml+='<span style="font-size:10px;padding:3px 8px;border-radius:20px;white-space:nowrap;cursor:pointer;'+(hasShaken?'background:#E65100;color:#fff':'background:#e0e0e0;color:#888')+'" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'shaken\')" title="クリックで車検証アップロード">車検 '+(cv.shaken?.exp?cv.shaken.exp.slice(5).replace(/-/g,'/'):'—')+'</span>';
-        cardHtml+='<span style="font-size:10px;padding:3px 8px;border-radius:20px;white-space:nowrap;cursor:pointer;'+(hasJibai?'background:#E65100;color:#fff':'background:#e0e0e0;color:#888')+'" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'jibai\')" title="クリックで自賠責アップロード">自賠 '+(cv.jibai?.exp?cv.jibai.exp.slice(5).replace(/-/g,'/'):'—')+'</span>';
-        cardHtml+='<span style="font-size:10px;padding:3px 8px;border-radius:20px;white-space:nowrap;cursor:pointer;'+(hasNin?'background:#E65100;color:#fff':'background:#e0e0e0;color:#888')+'" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'nin\')" title="クリックで任意保険アップロード">任意 '+(cv.nin?.exp?cv.nin.exp.slice(5).replace(/-/g,'/'):'—')+'</span>';
-      }
       cardHtml+='</div>';
 
       // 期限入力タブ（ドライバー：免許のみ）
@@ -5731,6 +5726,12 @@ function renderStorage(){
         cardHtml+='<button class="btn btn-sm" style="font-size:10px;padding:2px 10px" onclick="event.stopPropagation();openVehicleModal('+cv.id+')">編集</button>';
         cardHtml+='<span style="font-size:10px;padding:3px 10px;border-radius:20px;cursor:pointer;background:#4a90e2;color:#fff" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'\')">+ 追加</span>';
         cardHtml+='</div></div>';
+        // 車両バッジ行（車検・自賠・任意）
+        cardHtml+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin:4px 0 6px;align-items:center">';
+        cardHtml+='<span style="font-size:10px;padding:3px 8px;border-radius:20px;white-space:nowrap;cursor:pointer;'+(hasShaken?'background:#E65100;color:#fff':'background:#e0e0e0;color:#888')+'" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'shaken\')" title="クリックで車検証アップロード">車検 '+(cv.shaken?.exp?cv.shaken.exp.slice(5).replace(/-/g,'/'):'—')+'</span>';
+        cardHtml+='<span style="font-size:10px;padding:3px 8px;border-radius:20px;white-space:nowrap;cursor:pointer;'+(hasJibai?'background:#E65100;color:#fff':'background:#e0e0e0;color:#888')+'" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'jibai\')" title="クリックで自賠責アップロード">自賠 '+(cv.jibai?.exp?cv.jibai.exp.slice(5).replace(/-/g,'/'):'—')+'</span>';
+        cardHtml+='<span style="font-size:10px;padding:3px 8px;border-radius:20px;white-space:nowrap;cursor:pointer;'+(hasNin?'background:#E65100;color:#fff':'background:#e0e0e0;color:#888')+'" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'nin\')" title="クリックで任意保険アップロード">任意 '+(cv.nin?.exp?cv.nin.exp.slice(5).replace(/-/g,'/'):'—')+'</span>';
+        cardHtml+='</div>';
         // 車両期限入力タブ
         var vExpTabId2='vexp-tab-'+cv.id;
         cardHtml+='<div style="margin:6px 0 8px"><div style="display:inline-flex;border-radius:6px 6px 0 0;overflow:hidden;border:1px solid #8a7a6a;border-bottom:none"><span style="font-size:11px;color:#333;font-weight:600;cursor:pointer;padding:5px 14px;background:#dcd4c8;display:flex;align-items:center;gap:4px;user-select:none" onclick="var panel=document.getElementById(\''+vExpTabId2+'\');var show=panel.style.display===\'none\';panel.style.display=show?\'flex\':\'none\';this.querySelector(\'.exp-arrow\').textContent=show?\'▼\':\'▶\'">車両期限 <span class="exp-arrow" style="font-size:9px">▶</span></span></div>';
@@ -8054,11 +8055,11 @@ function renderMailAttachments(office){
   if(companyEntries.length){
     companyEntries.forEach(co=>{
       html+='<div style="margin-bottom:4px;padding:5px 8px;background:#f5f0ff;border:1px solid #e0d5f5;border-radius:6px">';
-      html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;font-weight:600;color:#7B1FA2"><input type="checkbox" class="mail-co-check" data-co="'+co.name+'"> '+co.name+' <span style="font-size:9px;color:#999;font-weight:400">— 再委託先書類を生成</span></label>';
+      html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;font-weight:600;color:#7B1FA2"><input type="checkbox" class="mail-co-check mail-sub-target" data-co="'+co.name+'" data-target-type="company" data-company-id="'+(co.id||'')+'" data-company-name="'+esc(co.name)+'" data-addr="'+esc(co.addr||'')+'" data-tel="'+esc(co.tel||'')+'" data-rep="'+esc(co.rep||'')+'" data-rep-kana="'+esc(co.repKana||'')+'" data-rep-birth="'+esc(co.repBirth||'')+'" data-count="'+(co.count||1)+'"> '+co.name+' <span style="font-size:9px;color:#999;font-weight:400">— 再委託先書類を生成</span></label>';
       co.drivers.forEach(cd=>{
         html+='<div style="padding:2px 0 0 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
         html+='<span style="font-size:10px;color:#555;min-width:70px">'+cd.name+'</span>';
-        html+='<label style="display:flex;align-items:center;gap:3px;font-size:9px;cursor:pointer;color:#7B1FA2;padding:1px 6px;background:#fff;border:1px solid #e0d5f5;border-radius:4px"><input type="checkbox" class="mail-co-driver-sub" data-co="'+co.name+'" data-driver-name="'+cd.name+'"> 再委託先書類</label>';
+        html+='<label style="display:flex;align-items:center;gap:3px;font-size:9px;cursor:pointer;color:#7B1FA2;padding:1px 6px;background:#fff;border:1px solid #e0d5f5;border-radius:4px"><input type="checkbox" class="mail-co-driver-sub mail-sub-target" data-co="'+co.name+'" data-driver-name="'+cd.name+'" data-target-type="co-driver" data-driver-id="'+(cd.id||'')+'" data-company-id="'+(co.id||'')+'" data-company-name="'+esc(co.name)+'"> 再委託先書類</label>';
         html+='<label style="display:flex;align-items:center;gap:3px;font-size:9px;cursor:pointer;color:#1565C0;padding:1px 6px;background:#fff;border:1px solid #BBDEFB;border-radius:4px"><input type="checkbox" class="mail-co-driver-check" data-co="'+co.name+'" data-driver-name="'+cd.name+'" onchange="mailToggleSingleCoDriver(this,\''+office+'\')"> 添付ファイル</label>';
         html+='</div>';
       });
@@ -8109,9 +8110,9 @@ function renderMailAttachments(office){
   html+='<div style="margin-top:6px;padding:6px 8px;background:#f5f0ff;border:1px solid #e0d5f5;border-radius:6px">';
   html+='<div style="font-size:10px;font-weight:600;color:#7B1FA2;margin-bottom:6px">再委託先書類（送信時に自動生成）</div>';
 
-  // --- 対象選択 ---
+  // --- 対象選択（外注個人のみ。委託会社は上のチェックリストで操作） ---
   html+='<div style="margin-bottom:6px;padding:4px 6px;background:#fff;border:1px solid #e0d5f5;border-radius:4px">';
-  html+='<div style="font-size:9px;font-weight:600;color:#7B1FA2;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between">対象選択 <label style="font-size:9px;cursor:pointer;color:#888;font-weight:400"><input type="checkbox" onchange="mailToggleSubTargets(this.checked)"> 全選択</label></div>';
+  html+='<div style="font-size:9px;font-weight:600;color:#7B1FA2;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between">対象選択（外注個人） <label style="font-size:9px;cursor:pointer;color:#888;font-weight:400"><input type="checkbox" onchange="mailToggleSubTargets(this.checked)"> 全選択</label></div>';
 
   // 外注（個人）
   subPersons.forEach(d=>{
@@ -8119,18 +8120,8 @@ function renderMailAttachments(office){
     html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:2px 0"><input type="checkbox" class="mail-sub-target" data-target-type="person" data-driver-id="'+d.id+'" data-driver-name="'+esc(d.name)+'"> '+esc(label)+'<span style="font-size:9px;color:#888;margin-left:2px">（外注個人）</span></label>';
   });
 
-  // 委託会社（会社 + ドライバー個人）
-  companyEntries.forEach(co=>{
-    html+='<div style="margin:4px 0 2px;padding:4px 6px;background:#f0ebff;border-radius:4px">';
-    html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;font-weight:600;color:#7B1FA2;padding:2px 0"><input type="checkbox" class="mail-sub-target" data-target-type="company" data-company-id="'+(co.id||'')+'" data-company-name="'+esc(co.name)+'" data-addr="'+esc(co.addr||'')+'" data-tel="'+esc(co.tel||'')+'" data-rep="'+esc(co.rep||'')+'" data-rep-kana="'+esc(co.repKana||'')+'" data-rep-birth="'+esc(co.repBirth||'')+'" data-count="'+(co.count||1)+'"> '+esc(co.name)+'</label>';
-    co.drivers.forEach(cd=>{
-      html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:2px 0 2px 16px;color:#555"><input type="checkbox" class="mail-sub-target" data-target-type="co-driver" data-driver-id="'+(cd.id||'')+'" data-driver-name="'+esc(cd.name)+'" data-company-id="'+(co.id||'')+'" data-company-name="'+esc(co.name)+'"> '+esc(cd.name)+'（'+esc(co.name)+'）</label>';
-    });
-    html+='</div>';
-  });
-
-  if(!subPersons.length&&!companyEntries.length){
-    html+='<div style="font-size:10px;color:#888;padding:4px 0">該当する外注・委託会社ドライバーはこの営業所にいません</div>';
+  if(!subPersons.length){
+    html+='<div style="font-size:10px;color:#888;padding:4px 0">外注（個人）ドライバーはこの営業所にいません</div>';
   }
   html+='</div>';
 
