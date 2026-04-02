@@ -3905,6 +3905,17 @@ function saveVehicle(){
     })();
   }
   saveLocal();closeModal('vehicle-modal');renderVehicles(currentOfficeFilter);renderDashboard();renderDocPage();
+  // 未分類ファイルからの新規登録時: ファイルを自動添付
+  if(window._pendingFileAssign&&window._pendingFileAssign.kind==='vehicle'){
+    var pf=window._pendingFileAssign;
+    var uf=unassignedFiles[pf.idx];
+    if(uf){
+      var saved=vehicles.find(v=>v.id===obj.id);
+      if(saved){if(!saved.attachedFiles)saved.attachedFiles=[];saved.attachedFiles.push({name:uf.name,type:uf.type,url:uf.url,fileId:uf.fileId,uploadedAt:new Date().toISOString()});unassignedFiles.splice(pf.idx,1);saveLocal();}
+    }
+    window._pendingFileAssign=null;
+    try{renderStorage();}catch(e){}
+  }
   if(vStatus==='廃車') renderArchive();
 }
 function openDriverModal(id){
@@ -4059,6 +4070,17 @@ function saveDriver(){
     })();
   }
   saveLocal();closeModal('driver-modal');renderDrivers(currentOfficeFilter);renderDashboard();renderDocPage();
+  // 未分類ファイルからの新規登録時: ファイルを自動添付
+  if(window._pendingFileAssign&&window._pendingFileAssign.kind==='driver'){
+    var pf=window._pendingFileAssign;
+    var uf=unassignedFiles[pf.idx];
+    if(uf){
+      var saved=drivers.find(d=>d.id===obj.id);
+      if(saved){if(!saved.attachedFiles)saved.attachedFiles=[];saved.attachedFiles.push({name:uf.name,type:uf.type,url:uf.url,fileId:uf.fileId,uploadedAt:new Date().toISOString()});unassignedFiles.splice(pf.idx,1);saveLocal();}
+    }
+    window._pendingFileAssign=null;
+    try{renderStorage();}catch(e){}
+  }
   if(status==='退職'||status==='休止'){
     renderArchive();
     // ★ 退職メールタスク自動生成（既存ドライバーのステータス変更時のみ）
@@ -5191,6 +5213,28 @@ function deleteUnassignedFile(idx){
 }
 
 // 未分類ファイルをドライバー/車両に振り分け
+// ファイル名からドライバー名・車両ナンバーを推測
+function parseFileNameHints(fileName){
+  var name=(fileName||'').replace(/\.[^.]+$/,''); // 拡張子除去
+  name=name.replace(/[_\-＿－]/g,' ').replace(/\s+/g,' ').trim();
+  var hints={driverName:'',vehiclePlate:'',guessType:''};
+  // 車両ナンバーパターン: 地名+数字+かな+数字
+  var plateMatch=name.match(/([^\s]{1,4})\s*(\d{1,3})\s*([あ-んア-ヲ])\s*(\d{1,4})/);
+  if(plateMatch){hints.vehiclePlate=plateMatch[0].replace(/\s+/g,' ');hints.guessType='vehicle';}
+  // 4桁数字（ナンバー末尾）
+  var numMatch=name.match(/\b(\d{4})\b/);
+  if(numMatch&&!plateMatch){hints.vehiclePlate=numMatch[1];hints.guessType='vehicle';}
+  // 日本語2-5文字（姓名推測）
+  var jpMatch=name.match(/([\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]{1,5})\s*([\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]{1,5})/);
+  if(jpMatch){hints.driverName=(jpMatch[1]+' '+jpMatch[2]).trim();hints.guessType=hints.guessType||'driver';}
+  // 単独の漢字2-4文字（姓のみ）
+  if(!hints.driverName){
+    var seiMatch=name.match(/([\u4E00-\u9FFF]{2,4})/);
+    if(seiMatch){hints.driverName=seiMatch[1];hints.guessType=hints.guessType||'driver';}
+  }
+  return hints;
+}
+
 function assignUnassignedFile(idx){
   const f=unassignedFiles[idx];
   if(!f) return;
@@ -5206,7 +5250,45 @@ function assignUnassignedFile(idx){
   window._assignTargets=[...allD,...allV];
   window._assignIdx=idx;
 
+  // ファイル名から推測
+  var hints=parseFileNameHints(f.name);
+  window._assignHints=hints;
+
+  // 既存データとマッチング
+  var suggestions=[];
+  if(hints.driverName){
+    var hn=hints.driverName.replace(/\s/g,'');
+    allD.forEach(function(d){if(d.name.replace(/\s/g,'').includes(hn)||hn.includes(d.name.replace(/\s/g,'')))suggestions.push(d);});
+  }
+  if(hints.vehiclePlate){
+    var hp=hints.vehiclePlate.replace(/[\s　]/g,'');
+    allV.forEach(function(v){if(v.name.replace(/[\s　]/g,'').includes(hp)||hp.includes(v.name.replace(/[\s　]/g,'')))suggestions.push(v);});
+  }
+  window._assignSuggestions=suggestions;
+
   const officeOpts='<option value="">すべて</option>'+offices.map(o=>'<option>'+o+'</option>').join('');
+
+  // 推測バナー
+  var suggestHtml='';
+  if(suggestions.length){
+    suggestHtml='<div style="padding:6px 8px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:6px;margin-bottom:8px">';
+    suggestHtml+='<div style="font-size:10px;font-weight:500;color:#2E7D32;margin-bottom:4px">推測マッチ</div>';
+    suggestions.forEach(function(s){
+      suggestHtml+='<div style="padding:5px 8px;cursor:pointer;font-size:12px;background:#fff;border:1px solid #C8E6C9;border-radius:4px;margin-bottom:3px;display:flex;justify-content:space-between;align-items:center" onclick="execAssignUnassigned('+idx+',\''+s.kind+'\','+s.id+')">';
+      suggestHtml+='<span><strong>'+esc(s.label)+'</strong> <span style="font-size:10px;color:#888">'+s.sub+'</span></span>';
+      suggestHtml+='<span style="font-size:10px;color:#2E7D32">割り当て →</span></div>';
+    });
+    suggestHtml+='</div>';
+  } else if(hints.driverName||hints.vehiclePlate){
+    suggestHtml='<div style="padding:6px 8px;background:#FFF3E0;border:1px solid #FFCC80;border-radius:6px;margin-bottom:8px;font-size:11px;color:#E65100">';
+    suggestHtml+='「'+(hints.driverName||hints.vehiclePlate)+'」に一致する登録データがありません。<br>下の新規登録で追加できます。</div>';
+  }
+
+  // 新規登録ボタン
+  var newRegHtml='<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #eee">';
+  newRegHtml+='<button class="btn btn-sm" style="flex:1;font-size:11px" onclick="assignNewDriver('+idx+')">＋ 新規ドライバー登録</button>';
+  newRegHtml+='<button class="btn btn-sm" style="flex:1;font-size:11px" onclick="assignNewVehicle('+idx+')">＋ 新規車両登録</button>';
+  newRegHtml+='</div>';
 
   const modal=document.createElement('div');
   modal.className='modal-bg';modal.style.display='flex';modal.id='assign-modal';
@@ -5214,16 +5296,56 @@ function assignUnassignedFile(idx){
     '<div class="modal-header"><span class="modal-title">振り分け先を選択</span><button class="modal-close" onclick="this.closest(\'.modal-bg\').remove()">✕</button></div>'+
     '<div class="modal-body" style="padding:8px 12px;max-height:65vh;overflow-y:auto">'+
       '<div style="font-size:11px;color:#888;margin-bottom:6px;padding:4px 0;border-bottom:1px solid #eee">ファイル: '+(f.name||'未分類')+'</div>'+
+      suggestHtml+
       '<div style="display:flex;gap:6px;margin-bottom:8px">'+
         '<select id="assign-office" style="flex:1;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:5px" onchange="renderAssignList()">'+officeOpts+'</select>'+
         '<input type="text" id="assign-search" placeholder="名前・番号で検索" style="flex:1;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:5px" oninput="renderAssignList()">'+
       '</div>'+
       '<div id="assign-list"></div>'+
+      newRegHtml+
     '</div>'+
   '</div>';
   document.body.appendChild(modal);
   modal.onclick=function(e){if(e.target===modal)modal.remove();};
+  // 推測名で検索欄を事前入力
+  if(hints.driverName&&!suggestions.length) document.getElementById('assign-search').value=hints.driverName;
+  else if(hints.vehiclePlate&&!suggestions.length) document.getElementById('assign-search').value=hints.vehiclePlate;
   renderAssignList();
+}
+
+// 新規ドライバー登録（ファイル名から姓名を自動入力）
+function assignNewDriver(fileIdx){
+  var modal=document.getElementById('assign-modal');
+  if(modal) modal.remove();
+  var hints=window._assignHints||{};
+  openDriverModal();
+  // 姓名を自動入力
+  if(hints.driverName){
+    var parts=hints.driverName.split(/[\s　]+/);
+    setTimeout(function(){
+      var seiEl=document.getElementById('d-sei');
+      var meiEl=document.getElementById('d-mei');
+      if(seiEl&&parts[0]) seiEl.value=parts[0];
+      if(meiEl&&parts[1]) meiEl.value=parts[1];
+    },100);
+  }
+  // ファイルインデックスを記憶（保存時に自動添付）
+  window._pendingFileAssign={idx:fileIdx,kind:'driver'};
+}
+
+// 新規車両登録（ファイル名からナンバーを自動入力）
+function assignNewVehicle(fileIdx){
+  var modal=document.getElementById('assign-modal');
+  if(modal) modal.remove();
+  var hints=window._assignHints||{};
+  openVehicleModal();
+  if(hints.vehiclePlate){
+    setTimeout(function(){
+      var plateEl=document.getElementById('v-plate');
+      if(plateEl) plateEl.value=hints.vehiclePlate;
+    },100);
+  }
+  window._pendingFileAssign={idx:fileIdx,kind:'vehicle'};
 }
 
 function renderAssignList(){
