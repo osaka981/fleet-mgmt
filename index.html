@@ -1249,7 +1249,7 @@ async function syncInboxFromSheet(){
 async function syncToSheet(){
   setSyncStatus('保存中...','');
   try{
-    const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'saveAll',drivers,vehicles,companies})});
+    const res=await fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())});
     const json=await res.json();
     if(json.ok){
       isDirty=false;
@@ -1268,7 +1268,15 @@ async function syncAll(saveFirst){
     if(saveFirst){
       // 明示的に「保存→読込」する場合のみ保存を先に行う
       setSyncStatus('保存中...','');
-      const saveRes=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'saveAll',drivers,vehicles,companies})});
+      var settings={
+        mailTasks:mailTasks,
+        officeAreas:officeAreas,
+        officePostMap:officePostMap,
+        unassignedFiles:unassignedFiles,
+        docExclude:docExclude,
+        mailSettings:JSON.parse(localStorage.getItem('fleet_mail_settings')||'{}')
+      };
+      const saveRes=await fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())});
       const saveJson=await saveRes.json();
       if(!saveJson.ok) throw new Error('保存エラー');
     }
@@ -1290,6 +1298,21 @@ async function syncAll(saveFirst){
       drivers=dedup(drivers);
       vehicles=dedup(vehicles);
       companies.forEach(c=>{c.drivers=dedup(c.drivers||[]);c.vehicles=dedup(c.vehicles||[]);});
+      // 設定データの読み込み
+      if(json.data.settings?.length){
+        var st=json.data.settings[0]||{};
+        if(st.value){
+          try{
+            var parsed=JSON.parse(st.value);
+            if(parsed.mailTasks&&Array.isArray(parsed.mailTasks)){mailTasks=parsed.mailTasks;localStorage.setItem('fleet_mail_tasks',JSON.stringify(mailTasks));}
+            if(parsed.officeAreas&&typeof parsed.officeAreas==='object'){officeAreas=parsed.officeAreas;}
+            if(parsed.officePostMap&&typeof parsed.officePostMap==='object'){officePostMap=parsed.officePostMap;}
+            if(parsed.unassignedFiles&&Array.isArray(parsed.unassignedFiles)){unassignedFiles=parsed.unassignedFiles;}
+            if(parsed.docExclude&&Array.isArray(parsed.docExclude)){docExclude=parsed.docExclude;}
+            if(parsed.mailSettings&&typeof parsed.mailSettings==='object'){localStorage.setItem('fleet_mail_settings',JSON.stringify(parsed.mailSettings));}
+          }catch(e){}
+        }
+      }
       saveLocal();saveCompanies();renderAll();
     }
     // Step3: 受信更新
@@ -1306,6 +1329,14 @@ async function syncAll(saveFirst){
   }finally{
     if(btn){btn.disabled=false;btn.textContent='一括同期';}
   }
+}
+
+function buildSavePayload(){
+  return {action:'saveAll',drivers,vehicles,companies,settings:{
+    mailTasks:mailTasks,officeAreas:officeAreas,officePostMap:officePostMap,
+    unassignedFiles:unassignedFiles,docExclude:docExclude,
+    mailSettings:JSON.parse(localStorage.getItem('fleet_mail_settings')||'{}')
+  }};
 }
 
 // ====== ヘルパー ======
@@ -1330,7 +1361,7 @@ async function doLogout(){
   if(isDirty){
     setSyncStatus('保存中...','');
     try{
-      await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'saveAll',drivers,vehicles,companies})});
+      await fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())});
       isDirty=false;
     }catch(e){}
   }
@@ -8196,7 +8227,7 @@ function scheduleAutoSave(){
     _autoSaveTimer=null;
     if(!isDirty) return;
     if(sessionStorage.getItem('fleet_session')!=='ok') return;
-    fetch(API_URL,{method:'POST',body:JSON.stringify({action:'saveAll',drivers,vehicles,companies})})
+    fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())})
       .then(r=>r.json())
       .then(j=>{
         if(j.ok){
@@ -8239,7 +8270,7 @@ setInterval(function(){
 window.addEventListener('beforeunload', function(){
   if(!isDirty) return;
   if(sessionStorage.getItem('fleet_session')!=='ok') return;
-  const payload=JSON.stringify({action:'saveAll',drivers,vehicles,companies});
+  const payload=JSON.stringify(buildSavePayload());
   navigator.sendBeacon(API_URL, payload);
   isDirty=false;
 });
@@ -8250,7 +8281,7 @@ document.addEventListener('visibilitychange', function(){
     // 非表示時: 変更があれば保存
     if(!isDirty) return;
     if(sessionStorage.getItem('fleet_session')!=='ok') return;
-    const payload=JSON.stringify({action:'saveAll',drivers,vehicles,companies});
+    const payload=JSON.stringify(buildSavePayload());
     navigator.sendBeacon(API_URL, payload);
     isDirty=false;
   } else {
