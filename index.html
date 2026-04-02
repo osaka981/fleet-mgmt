@@ -6184,8 +6184,8 @@ function clearTempVehicle(kind, id){
 }
 function generateQR(){
   // ローカルファイル・about:srcdoc・Claude内プレビューなど本番以外の場合は固定URLを使う
-  const FIXED_URL = 'https://takaram100-prog.github.io/fleet-mgmt/#form';
-  const isProduction = location.protocol === 'https:' && location.hostname === 'takaram100-prog.github.io';
+  const FIXED_URL = 'https://osaka981.github.io/fleet-mgmt/#form';
+  const isProduction = location.protocol === 'https:' && location.hostname === 'osaka981.github.io';
   const url = isProduction ? (location.href.split('?')[0].split('#')[0]+'#form') : FIXED_URL;
   document.getElementById('qr-url').textContent=url;
   // QRコードライブラリを動的ロード
