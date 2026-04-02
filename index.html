@@ -1874,6 +1874,12 @@ function execAssignDriver(vehicleId){
 
 function renderVehicles(off){
   let data=vehicles.filter(v=>!v.status||v.status==='稼働');
+  // 委託会社車両も追加
+  companies.forEach(c=>{
+    (c.vehicles||[]).forEach(v=>{
+      data.push({...v,_src:c.name,_companyId:c.id});
+    });
+  });
   // 重複排除（id基準）
   const seen={};data=data.filter(v=>{if(seen[v.id])return false;seen[v.id]=true;return true;});
   if(off) data=data.filter(v=>belongsToOffice(v,off));
@@ -1975,6 +1981,12 @@ function toggleVehicleDetail(id){
 }
 function renderDrivers(off){
   let data=drivers.filter(d=>!d.status||d.status==='在籍');
+  // 委託会社ドライバーも追加
+  companies.forEach(c=>{
+    (c.drivers||[]).forEach(d=>{
+      data.push({...d,type:'外注',_src:c.name,_companyId:c.id,sub:{company:c.name}});
+    });
+  });
   // 重複排除（id基準）
   const seen={};data=data.filter(d=>{if(seen[d.id])return false;seen[d.id]=true;return true;});
   if(off)data=data.filter(d=>{
@@ -2016,10 +2028,17 @@ function renderDrivers(off){
       '<td>'+subHtml+'</td>'+
       (function(){
         var cv=vehicles.find(function(v){return v.driverId&&String(v.driverId)===String(did);})||vehicles.find(function(v){return v.driver===d.name;});
+        // 委託会社の車両も検索
+        if(!cv){
+          companies.forEach(function(c){
+            if(cv) return;
+            (c.vehicles||[]).forEach(function(v2){if(v2.driverId&&String(v2.driverId)===String(did))cv=v2;});
+          });
+        }
         if(cv) return '<td><span style="cursor:pointer;color:#4a90e2;text-decoration:underline;font-size:11px" onclick="event.stopPropagation();navigateToVehicle(\''+esc(cv.plate)+'\')" title="車両管理へ移動">'+cv.plate+'</span></td>';
         return '<td style="font-size:11px;color:#888">—</td>';
       })()+
-      '<td><button class="btn btn-sm" onclick="event.stopPropagation();openDriverModal('+did+')">編集</button></td></tr>'+
+      '<td>'+(d._companyId?'<button class="btn btn-sm" onclick="event.stopPropagation();openCompanyDriverModal('+d._companyId+','+did+')">編集</button>':'<button class="btn btn-sm" onclick="event.stopPropagation();openDriverModal('+did+')">編集</button>')+'</td></tr>'+
     '<tr id="driver-detail-'+did+'" style="display:none"><td colspan="9" style="background:#f7f8fa;padding:10px 14px">'+buildDriverDetailRow(d,af)+'</td></tr>';
   }).join('');
 }
@@ -2041,7 +2060,8 @@ function buildDriverDetailRow(d, af){
   var dCats=[{key:'免許証（表）',label:'免許(表)'},{key:'免許証（裏）',label:'免許(裏)'},{key:'健康診断書',label:'健康診断'}];
   var vCats=[{key:'車検証',label:'車検証'},{key:'自賠責',label:'自賠責'},{key:'任意保険',label:'任意保険'}];
   var cv=vehicles.find(function(v){return v.driverId&&String(v.driverId)===String(d.id);})||vehicles.find(function(v){return v.driver===d.name;});
-
+  // 委託会社車両も検索
+  if(!cv){companies.forEach(function(c){if(cv)return;(c.vehicles||[]).forEach(function(v2){if(v2.driverId&&String(v2.driverId)===String(d.id))cv=v2;else if(v2.driver===d.name)cv=v2;});});}
   var html='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">';
   dCats.forEach(function(cat){
     var files=af.map(function(f,i){return {f:f,i:i};}).filter(function(x){return (x.f.category||'').includes(cat.key);});
@@ -2079,13 +2099,19 @@ function toggleDriverDetail(id){
 function updateDriverExpInline(id,val){
   val=normalizeBirthDate(val);
   var d=drivers.find(x=>x.id==id);
-  if(d){if(!d.license)d.license={};d.license.exp=val;saveLocal();renderDrivers(currentOfficeFilter);renderStorage();renderDashboard();}
+  if(d){if(!d.license)d.license={};d.license.exp=val;saveLocal();renderDrivers(currentOfficeFilter);renderStorage();renderDashboard();return;}
+  // 委託会社ドライバーも検索
+  companies.forEach(c=>{(c.drivers||[]).forEach(cd=>{if(cd.id==id){if(!cd.license)cd.license={};cd.license.exp=val;}});});
+  saveLocal();saveCompanies();renderDrivers(currentOfficeFilter);renderStorage();renderDashboard();
 }
 
 function updateVehicleExpInline(id,field,val){
   val=normalizeBirthDate(val);
   var v=vehicles.find(x=>x.id==id);
-  if(v){if(!v[field])v[field]={};v[field].exp=val;saveLocal();renderVehicles(currentOfficeFilter);renderStorage();renderDashboard();}
+  if(v){if(!v[field])v[field]={};v[field].exp=val;saveLocal();renderVehicles(currentOfficeFilter);renderStorage();renderDashboard();return;}
+  // 委託会社車両も検索
+  companies.forEach(c=>{(c.vehicles||[]).forEach(cv=>{if(cv.id==id){if(!cv[field])cv[field]={};cv[field].exp=val;}});});
+  saveLocal();saveCompanies();renderVehicles(currentOfficeFilter);renderStorage();renderDashboard();
 }
 
 // ====== ダッシュボード ======
@@ -3818,7 +3844,7 @@ function openVehicleModal(id){
   document.getElementById('v-driver').innerHTML='<option value="">未割当</option>'+allDriverOpts.join('');
   ['v-plate','v-model','v-color','v-owner','v-user','v-sub','v-note','v-shaken-exp','v-shaken-chassis','v-shaken-type','v-jibai-exp','v-jibai-no','v-jibai-company','v-nin-exp','v-nin-no','v-nin-company'].forEach(f=>document.getElementById(f).value='');
   document.getElementById('v-type').value='社有';document.getElementById('v-kind').value='軽四';document.getElementById('v-status').value='稼働';
-  if(id){const v=vehicles.find(x=>x.id==id);if(v){document.getElementById('v-plate').value=v.plate||'';document.getElementById('v-model').value=v.model||'';document.getElementById('v-kind').value=v.kind||'軽四';document.getElementById('v-type').value=v.type||'社有';document.getElementById('v-status').value=v.status||'稼働';document.getElementById('v-office').value=v.office||'';document.getElementById('v-driver').value=v.driverId||'';document.getElementById('v-color').value=v.color||'';document.getElementById('v-owner').value=v.owner||'';document.getElementById('v-user').value=v.vehicleUser||'';document.getElementById('v-sub').value=v.sub||'';document.getElementById('v-note').value=v.note||'';document.getElementById('v-shaken-exp').value=v.shaken?.exp||'';document.getElementById('v-shaken-chassis').value=v.shaken?.chassis||'';document.getElementById('v-shaken-type').value=v.shaken?.type||'';document.getElementById('v-jibai-exp').value=v.jibai?.exp||'';document.getElementById('v-jibai-no').value=v.jibai?.no||'';document.getElementById('v-jibai-company').value=v.jibai?.company||'';document.getElementById('v-nin-exp').value=v.nin?.exp||'';document.getElementById('v-nin-no').value=v.nin?.no||'';document.getElementById('v-nin-company').value=v.nin?.company||'';}}
+  if(id){const v=vehicles.find(x=>x.id==id)||(function(){var found=null;companies.forEach(c=>{(c.vehicles||[]).forEach(cv=>{if(cv.id==id)found=cv;});});return found;})();if(v){document.getElementById('v-plate').value=v.plate||'';document.getElementById('v-model').value=v.model||'';document.getElementById('v-kind').value=v.kind||'軽四';document.getElementById('v-type').value=v.type||'社有';document.getElementById('v-status').value=v.status||'稼働';document.getElementById('v-office').value=v.office||(Array.isArray(v.offices)&&v.offices[0])||'';document.getElementById('v-driver').value=v.driverId||'';document.getElementById('v-color').value=v.color||'';document.getElementById('v-owner').value=v.owner||'';document.getElementById('v-user').value=v.vehicleUser||'';document.getElementById('v-sub').value=v.sub||'';document.getElementById('v-note').value=v.note||'';document.getElementById('v-shaken-exp').value=v.shaken?.exp||'';document.getElementById('v-shaken-chassis').value=v.shaken?.chassis||'';document.getElementById('v-shaken-type').value=v.shaken?.type||'';document.getElementById('v-jibai-exp').value=v.jibai?.exp||'';document.getElementById('v-jibai-no').value=v.jibai?.no||'';document.getElementById('v-jibai-company').value=v.jibai?.company||'';document.getElementById('v-nin-exp').value=v.nin?.exp||'';document.getElementById('v-nin-no').value=v.nin?.no||'';document.getElementById('v-nin-company').value=v.nin?.company||'';}}
   document.getElementById('vehicle-modal').style.display='flex';
   initDateFields();
   modalFiles['v-files']=[];
@@ -5598,7 +5624,7 @@ function renderStorage(){
       const hasJibai=vaf2.some(f=>(f.category||'').includes('自賠'));
       const hasNin=vaf2.some(f=>(f.category||'').includes('任意'));
 
-      let cardHtml='<div style="background:#cfd4dc;border:1.5px solid #777;border-radius:10px;padding:4px 16px 14px;overflow:hidden;grid-column:1/-1">';
+      let cardHtml='<div style="background:#cfd4dc;border:1.5px solid #777;border-radius:10px;padding:4px 16px 14px;overflow:hidden">';
       cardHtml+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;cursor:pointer" onclick="storageToggleExpand(\''+key+'\')">';
       cardHtml+='<div style="display:flex;align-items:center;gap:10px">';
       cardHtml+='<div style="width:34px;height:34px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:500;font-size:12px">'+typeIcon+'</div>';
@@ -5738,7 +5764,7 @@ function renderStorage(){
       }
 
       // 展開状態
-      var cardHtml='<div style="background:#cfd4dc;border:1.5px solid #777;border-radius:10px;padding:4px 16px 14px;overflow:hidden;grid-column:1/-1">';
+      var cardHtml='<div style="background:#cfd4dc;border:1.5px solid #777;border-radius:10px;padding:4px 16px 14px;overflow:hidden">';
       cardHtml+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;cursor:pointer" onclick="storageToggleExpand(\''+key+'\')">';
       cardHtml+='<div style="display:flex;align-items:center;gap:10px">';
       cardHtml+='<div style="width:34px;height:34px;border-radius:50%;background:#546E7A;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:12px">車</div>';
@@ -5757,6 +5783,15 @@ function renderStorage(){
       cardHtml+=expBadge(v.jibai?.exp,hasJibai,'自賠責');
       cardHtml+=expBadge(v.nin?.exp,hasNin,'任意保険');
       cardHtml+='</div>';
+
+      // 期限入力タブ（車両）
+      var vExpTabId='vexp-tab-'+v.id;
+      cardHtml+='<div style="margin-bottom:8px"><div style="display:inline-flex;border-radius:6px 6px 0 0;overflow:hidden;border:1px solid #aaa;border-bottom:none"><span style="font-size:11px;color:#333;font-weight:600;cursor:pointer;padding:5px 14px;background:#e8edf2;display:flex;align-items:center;gap:4px;user-select:none" onclick="var panel=document.getElementById(\''+vExpTabId+'\');var show=panel.style.display===\'none\';panel.style.display=show?\'flex\':\'none\';this.querySelector(\'.exp-arrow\').textContent=show?\'▼\':\'▶\'">期限入力 <span class="exp-arrow" style="font-size:9px">▶</span></span></div>';
+      cardHtml+='<div id="'+vExpTabId+'" style="display:none;gap:6px;flex-wrap:wrap;padding:8px 10px;align-items:center;font-size:11px;color:#555;background:#f4f6f9;border:1px solid #aaa;border-radius:0 6px 6px 6px">';
+      cardHtml+='<label style="display:flex;align-items:center;gap:4px;min-height:28px">車検 <input type="text" value="'+(v.shaken?.exp||'')+'" style="width:100px;font-size:11px;padding:3px 6px;border:1px solid #bbb;border-radius:4px" onchange="updateVehicleExpInline('+v.id+',\'shaken\',this.value)" placeholder="和暦/西暦OK"></label>';
+      cardHtml+='<label style="display:flex;align-items:center;gap:4px;min-height:28px">自賠 <input type="text" value="'+(v.jibai?.exp||'')+'" style="width:100px;font-size:11px;padding:3px 6px;border:1px solid #bbb;border-radius:4px" onchange="updateVehicleExpInline('+v.id+',\'jibai\',this.value)" placeholder="和暦/西暦OK"></label>';
+      cardHtml+='<label style="display:flex;align-items:center;gap:4px;min-height:28px">任意 <input type="text" value="'+(v.nin?.exp||'')+'" style="width:100px;font-size:11px;padding:3px 6px;border:1px solid #bbb;border-radius:4px" onchange="updateVehicleExpInline('+v.id+',\'nin\',this.value)" placeholder="和暦/西暦OK"></label>';
+      cardHtml+='</div></div>';
 
       // ファイルサムネ
       if(vaf.length){
