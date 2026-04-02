@@ -578,6 +578,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
           <div class="nav-item" onclick="showPage('drivers',this)" data-page="drivers"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="4.5" r="2.5"/><path d="M2 13c0-2.8 2.2-5 5-5s5 2.2 5 5"/></svg>ドライバー管理</div>
           <div class="nav-item" onclick="showPage('vehicles',this)" data-page="vehicles"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="12" height="7" rx="2"/><circle cx="4" cy="10.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="10" cy="10.5" r="1.2" fill="currentColor" stroke="none"/></svg>車両管理</div>
           <div class="nav-item" onclick="showPage('contractors',this)" data-page="contractors"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="12" height="9" rx="1.5"/><path d="M5 3V2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1"/><path d="M4 7h6M4 9.5h4"/></svg>委託会社管理</div>
+          <div class="nav-item" onclick="showPage('archive',this)" data-page="archive"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="12" height="9" rx="1"/><path d="M1 4l2-3h8l2 3"/><path d="M5 8h4"/></svg>アーカイブ</div>
         </div>
 
         <div class="nav-section" onclick="toggleNavGroup('nav-grp-company')" style="cursor:pointer">委託会社 <span class="nav-group-arrow" id="nav-grp-company-arrow" style="margin-left:auto">▶</span><button class="nav-add-btn" onclick="event.stopPropagation();openCompanyModal()">+</button></div>
@@ -689,13 +690,13 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
         <div class="topbar">
           <h1>メール</h1>
           <div style="display:flex;gap:6px;align-items:center" id="mail-topbar-actions">
-            <button class="btn btn-sm btn-primary" onclick="openCreateMailTask()">＋ データ送信</button>
+            <button class="btn btn-sm btn-primary" onclick="openCreateMailTask()">＋ メールデータ送信</button>
           </div>
         </div>
         <div class="content">
           <!-- メイン タブ: 送信 / 受信ボックス -->
           <div style="display:flex;border-bottom:2px solid #e0e0e0;margin-bottom:12px" id="mail-main-tabs">
-            <div onclick="mailMainTab('send')" class="filter-chip active" data-mtab="send" style="cursor:pointer;padding:8px 16px;font-size:13px;font-weight:600">データ送信 <span id="mail-pending-count" style="background:#e53935;color:#fff;border-radius:99px;padding:0 5px;font-size:10px;margin-left:2px"></span></div>
+            <div onclick="mailMainTab('send')" class="filter-chip active" data-mtab="send" style="cursor:pointer;padding:8px 16px;font-size:13px;font-weight:600">メール送信 <span id="mail-pending-count" style="background:#e53935;color:#fff;border-radius:99px;padding:0 5px;font-size:10px;margin-left:2px"></span></div>
             <div onclick="mailMainTab('inbox')" class="filter-chip" data-mtab="inbox" style="cursor:pointer;padding:8px 16px;font-size:13px;font-weight:600">受信ボックス <span id="inbox-badge" style="display:inline-block;padding:1px 7px;border-radius:99px;background:#e53935;color:#fff;font-size:10px;margin-left:4px"></span></div>
           </div>
 
@@ -2465,7 +2466,7 @@ function markMailTaskPending(id){
   if(t){t.status='pending';t.sentAt=null;saveMailTasks();renderMailTasks();}
 }
 function deleteMailTask(id){
-  if(!confirm('このデータ送信を削除しますか？'))return;
+  if(!confirm('このメール送信タスクを削除しますか？'))return;
   mailTasks=mailTasks.filter(x=>x.id!==id);
   saveMailTasks();renderMailTasks();
 }
@@ -2483,10 +2484,10 @@ function openCreateMailTask(){
   const modal=document.createElement('div');
   modal.className='modal-bg';modal.style.display='flex';
   modal.innerHTML='<div class="modal" style="max-width:480px" onclick="event.stopPropagation()">'+
-    '<div class="modal-header"><span class="modal-title">＋ ドライバー・車両データの送信</span><button class="modal-close" onclick="this.closest(\'.modal-bg\').remove()">✕</button></div>'+
+    '<div class="modal-header"><span class="modal-title">メール送信の内容選択</span><button class="modal-close" onclick="this.closest(\'.modal-bg\').remove()">✕</button></div>'+
     '<div class="modal-body" style="max-height:65vh;overflow-y:auto">'+
       '<div class="form-group" style="margin-bottom:12px">'+
-        '<label style="font-size:11px;color:#666;font-weight:500">種別 *</label>'+
+        '<label style="font-size:11px;color:#666;font-weight:500">通知内容 *</label>'+
         '<select id="mt-type" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #ddd;border-radius:6px">'+
           '<option>入社</option><option>退職</option><option>書類更新</option><option>営業所移動</option><option>車両変更</option>'+
         '</select>'+
@@ -2582,15 +2583,18 @@ function openMailSendModal(taskId){
   const subject=`【大阪急配】${t.driverName} ${t.type}書類のご送付（${postOffice}）`;
 
   // 本文テンプレート
-  const body=`${postOffice}\nご担当者　様\n\nお世話になっております。\n大阪急配株式会社でございます。\n\n下記書類を送付いたします。\nご確認のほどよろしくお願いいたします。\n\n【対象者】${t.driverName}\n【営業所】${t.office}\n【種別】${t.type}\n${t.vehiclePlate?'【搭乗車両】'+t.vehiclePlate:''}\n\n━━━━━━━━━━━━━━━━━━\n大阪急配株式会社\n管理部\n℡ 072-258-9811\n℡ 080-5316-5172\n━━━━━━━━━━━━━━━━━━`;
+  var retireNote=t.type==='退職'?'\n※ 添付の現況届は'+t.driverName+'の退職を反映した最新版です。\n':'';
+  const body=`${postOffice}\nご担当者　様\n\nお世話になっております。\n大阪急配株式会社でございます。\n\n下記書類を送付いたします。\nご確認のほどよろしくお願いいたします。\n\n【対象者】${t.driverName}\n【営業所】${t.office}\n【通知内容】${t.type}\n${t.vehiclePlate?'【搭乗車両】'+t.vehiclePlate:''}${retireNote}\n━━━━━━━━━━━━━━━━━━\n大阪急配株式会社\n管理部\n℡ 072-258-9811\n℡ 080-5316-5172\n━━━━━━━━━━━━━━━━━━`;
 
   // 全車両リスト（代車追加用）
   const allVehicles=[...vehicles,...companies.flatMap(c=>c.vehicles||[])];
   const extraVOpts=allVehicles.filter(v=>String(v.id)!==t.vehicleId).map(v=>`<option value="${v.id}">${v.plate} ${v.model||''}</option>`).join('');
 
-  // ファイルチェックリスト
-  const dFilesHtml=(t.driverFiles||[]).map((f,i)=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0"><input type="checkbox" checked class="ms-file" data-src="driver" data-idx="${i}" data-fileid="${f.fileId||''}"> ${esc(f.name)}</label>`).join('');
-  const vFilesHtml=(t.vehicleFiles||[]).map((f,i)=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0"><input type="checkbox" checked class="ms-file" data-src="vehicle" data-idx="${i}" data-fileid="${f.fileId||''}"> ${esc(f.name)}</label>`).join('');
+  // ファイルチェックリスト（退職時はすべて未選択）
+  const isRetire=t.type==='退職';
+  const fileChk=isRetire?'':'checked';
+  const dFilesHtml=(t.driverFiles||[]).map((f,i)=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0"><input type="checkbox" ${fileChk} class="ms-file" data-src="driver" data-idx="${i}" data-fileid="${f.fileId||''}"> ${esc(f.name)}</label>`).join('');
+  const vFilesHtml=(t.vehicleFiles||[]).map((f,i)=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0"><input type="checkbox" ${fileChk} class="ms-file" data-src="vehicle" data-idx="${i}" data-fileid="${f.fileId||''}"> ${esc(f.name)}</label>`).join('');
   const pdfHtml=(t.genPdfs||[]).map((f,i)=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0"><input type="checkbox" checked class="ms-file" data-src="pdf" data-idx="${i}" data-type="${f.type}" data-office="${f.office}"> ${esc(f.name)}</label>`).join('');
 
   const isShaIn=t.driverType==='社員';
@@ -2628,8 +2632,9 @@ function openMailSendModal(taskId){
   const modal=document.createElement('div');
   modal.className='modal-bg';modal.style.display='flex';
   modal.innerHTML=`<div class="modal" style="max-width:560px" onclick="event.stopPropagation()">
-    <div class="modal-header"><span class="modal-title">メール送信</span><button class="modal-close" onclick="this.closest('.modal-bg').remove()">✕</button></div>
+    <div class="modal-header"><span class="modal-title">メール送信${t.type==='退職'?' （退職通知）':''}</span><button class="modal-close" onclick="this.closest('.modal-bg').remove()">✕</button></div>
     <div class="modal-body" style="max-height:75vh;overflow-y:auto">
+      ${t.type==='退職'?'<div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:#E65100"><strong>退職通知</strong>: 送信後に <strong>'+esc(t.driverName)+'</strong> はアーカイブに移動'+(t.vehiclePlate?'、車両 <strong>'+esc(t.vehiclePlate)+'</strong> は本社に移動':'')+'されます。<br>生成PDFは退職者を除いた最新版になります。</div>':''}
       <div class="form-group" style="margin-bottom:10px">
         <label style="font-size:11px;color:#666;font-weight:500">宛先 *</label>
         <div style="display:flex;gap:8px">
@@ -2756,8 +2761,14 @@ async function execMailSend(taskId){
         if(!docType){console.error('不明なPDF種別:',pdfReq.type);continue;}
 
         if(sendBtn) sendBtn.textContent='生成中: '+pdfReq.type+'...';
-        const allD=[...offD,...coD];
-        const allV=[...offV,...coV];
+        let allD=[...offD,...coD];
+        let allV=[...offV,...coV];
+
+        // 退職の場合: 対象ドライバーと搭乗車両を除外してPDF生成
+        if(t.type==='退職'){
+          allD=allD.filter(d=>String(d.id)!==String(t.driverId)&&d.name!==t.driverName);
+          if(t.vehicleId) allV=allV.filter(v=>String(v.id)!==String(t.vehicleId));
+        }
 
         const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({
           action:'generatePdf',
@@ -2792,6 +2803,42 @@ async function execMailSend(taskId){
       t.status='sent';t.sentAt=new Date().toISOString();
       saveMailTasks();renderMailTasks();
       document.querySelectorAll('.modal-bg').forEach(m=>m.remove());
+
+      // 退職の場合: ドライバーをアーカイブ、車両を本社に移動
+      if(t.type==='退職'){
+        var archived=false;
+        // 自社ドライバーの場合
+        var dr=drivers.find(d=>String(d.id)===String(t.driverId));
+        if(dr){
+          dr.status='退職';dr.retiredAt=new Date().toISOString();
+          archived=true;
+        } else {
+          // 委託会社ドライバーの場合
+          companies.forEach(c=>{
+            var cd=(c.drivers||[]).find(d=>String(d.id)===String(t.driverId)||d.name===t.driverName);
+            if(cd){cd.status='退職';cd.retiredAt=new Date().toISOString();archived=true;}
+          });
+        }
+        // 搭乗車両を本社に移動
+        if(t.vehicleId){
+          var veh=vehicles.find(v=>String(v.id)===String(t.vehicleId));
+          if(veh){veh.office='本社';veh.driver='';veh.driverId=null;}
+          else{
+            companies.forEach(c=>{
+              var cv=(c.vehicles||[]).find(v=>String(v.id)===String(t.vehicleId));
+              if(cv){cv.offices=['本社'];}
+            });
+          }
+        }
+        if(archived){
+          saveLocal();saveCompanies();
+          try{renderDashboard();}catch(e){}
+          try{renderArchive();}catch(e){}
+          alert('メールを送信しました（添付 '+fileIds.length+'件）\n\n'+t.driverName+'をアーカイブ（退職）に移動しました。'+(t.vehiclePlate?'\n車両 '+t.vehiclePlate+' を本社に移動しました。':''));
+          return;
+        }
+      }
+
       alert('メールを送信しました（添付 '+fileIds.length+'件）');
     } else {
       if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='送信する';}
@@ -2829,7 +2876,7 @@ function openBulkSendByOffice(){
   const modal=document.createElement('div');
   modal.className='modal-bg';modal.style.display='flex';
   modal.innerHTML='<div class="modal" style="max-width:520px" onclick="event.stopPropagation()">'+
-    '<div class="modal-header"><span class="modal-title">営業所一括データ送信</span><button class="modal-close" onclick="this.closest(\'.modal-bg\').remove()">✕</button></div>'+
+    '<div class="modal-header"><span class="modal-title">営業所一括メール送信</span><button class="modal-close" onclick="this.closest(\'.modal-bg\').remove()">✕</button></div>'+
     '<div class="modal-body" style="max-height:60vh;overflow-y:auto">'+
       '<div style="font-size:12px;color:#555;margin-bottom:10px">送信する営業所を選択してください。各営業所の現況届・雇用証明書（社員がいる場合）・ドライバー書類・車両書類が自動添付されます。</div>'+
       '<div style="display:flex;gap:4px;margin-bottom:10px">'+
@@ -3024,6 +3071,7 @@ async function generatePdfViaApps(office, docType, dateStr){
   // 委託会社ドライバー・車両をofficeに紐付けて追加
   const companyDrivers = [];
   const companyVehicles = [];
+  const offVIds = new Set(offV.map(v=>v.id));
   companies.forEach(c=>{
     (c.drivers||[]).forEach(d=>{
       if((d.offices||[]).includes(office)){
@@ -3032,10 +3080,13 @@ async function generatePdfViaApps(office, docType, dateStr){
           type:'外注',
           subCompany: c.name,
         });
+        // このドライバーが使用するメイン車両がoffVに含まれていなければ追加
+        var mv=vehicles.find(vv=>vv.driver===d.name&&!offVIds.has(vv.id));
+        if(mv){offV.push(mv);offVIds.add(mv.id);}
       }
     });
     (c.vehicles||[]).forEach(v=>{
-      if((v.offices||[]).includes(office)){
+      if((v.offices||[]).includes(office)&&!offVIds.has(v.id)){
         companyVehicles.push({
           ...v,
           sub: c.name,
@@ -3708,7 +3759,15 @@ function saveVehicle(){
   }
 
   const vStatus=document.getElementById('v-status').value;
-  const obj={id:editingVehicleId||Date.now(),plate,status:vStatus,model:document.getElementById('v-model').value,kind:document.getElementById('v-kind').value,type:document.getElementById('v-type').value,office:document.getElementById('v-office').value,driver:(drivers.find(d=>d.id==document.getElementById('v-driver').value)||{name:''}).name,driverId:document.getElementById('v-driver').value||null,color:document.getElementById('v-color').value||'白',owner:document.getElementById('v-owner').value,vehicleUser:document.getElementById('v-user').value,sub:document.getElementById('v-sub').value,note:document.getElementById('v-note').value,shaken:{exp:normalizeBirthDate(document.getElementById('v-shaken-exp').value),chassis:document.getElementById('v-shaken-chassis').value,type:document.getElementById('v-shaken-type').value},jibai:{exp:normalizeBirthDate(document.getElementById('v-jibai-exp').value),no:document.getElementById('v-jibai-no').value,company:document.getElementById('v-jibai-company').value},nin:{exp:normalizeBirthDate(document.getElementById('v-nin-exp').value),no:document.getElementById('v-nin-no').value,company:document.getElementById('v-nin-company').value}};
+  var driverVal=document.getElementById('v-driver').value||'';
+  var driverName='';
+  if(driverVal.startsWith('cd:')){
+    driverName=driverVal.replace('cd:','');
+  } else if(driverVal){
+    var dr=drivers.find(d=>d.id==driverVal);
+    driverName=dr?dr.name:'';
+  }
+  const obj={id:editingVehicleId||Date.now(),plate,status:vStatus,model:document.getElementById('v-model').value,kind:document.getElementById('v-kind').value,type:document.getElementById('v-type').value,office:document.getElementById('v-office').value,driver:driverName,driverId:driverVal||null,color:document.getElementById('v-color').value||'白',owner:document.getElementById('v-owner').value,vehicleUser:document.getElementById('v-user').value,sub:document.getElementById('v-sub').value,note:document.getElementById('v-note').value,shaken:{exp:normalizeBirthDate(document.getElementById('v-shaken-exp').value),chassis:document.getElementById('v-shaken-chassis').value,type:document.getElementById('v-shaken-type').value},jibai:{exp:normalizeBirthDate(document.getElementById('v-jibai-exp').value),no:document.getElementById('v-jibai-no').value,company:document.getElementById('v-jibai-company').value},nin:{exp:normalizeBirthDate(document.getElementById('v-nin-exp').value),no:document.getElementById('v-nin-no').value,company:document.getElementById('v-nin-company').value}};
   if(editingVehicleId){const i=vehicles.findIndex(v=>v.id==editingVehicleId);if(i>=0)vehicles[i]=obj;else vehicles.push(obj);}else vehicles.push(obj);
   // ★ モーダルの添付ファイルをDriveにアップロード
   const vFiles = modalFiles['v-files'] || [];
