@@ -6462,9 +6462,7 @@ function renderInbox(){
   if(!el)return;
   if(!inbox.length){el.innerHTML='<div style="padding:16px;text-align:center;color:#888;font-size:12px">受信したフォームはありません</div>';return;}
 
-  // 現在のタブ取得
   const currentTab = el.dataset.tab || 'unread';
-
   const pending = inbox.filter(i=>i.status!=='登録済');
   const registered = inbox.filter(i=>i.status==='登録済');
 
@@ -6477,18 +6475,16 @@ function renderInbox(){
     const isNew = item.mode==='new';
     const fileCount = (item.files||[]).length;
     const filesHTML = fileCount ? `
-      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
         ${(item.files||[]).map((f,fi)=>{
           const fname = typeof f==='string' ? f : f.name;
           const fdataUrl = typeof f==='object' ? (f.dataUrl||'') : '';
-          const furl = typeof f==='object' ? (f.url||'') : '';
           const fFileId = typeof f==='object' ? (f.fileId||'') : '';
           const isImg = fname.match(/\.(jpg|jpeg|png|gif)$/i);
-          const isPdf = fname.match(/\.pdf$/i);
           const driveThumbUrl = fFileId ? 'https://drive.google.com/thumbnail?id='+fFileId+'&sz=w80' : '';
           const imgSrc = fdataUrl || driveThumbUrl;
           if(imgSrc && isImg){
-            return `<img src="${imgSrc}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #e0e0e0;cursor:pointer" onclick="openFilePreviewFromAttached('','${esc(fname)}','${fdataUrl.substring(0,30)}');openInboxFilePreview(${item.id},${fi})" title="${esc(fname)}">`;
+            return `<img src="${imgSrc}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #e0e0e0;cursor:pointer" onclick="openInboxFilePreview(${item.id},${fi})" title="${esc(fname)}">`;
           }
           return `<div onclick="openInboxFilePreview(${item.id},${fi})" style="display:flex;align-items:center;gap:3px;padding:2px 6px;background:#f0f4ff;border-radius:4px;font-size:10px;color:#4a90e2;cursor:pointer;border:1px solid #c5d8f8">
             <img src="${LOGO_THUMB}" style="width:20px;height:20px;object-fit:contain"> ${esc(fname)}
@@ -6496,31 +6492,34 @@ function renderInbox(){
         }).join('')}
       </div>` : '';
 
-    // 登録済のコンパクト表示
+    // 登録済のコンパクト表示（カード型）
     if(isCompact){
-      return `<div style="padding:6px 12px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px;font-size:11px">
-        <input type="checkbox" class="inbox-check" data-inbox-id="${item.id}" onchange="inboxUpdateBulkBar()" style="width:14px;height:14px;cursor:pointer;flex-shrink:0">
-        <span style="cursor:pointer;flex:1;min-width:0;display:flex;align-items:center;gap:4px;flex-wrap:wrap" onclick="inboxToggleRegDetail(${item.id})">
-          <strong style="font-size:12px">${esc(item.name)}</strong>
-          <span style="font-size:10px;background:#e3f2fd;color:#1565c0;padding:1px 5px;border-radius:99px">${esc(item.doctype||'')}</span>
-          <span style="font-size:10px;background:#e8f5e9;color:#2e7d32;padding:1px 5px;border-radius:99px">登録済</span>
-          <span style="font-size:10px;color:#888">${isNew?'新規':'更新'}</span>
-          ${fileCount?`<span style="font-size:10px;background:#fff;color:#444;padding:1px 6px;border-radius:6px;border:1px solid #aab">${fileCount}件</span>`:''}
-          <span style="font-size:9px;color:#aaa;margin-left:auto;white-space:nowrap">${new Date(item.timestamp).toLocaleDateString('ja-JP')}</span>
-          <span style="font-size:9px;color:#999" id="inbox-reg-arrow-${item.id}">▶</span>
-        </span>
-        <button class="btn btn-sm" onclick="event.stopPropagation();restoreInboxItem(${item.id})" style="font-size:9px;padding:2px 8px;flex-shrink:0">復元</button>
-        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteInboxItem(${item.id})" style="font-size:9px;padding:2px 8px;flex-shrink:0">削除</button>
-      </div>
-      <div id="inbox-reg-detail-${item.id}" style="display:none;padding:4px 12px 8px 40px;border-bottom:1px solid #f0f0f0;background:#f9fafb">
-        <div style="font-size:10px;color:#888">${new Date(item.timestamp).toLocaleString('ja-JP')}${item.note?'　'+esc(item.note):''}</div>
-        ${item.plate?`<div style="font-size:10px;color:#555;margin-top:2px">${esc(item.plate)}${item.vModel?' '+esc(item.vModel):''}</div>`:''}
-        ${filesHTML}
+      return `<div style="background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:10px 12px;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" class="inbox-check" data-inbox-id="${item.id}" onchange="inboxUpdateBulkBar()" style="width:14px;height:14px;cursor:pointer;flex-shrink:0">
+          <span style="cursor:pointer;flex:1;min-width:0;display:flex;align-items:center;gap:4px;flex-wrap:wrap" onclick="inboxToggleRegDetail(${item.id})">
+            <strong style="font-size:12px">${esc(item.name)}</strong>
+            <span style="font-size:10px;background:#e3f2fd;color:#1565c0;padding:1px 5px;border-radius:99px">${esc(item.doctype||'')}</span>
+            <span style="font-size:10px;background:#e8f5e9;color:#2e7d32;padding:1px 5px;border-radius:99px">登録済</span>
+            <span style="font-size:10px;color:#888">${isNew?'新規':'更新'}</span>
+            ${fileCount?`<span style="font-size:10px;background:#fff;color:#444;padding:1px 6px;border-radius:6px;border:1px solid #aab">${fileCount}件</span>`:''}
+            <span style="font-size:9px;color:#aaa;margin-left:auto;white-space:nowrap">${new Date(item.timestamp).toLocaleDateString('ja-JP')}</span>
+            <span style="font-size:9px;color:#999" id="inbox-reg-arrow-${item.id}">▶</span>
+          </span>
+          <button class="btn btn-sm" onclick="event.stopPropagation();restoreInboxItem(${item.id})" style="font-size:9px;padding:2px 8px;flex-shrink:0">復元</button>
+          <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteInboxItem(${item.id})" style="font-size:9px;padding:2px 8px;flex-shrink:0">削除</button>
+        </div>
+        <div id="inbox-reg-detail-${item.id}" style="display:none;padding:6px 0 0 28px">
+          <div style="font-size:10px;color:#888">${new Date(item.timestamp).toLocaleString('ja-JP')}${item.note?'　'+esc(item.note):''}</div>
+          ${item.plate?`<div style="font-size:10px;color:#555;margin-top:2px">${esc(item.plate)}${item.vModel?' '+esc(item.vModel):''}</div>`:''}
+          ${filesHTML}
+        </div>
       </div>`;
     }
 
-    // 通常表示（未確認・確認済）
-    return `<div style="padding:10px 12px;border-bottom:1px solid #f0f0f0;${item.status==='未確認'?'background:#fffde7':''}">
+    // 通常表示（カード型）
+    const statusBg = item.status==='未確認' ? 'background:#fffde7;border:1px solid #ffe082' : 'background:#fff;border:1px solid #e0e0e0';
+    return `<div style="${statusBg};border-radius:8px;padding:10px 12px;margin-bottom:6px">
       <div style="display:flex;align-items:flex-start;gap:8px">
         <input type="checkbox" class="inbox-check" data-inbox-id="${item.id}" onchange="inboxUpdateBulkBar()" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;margin-top:3px">
         <div style="flex:1;min-width:0">
@@ -6540,9 +6539,7 @@ function renderInbox(){
         </div>
         <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
           ${(()=>{
-            // 新規登録モードの場合は登録ボタン表示
             if(isNew && item.status!=='登録完了' && item.status!=='登録済') return `<button class="btn btn-sm btn-primary" onclick="registerFromInbox(${item.id})" style="font-size:10px">登録</button>`;
-            // 書類更新モードだが氏名がドライバーに見つからない場合も登録ボタン表示
             if(!isNew && item.status!=='登録完了' && item.status!=='登録済'){
               const nameMatch = drivers.find(d=>d.name===item.name) || companies.flatMap(co=>co.drivers||[]).find(d=>d.name===item.name);
               if(!nameMatch) return `<button class="btn btn-sm btn-primary" onclick="registerFromInbox(${item.id})" style="font-size:10px" title="氏名が未登録です">新規登録</button>`;
@@ -6559,11 +6556,11 @@ function renderInbox(){
     </div>`;
   };
 
-  // ★ 一括操作バー
-  const bulkBarHTML = '<div id="inbox-bulk-bar" style="display:none;padding:8px 12px;background:#e3f2fd;border-radius:6px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+  // ★ 一括操作バー（display:noneのみ — inboxUpdateBulkBarで制御）
+  const bulkBarHTML = '<div id="inbox-bulk-bar" style="display:none;padding:8px 12px;background:#e3f2fd;border:1px solid #90CAF9;border-radius:8px;margin-bottom:8px;align-items:center;gap:8px;flex-wrap:wrap">' +
     '<span style="font-size:12px;font-weight:600;color:#1565c0" id="inbox-bulk-count">0件選択中</span>' +
     '<button class="btn btn-sm btn-primary" onclick="inboxBulkSave()" style="font-size:11px">💾 一括振り分け</button>' +
-    '<button class="btn btn-sm btn-danger" onclick="inboxBulkDelete()" style="font-size:11px">削除 一括削除</button>' +
+    '<button class="btn btn-sm btn-danger" onclick="inboxBulkDelete()" style="font-size:11px">🗑 一括削除</button>' +
     '<button class="btn btn-sm" onclick="inboxBulkClearSelection()" style="font-size:11px">選択解除</button>' +
     '<label style="margin-left:auto;font-size:11px;cursor:pointer;color:#888"><input type="checkbox" onchange="inboxToggleAll(this.checked)" style="margin-right:4px">全選択</label>' +
   '</div>';
@@ -6572,7 +6569,6 @@ function renderInbox(){
   el.innerHTML = tabsHTML + bulkBarHTML + (list.length
     ? list.map(item=>renderItem(item, currentTab==='registered')).join('')
     : `<div style="padding:16px;text-align:center;color:#888;font-size:12px">${currentTab==='registered'?'登録済みのデータはありません':'未確認・確認済みのデータはありません'}</div>`);
-  // 一括バーの初期表示制御
   inboxUpdateBulkBar();
 }
 
