@@ -3850,6 +3850,7 @@ function openVehicleModal(id){
   modalFiles['v-files']=[];
   renderFilePreview('v-files');
   renderExistingFiles('v-existing-files','vehicle',id);
+  setTimeout(()=>initModalKeyNav('vehicle-modal'),100);
 }
 function saveVehicle(){
   const plate=document.getElementById('v-plate').value.trim();if(!plate){alert('車両番号は必須です');return;}
@@ -3980,13 +3981,44 @@ function removeOtherDoc(id){const el=document.getElementById('other-doc-'+id);if
 function initModalKeyNav(modalId){
   const modal=document.getElementById(modalId);
   if(!modal)return;
-  const fields=Array.from(modal.querySelectorAll('.modal-field'));
+  // 全操作可能要素を収集（input, select, textarea + 営業所バッジ label）
+  const allEls=Array.from(modal.querySelectorAll('input:not([type="file"]):not([type="checkbox"][style*="display:none"]):not([type="hidden"]),select,textarea,.office-checkbox-label'));
+  // 非表示の親要素内の要素を除外
+  const fields=allEls.filter(el=>{
+    var p=el;while(p&&p!==modal){if(p.style&&(p.style.display==='none'||p.offsetParent===null&&p.style.position!=='fixed'))return false;p=p.parentElement;}
+    return true;
+  });
+
   fields.forEach((f,i)=>{
+    // tabindexを設定（営業所バッジ用）
+    if(f.classList&&f.classList.contains('office-checkbox-label')&&!f.hasAttribute('tabindex')) f.setAttribute('tabindex','0');
+
     f.onkeydown=function(e){
-      if(e.key==='Enter'||e.key==='ArrowDown'){e.preventDefault();const next=fields[i+1];if(next)next.focus();}
-      if(e.key==='ArrowUp'){e.preventDefault();const prev=fields[i-1];if(prev)prev.focus();}
+      if(e.key==='Enter'){
+        e.preventDefault();
+        // 営業所バッジの場合はトグル
+        if(f.classList&&f.classList.contains('office-checkbox-label')){
+          var cb=f.querySelector('input[type="checkbox"]');
+          if(cb){cb.checked=!cb.checked;cb.dispatchEvent(new Event('change'));}
+          return;
+        }
+        // 次のフィールドへ移動
+        var next=fields[i+1];if(next)next.focus();
+      }
+      if(e.key==='ArrowDown'){e.preventDefault();var next=fields[i+1];if(next)next.focus();}
+      if(e.key==='ArrowUp'){e.preventDefault();var prev=fields[i-1];if(prev)prev.focus();}
+      // 営業所バッジでSpace
+      if(e.key===' '&&f.classList&&f.classList.contains('office-checkbox-label')){
+        e.preventDefault();
+        var cb=f.querySelector('input[type="checkbox"]');
+        if(cb){cb.checked=!cb.checked;cb.dispatchEvent(new Event('change'));}
+      }
     };
   });
+
+  // 最初のテキスト入力フィールドにフォーカス
+  var firstInput=fields.find(f=>f.tagName==='INPUT'&&(f.type==='text'||f.type==='tel'));
+  if(firstInput)setTimeout(()=>firstInput.focus(),100);
 }
 
 function saveDriver(){
@@ -6424,9 +6456,10 @@ function renderInbox(){
     </div>
   </div>`;
 
-  const renderItem = (item) => {
+  const renderItem = (item, isCompact) => {
     const isNew = item.mode==='new';
-    const filesHTML = (item.files||[]).length ? `
+    const fileCount = (item.files||[]).length;
+    const filesHTML = fileCount ? `
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
         ${(item.files||[]).map((f,fi)=>{
           const fname = typeof f==='string' ? f : f.name;
@@ -6435,7 +6468,6 @@ function renderInbox(){
           const fFileId = typeof f==='object' ? (f.fileId||'') : '';
           const isImg = fname.match(/\.(jpg|jpeg|png|gif)$/i);
           const isPdf = fname.match(/\.pdf$/i);
-          // Drive URLからサムネイルを生成
           const driveThumbUrl = fFileId ? 'https://drive.google.com/thumbnail?id='+fFileId+'&sz=w80' : '';
           const imgSrc = fdataUrl || driveThumbUrl;
           if(imgSrc && isImg){
@@ -6447,6 +6479,30 @@ function renderInbox(){
         }).join('')}
       </div>` : '';
 
+    // 登録済のコンパクト表示
+    if(isCompact){
+      return `<div style="padding:6px 12px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px;font-size:11px">
+        <input type="checkbox" class="inbox-check" data-inbox-id="${item.id}" onchange="inboxUpdateBulkBar()" style="width:14px;height:14px;cursor:pointer;flex-shrink:0">
+        <span style="cursor:pointer;flex:1;min-width:0;display:flex;align-items:center;gap:4px;flex-wrap:wrap" onclick="inboxToggleRegDetail(${item.id})">
+          <strong style="font-size:12px">${esc(item.name)}</strong>
+          <span style="font-size:10px;background:#e3f2fd;color:#1565c0;padding:1px 5px;border-radius:99px">${esc(item.doctype||'')}</span>
+          <span style="font-size:10px;background:#e8f5e9;color:#2e7d32;padding:1px 5px;border-radius:99px">登録済</span>
+          <span style="font-size:10px;color:#888">${isNew?'新規':'更新'}</span>
+          ${fileCount?`<span style="font-size:10px;background:#fff;color:#444;padding:1px 6px;border-radius:6px;border:1px solid #aab">${fileCount}件</span>`:''}
+          <span style="font-size:9px;color:#aaa;margin-left:auto;white-space:nowrap">${new Date(item.timestamp).toLocaleDateString('ja-JP')}</span>
+          <span style="font-size:9px;color:#999" id="inbox-reg-arrow-${item.id}">▶</span>
+        </span>
+        <button class="btn btn-sm" onclick="event.stopPropagation();restoreInboxItem(${item.id})" style="font-size:9px;padding:2px 8px;flex-shrink:0">復元</button>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteInboxItem(${item.id})" style="font-size:9px;padding:2px 8px;flex-shrink:0">削除</button>
+      </div>
+      <div id="inbox-reg-detail-${item.id}" style="display:none;padding:4px 12px 8px 40px;border-bottom:1px solid #f0f0f0;background:#f9fafb">
+        <div style="font-size:10px;color:#888">${new Date(item.timestamp).toLocaleString('ja-JP')}${item.note?'　'+esc(item.note):''}</div>
+        ${item.plate?`<div style="font-size:10px;color:#555;margin-top:2px">${esc(item.plate)}${item.vModel?' '+esc(item.vModel):''}</div>`:''}
+        ${filesHTML}
+      </div>`;
+    }
+
+    // 通常表示（未確認・確認済）
     return `<div style="padding:10px 12px;border-bottom:1px solid #f0f0f0;${item.status==='未確認'?'background:#fffde7':''}">
       <div style="display:flex;align-items:flex-start;gap:8px">
         <input type="checkbox" class="inbox-check" data-inbox-id="${item.id}" onchange="inboxUpdateBulkBar()" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;margin-top:3px">
@@ -6497,7 +6553,7 @@ function renderInbox(){
 
   const list = currentTab==='registered' ? registered : pending;
   el.innerHTML = tabsHTML + bulkBarHTML + (list.length
-    ? list.map(renderItem).join('')
+    ? list.map(item=>renderItem(item, currentTab==='registered')).join('')
     : `<div style="padding:16px;text-align:center;color:#888;font-size:12px">${currentTab==='registered'?'登録済みのデータはありません':'未確認・確認済みのデータはありません'}</div>`);
   // 一括バーの初期表示制御
   inboxUpdateBulkBar();
@@ -6507,6 +6563,16 @@ function inboxSetTab(tab){
   const el=document.getElementById('inbox-list');
   if(el){el.dataset.tab=tab;}
   renderInbox();
+}
+
+function inboxToggleRegDetail(id){
+  var det=document.getElementById('inbox-reg-detail-'+id);
+  var arrow=document.getElementById('inbox-reg-arrow-'+id);
+  if(det){
+    var show=det.style.display==='none';
+    det.style.display=show?'block':'none';
+    if(arrow) arrow.textContent=show?'▼':'▶';
+  }
 }
 
 // ★ 一括操作関数群
@@ -7482,6 +7548,7 @@ function openCompanyDriverModal(companyId, driverId){
   initDateFields();
   modalFiles['cd-files']=[];
   renderFilePreview('cd-files');
+  setTimeout(()=>initModalKeyNav('company-driver-modal'),100);
 }
 
 function renderOfficeMultiSelect(elId, selected){
