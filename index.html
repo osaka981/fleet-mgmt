@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="大阪急配">
+<meta name="theme-color" content="#1B5E20">
+<link rel="icon" type="image/png" sizes="64x64">
+<link rel="apple-touch-icon" sizes="180x180">
 <title>大阪急配 フリート管理</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -677,7 +683,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
             <button class="btn btn-sm" onclick="toggleStorageView()" id="storage-view-btn" style="white-space:nowrap;min-height:34px">一覧</button>
             <button class="btn btn-primary" onclick="openFileMgrUploadGeneral()" style="white-space:nowrap;min-height:38px;padding:8px 14px;font-size:12px">＋ ファイル追加</button>
           </div>
-          <div id="storage-office-badges" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap"></div>
+          <div id="storage-office-badges" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:6px;margin-bottom:12px"></div>
           <div id="storage-content"></div>
         </div>
       </div>
@@ -5427,9 +5433,9 @@ function renderStorage(){
       const isUncat=o==='未分類';
       const bg=isActive?'background:#4a90e2;color:#fff;border:1px solid #4a90e2':'background:#f7f7f7;border:1px solid '+(isUncat?'#e53935':'#ddd')+';color:'+(isUncat?'#e53935':'#555');
       const subLabel=isUncat?'ドライバー:'+cnt.d+' / 車両:'+cnt.v+' / ファイル:'+uncatTotal:'ドライバー '+cnt.d+' / 車両 '+cnt.v;
-      return '<div style="padding:6px 4px;border-radius:8px;cursor:pointer;text-align:center;'+bg+'" onclick="storageSetOffice(\''+(isActive?'':o)+'\')">'+
-        '<div style="font-size:12px;font-weight:600">'+o+'</div>'+
-        '<div style="font-size:9px;opacity:.7">'+(isUncat?uncatTotal+'件':cnt.d+'人/'+cnt.v+'台')+'</div>'+
+      return '<div style="padding:8px 6px;border-radius:8px;cursor:pointer;text-align:center;'+bg+'" onclick="storageSetOffice(\''+(isActive?'':o)+'\')">'+
+        '<div style="font-size:12px;font-weight:600;white-space:nowrap">'+o+'</div>'+
+        '<div style="font-size:9px;opacity:.7;white-space:nowrap">'+(isUncat?uncatTotal+'件':cnt.d+'人/'+cnt.v+'台')+'</div>'+
       '</div>';
     }).filter(Boolean).join('');
   }
@@ -8252,8 +8258,60 @@ function loadScript(url){
 
 // ロゴ画像設定
 (function(){var els=['sidebar-logo','login-logo-img'];els.forEach(function(id){var el=document.getElementById(id);if(el)el.src=LOGO_THUMB;});
-// favicon
-var link=document.createElement('link');link.rel='icon';link.type='image/jpeg';link.href=LOGO_THUMB;document.head.appendChild(link);
+
+// ファビコン生成（深緑背景 + ロゴ + fleet文字）
+function generateFavicon(size,callback){
+  var canvas=document.createElement('canvas');
+  canvas.width=size;canvas.height=size;
+  var ctx=canvas.getContext('2d');
+  // 深緑背景（角丸）
+  var r=size*0.18;
+  ctx.fillStyle='#1B5E20';
+  ctx.beginPath();
+  ctx.moveTo(r,0);ctx.lineTo(size-r,0);ctx.quadraticCurveTo(size,0,size,r);
+  ctx.lineTo(size,size-r);ctx.quadraticCurveTo(size,size,size-r,size);
+  ctx.lineTo(r,size);ctx.quadraticCurveTo(0,size,0,size-r);
+  ctx.lineTo(0,r);ctx.quadraticCurveTo(0,0,r,0);
+  ctx.fill();
+  // ロゴ画像を中央上に配置
+  var img=new Image();
+  img.onload=function(){
+    var logoSize=size*0.55;
+    var lx=(size-logoSize)/2;
+    var ly=size*0.08;
+    ctx.drawImage(img,lx,ly,logoSize,logoSize);
+    // fleet文字
+    ctx.fillStyle='#fff';
+    ctx.font='bold '+Math.round(size*0.22)+'px sans-serif';
+    ctx.textAlign='center';
+    ctx.textBaseline='bottom';
+    ctx.fillText('fleet',size/2,size*0.95);
+    callback(canvas.toDataURL('image/png'));
+  };
+  img.onerror=function(){
+    // ロゴ読み込み失敗時はテキストのみ
+    ctx.fillStyle='#fff';
+    ctx.font='bold '+Math.round(size*0.28)+'px sans-serif';
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.fillText('fleet',size/2,size/2);
+    callback(canvas.toDataURL('image/png'));
+  };
+  img.crossOrigin='anonymous';
+  img.src=LOGO_THUMB;
+}
+
+// 各サイズのアイコンを生成・適用
+generateFavicon(64,function(url){
+  var link=document.querySelector('link[rel="icon"]');
+  if(!link){link=document.createElement('link');link.rel='icon';document.head.appendChild(link);}
+  link.type='image/png';link.href=url;
+});
+generateFavicon(180,function(url){
+  var link=document.querySelector('link[rel="apple-touch-icon"]');
+  if(!link){link=document.createElement('link');link.rel='apple-touch-icon';link.setAttribute('sizes','180x180');document.head.appendChild(link);}
+  link.href=url;
+});
 })();
 
 // ====== 自動保存 + 自動読込 + ページ離脱時同期 ======
