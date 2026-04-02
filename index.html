@@ -1554,31 +1554,6 @@ function renameOffice(oldName,newName){
   try{renderDocPage();}catch(e){}
   alert('「'+newName+'」に変更しました');
 }
-function renameOffice(oldName,newName){
-  newName=newName.trim();
-  if(!newName||newName===oldName) return;
-  if(offices.includes(newName)){alert('「'+newName+'」は既に存在します');return;}
-  var idx=offices.indexOf(oldName);
-  if(idx===-1) return;
-  offices[idx]=newName;
-  // ドライバー・車両の所属を更新
-  drivers.forEach(d=>{
-    if(Array.isArray(d.offices)) d.offices=d.offices.map(o=>o===oldName?newName:o);
-    if(d.office===oldName) d.office=newName;
-  });
-  vehicles.forEach(v=>{if(v.office===oldName) v.office=newName;});
-  companies.forEach(c=>{
-    (c.drivers||[]).forEach(d=>{if(Array.isArray(d.offices)) d.offices=d.offices.map(o=>o===oldName?newName:o);});
-    (c.vehicles||[]).forEach(v=>{if(v.office===oldName) v.office=newName;});
-  });
-  // 設定データも移行
-  if(officeAreas[oldName]){officeAreas[newName]=officeAreas[oldName];delete officeAreas[oldName];}
-  if(officePostMap[oldName]){officePostMap[newName]=officePostMap[oldName];delete officePostMap[oldName];}
-  saveLocal();saveCompanies();
-  renderOfficeNav();renderSettingsOffices();rebuildOfficeSelects();
-  try{renderDocPage();}catch(e){}
-  alert('「'+oldName+'」→「'+newName+'」に変更しました');
-}
 function deleteOffice(name){
   // 車両・ドライバーの紐づきを確認
   const affectedD=drivers.filter(d=>belongsToOffice(d,name));
@@ -6028,13 +6003,6 @@ function assignUnassignedFileSelect(idx, val){
 
   unassignedFiles.splice(idx, 1);
   saveLocal(); saveCompanies();
-  renderFileMgr();
-}
-
-function deleteUnassignedFile(idx){
-  if(!confirm('この未分類ファイルを削除しますか？')) return;
-  unassignedFiles.splice(idx, 1);
-  saveLocal();
   renderFileMgr();
 }
 
