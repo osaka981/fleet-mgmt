@@ -38,10 +38,8 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f
 .nav-group-arrow{font-size:10px;color:#4a90e2;font-weight:700;margin-left:auto}
 .nav-group-body{overflow:hidden;transition:max-height .2s ease}
 .nav-group-body.collapsed{max-height:0!important;overflow:hidden}
-.storage-grid{display:grid;grid-template-columns:1fr;gap:8px}
-@media(min-width:768px){.storage-grid{grid-template-columns:repeat(2,1fr)}}
-@media(min-width:1200px){.storage-grid{grid-template-columns:repeat(3,1fr)}}
-.storage-grid>div{align-self:start}
+.storage-grid{display:flex;gap:8px}
+.storage-grid>.storage-col{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
 .nav-add-btn{width:20px;height:20px;border:1px solid #ddd;border-radius:4px;background:transparent;cursor:pointer;color:#888;font-size:14px;display:flex;align-items:center;justify-content:center}
 .nav-add-btn:hover{background:#f5f5f5}
 .nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;cursor:pointer;color:#666;transition:all .15s;margin:1px 6px;font-size:12px}
@@ -240,7 +238,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
   .form-grid{grid-template-columns:1fr}
   .doc-fields{grid-template-columns:1fr}
   .subcon-grid{grid-template-columns:1fr}
-  .storage-grid{grid-template-columns:1fr!important}
+  .storage-grid{flex-direction:column!important}
 
   /* ===== テーブル（横スクロール対応） ===== */
   .table-wrap{border-radius:6px;overflow-x:auto!important;-webkit-overflow-scrolling:touch;max-width:calc(100vw - 16px)}
@@ -5790,6 +5788,15 @@ function storageToggleExpand(key){
   }
 }
 
+function storageColumnsHtml(cards){
+  if(!cards.length) return '';
+  var numCols=window.innerWidth>=1200?3:window.innerWidth>=768?2:1;
+  if(numCols===1) return '<div class="storage-grid"><div class="storage-col">'+cards.join('')+'</div></div>';
+  var cols=[];for(var i=0;i<numCols;i++)cols.push([]);
+  cards.forEach(function(c,i){cols[i%numCols].push(c);});
+  return '<div class="storage-grid">'+cols.map(function(col){return '<div class="storage-col">'+col.join('')+'</div>';}).join('')+'</div>';
+}
+
 function renderStorage(){
   const search = (document.getElementById('storage-search')?.value || '').toLowerCase();
   const el = document.getElementById('storage-content');
@@ -5876,8 +5883,7 @@ function renderStorage(){
 
   if(allDrivers.length){
     html+='<div style="font-size:11px;font-weight:500;color:#888;margin-bottom:8px">ドライバー（'+allDrivers.length+'名）</div>';
-    html+='<div class="storage-grid">';
-    html+=allDrivers.map(d=>{
+    var driverCards=allDrivers.map(d=>{
       const key='d-'+d.id;
       const expanded=storageExpandedIds[key];
       const af=d.attachedFiles||[];
@@ -6018,16 +6024,15 @@ function renderStorage(){
       cardHtml+='</div>';
       cardHtml+='</div>'; // close sc-e wrapper
       return '<div>'+collapsedHtml+cardHtml+'</div>';
-    }).join('');
-    html+='</div>'; // close storage-grid
+    });
+    html+=storageColumnsHtml(driverCards);
   }
 
   // 車両のみ（ドライバー未割当）
   const unassignedVehicles=allVehicles.filter(v=>!allDrivers.some(d=>String(d.id)===String(v.driverId)||d.name===v.driver));
   if(unassignedVehicles.length){
     html+='<div style="font-size:11px;font-weight:500;color:#888;margin:12px 0 8px">未割当車両（'+unassignedVehicles.length+'台）</div>';
-    html+='<div class="storage-grid">';
-    html+=unassignedVehicles.map(v=>{
+    var vehicleCards=unassignedVehicles.map(v=>{
       var key='v-'+v.id;
       var expanded=storageExpandedIds[key];
       var vaf=v.attachedFiles||[];
@@ -6106,8 +6111,8 @@ function renderStorage(){
       cardHtml+='</div>';
       cardHtml+='</div>'; // close sc-e wrapper
       return '<div>'+collapsedHtml+cardHtml+'</div>';
-    }).join('');
-    html+='</div>'; // close storage-grid
+    });
+    html+=storageColumnsHtml(vehicleCards);
   }
 
   // 未分類ファイル（未分類選択時のみ表示）
