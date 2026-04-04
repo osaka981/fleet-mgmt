@@ -1307,7 +1307,12 @@ async function syncFromSheet(){
     const res=await fetch(API_URL+'?action=getAll');const json=await res.json();
     if(json.ok){
       if(json.data.drivers?.length){drivers=json.data.drivers.map(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles'].includes(k)?[]:{};} });if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];if(!Array.isArray(d.offices))d.offices=typeof d.offices==='string'?[d.offices]:[];if(!d.license)d.license={};if(!d.other)d.other={};if(!d.sub)d.sub={};return d;});}
+        // attachedFiles保護: Sheet解析でファイルが消えた場合、ローカルを保持
+        var _oldDrvs=JSON.parse(localStorage.getItem("fleet_drivers")||"[]");
+        drivers.forEach(function(d){if(!d.attachedFiles||!d.attachedFiles.length){var od=_oldDrvs.find(function(o){return o.id==d.id;});if(od&&od.attachedFiles&&od.attachedFiles.length)d.attachedFiles=od.attachedFiles;}});
       if(json.data.vehicles?.length){vehicles=json.data.vehicles.map(v=>{['shaken','jibai','nin','attachedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=k==='attachedFiles'?[]:{};} });if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];if(!v.shaken)v.shaken={};if(!v.jibai)v.jibai={};if(!v.nin)v.nin={};return v;});}
+        var _oldVehs=JSON.parse(localStorage.getItem("fleet_vehicles")||"[]");
+        vehicles.forEach(function(v){if(!v.attachedFiles||!v.attachedFiles.length){var ov=_oldVehs.find(function(o){return o.id==v.id;});if(ov&&ov.attachedFiles&&ov.attachedFiles.length)v.attachedFiles=ov.attachedFiles;}});
       if(json.data.companies?.length){
         companies=json.data.companies.map(c=>{
           ['drivers','vehicles'].forEach(k=>{
@@ -1403,7 +1408,12 @@ async function syncAll(saveFirst){
     const json=await res.json();
     if(json.ok){
       if(json.data.drivers?.length){drivers=json.data.drivers.map(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles'].includes(k)?[]:{};} });if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];if(!Array.isArray(d.offices))d.offices=typeof d.offices==='string'?[d.offices]:[];if(!d.license)d.license={};if(!d.other)d.other={};if(!d.sub)d.sub={};return d;});}
+        // attachedFiles保護: Sheet解析でファイルが消えた場合、ローカルを保持
+        var _oldDrvs=JSON.parse(localStorage.getItem("fleet_drivers")||"[]");
+        drivers.forEach(function(d){if(!d.attachedFiles||!d.attachedFiles.length){var od=_oldDrvs.find(function(o){return o.id==d.id;});if(od&&od.attachedFiles&&od.attachedFiles.length)d.attachedFiles=od.attachedFiles;}});
       if(json.data.vehicles?.length){vehicles=json.data.vehicles.map(v=>{['shaken','jibai','nin','attachedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=k==='attachedFiles'?[]:{};} });if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];if(!v.shaken)v.shaken={};if(!v.jibai)v.jibai={};if(!v.nin)v.nin={};return v;});}
+        var _oldVehs=JSON.parse(localStorage.getItem("fleet_vehicles")||"[]");
+        vehicles.forEach(function(v){if(!v.attachedFiles||!v.attachedFiles.length){var ov=_oldVehs.find(function(o){return o.id==v.id;});if(ov&&ov.attachedFiles&&ov.attachedFiles.length)v.attachedFiles=ov.attachedFiles;}});
       if(json.data.companies?.length){
         companies=json.data.companies.map(c=>{
           ['drivers','vehicles'].forEach(k=>{if(typeof c[k]==='string')try{c[k]=JSON.parse(c[k]);}catch(e){c[k]=[];}if(!Array.isArray(c[k]))c[k]=[];});
@@ -9901,7 +9911,12 @@ setInterval(function(){
       }
       if(!updated) return;
       if(json.data.drivers?.length){drivers=json.data.drivers.map(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles'].includes(k)?[]:{};} });if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];if(!Array.isArray(d.offices))d.offices=typeof d.offices==='string'?[d.offices]:[];if(!d.license)d.license={};if(!d.other)d.other={};if(!d.sub)d.sub={};return d;});}
+        // attachedFiles保護: Sheet解析でファイルが消えた場合、ローカルを保持
+        var _oldDrvs=JSON.parse(localStorage.getItem("fleet_drivers")||"[]");
+        drivers.forEach(function(d){if(!d.attachedFiles||!d.attachedFiles.length){var od=_oldDrvs.find(function(o){return o.id==d.id;});if(od&&od.attachedFiles&&od.attachedFiles.length)d.attachedFiles=od.attachedFiles;}});
       if(json.data.vehicles?.length){vehicles=json.data.vehicles.map(v=>{['shaken','jibai','nin','attachedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=k==='attachedFiles'?[]:{};} });if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];if(!v.shaken)v.shaken={};if(!v.jibai)v.jibai={};if(!v.nin)v.nin={};return v;});}
+        var _oldVehs=JSON.parse(localStorage.getItem("fleet_vehicles")||"[]");
+        vehicles.forEach(function(v){if(!v.attachedFiles||!v.attachedFiles.length){var ov=_oldVehs.find(function(o){return o.id==v.id;});if(ov&&ov.attachedFiles&&ov.attachedFiles.length)v.attachedFiles=ov.attachedFiles;}});
       if(json.data.companies?.length){companies=json.data.companies.map(c=>{['drivers','vehicles'].forEach(k=>{if(typeof c[k]==='string')try{c[k]=JSON.parse(c[k]);}catch(e){c[k]=[];}if(!Array.isArray(c[k]))c[k]=[];});return c;});contractors=companies;}
       drivers=dedup(drivers);vehicles=dedup(vehicles);
       companies.forEach(c=>{c.drivers=dedup(c.drivers||[]);c.vehicles=dedup(c.vehicles||[]);});
