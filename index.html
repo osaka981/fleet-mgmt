@@ -2036,7 +2036,7 @@ function buildVehicleDetailRow(v, af){
     h+='</div>';return h;
   }
   var vCats=[{key:'車検証',label:'車検証'},{key:'自賠責',label:'自賠責'},{key:'任意保険',label:'任意保険'}];
-  var dCats=[{key:'免許証（表）',label:'免許(表)'},{key:'免許証（裏）',label:'免許(裏)'},{key:'健康診断書',label:'健康診断'}];
+  var dCats=[{key:'免許証（表）',label:'免許(表)'},{key:'免許証（裏）',label:'免許(裏)'},{key:'免許証（表裏）',label:'免許(表裏)'},{key:'健康診断書',label:'健康診断'}];
 
   var html='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">';
   vCats.forEach(function(cat){
@@ -2151,7 +2151,7 @@ function buildDriverDetailRow(d, af){
     else{h+='<div style="width:56px;height:56px;border:1px dashed #ccc;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#aaa">なし</div>';}
     h+='</div>';return h;
   }
-  var dCats=[{key:'免許証（表）',label:'免許(表)'},{key:'免許証（裏）',label:'免許(裏)'},{key:'健康診断書',label:'健康診断'}];
+  var dCats=[{key:'免許証（表）',label:'免許(表)'},{key:'免許証（裏）',label:'免許(裏)'},{key:'免許証（表裏）',label:'免許(表裏)'},{key:'健康診断書',label:'健康診断'}];
   var vCats=[{key:'車検証',label:'車検証'},{key:'自賠責',label:'自賠責'},{key:'任意保険',label:'任意保険'}];
   var cv=vehicles.find(function(v){return v.driverId&&String(v.driverId)===String(d.id);})||vehicles.find(function(v){return v.driver===d.name;});
   // 委託会社車両も検索
@@ -5263,9 +5263,9 @@ function openUnassignedPreview(fileIdx){
 
 // ファイルカテゴリ定義
 const FILE_CATEGORIES={
-  'd-files':['免許証（表）','免許証（裏）','健康診断書','その他'],
+  'd-files':['免許証（表）','免許証（裏）','免許証（表裏）','健康診断書','その他'],
   'v-files':['車検証','自賠責保険','任意保険','その他'],
-  'cd-files':['免許証（表）','免許証（裏）','健康診断書','その他'],
+  'cd-files':['免許証（表）','免許証（裏）','免許証（表裏）','健康診断書','その他'],
   'cv-files':['車検証','自賠責保険','任意保険','その他']
 };
 
@@ -5356,7 +5356,7 @@ function renderExistingFiles(elId, kind, ownerId){
   if(!af.length&&!archived.length){el.innerHTML='';return;}
 
   const isVehicle=kind==='vehicle'||kind==='cv';
-  const catList=isVehicle?['車検証','自賠責','任意保険','その他']:['免許証（表）','免許証（裏）','健康診断書','その他'];
+  const catList=isVehicle?['車検証','自賠責','任意保険','その他']:['免許証（表）','免許証（裏）','免許証（表裏）','健康診断書','その他'];
 
   let html='<div style="font-size:10px;color:#888;font-weight:500;margin-bottom:4px">登録済みファイル（'+af.length+'件）</div>';
   html+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
@@ -5905,7 +5905,8 @@ function execAssignUnassigned(idx,kind,targetId){
     url:f.url||'',
     fileId:f.fileId||'',
     dataUrl:f.dataUrl||'',
-    category:'',
+    category:f.category||'',
+    otherName:f.otherName||'',
     uploadedAt:new Date().toISOString()
   });
   unassignedFiles.splice(idx,1);
@@ -5945,7 +5946,7 @@ function openCatPicker(kind, ownerId, fileIdx, labelEl){
   // 既存ピッカーを閉じる
   document.querySelectorAll('.cat-picker-popup').forEach(e=>e.remove());
 
-  const driverCats=['免許証（表）','免許証（裏）','健康診断書','その他'];
+  const driverCats=['免許証（表）','免許証（裏）','免許証（表裏）','健康診断書','その他'];
   const vehicleCats=['車検証','自賠責','任意保険','その他'];
   const cats=kind==='driver'?driverCats:vehicleCats;
 
@@ -8017,7 +8018,7 @@ function renderCompanyFilesTabHTML(dc, vc, companyId){
     return '<div style="border:1px solid #ccc;border-radius:4px;overflow:hidden;cursor:pointer;position:relative" onclick="openAttachedFilePreview(\''+kind+'\','+eid+','+i+',\'\')" title="'+(f.name||'')+'">'+thumb+'<button style="position:absolute;top:1px;right:1px;width:14px;height:14px;border-radius:99px;background:rgba(0,0,0,.5);color:#fff;border:none;cursor:pointer;font-size:9px;display:flex;align-items:center;justify-content:center" onclick="event.stopPropagation();deleteCompanyAttachedFile('+companyId+',\''+kind+'\','+eid+','+i+')">×</button></div>';
   }
 
-  var dCats=[{key:'免許証（表）',label:'免許証(表)',color:'#1565C0'},{key:'免許証（裏）',label:'免許証(裏)',color:'#1565C0'},{key:'健康診断書',label:'健康診断',color:'#2e7d32'}];
+  var dCats=[{key:'免許証（表）',label:'免許証(表)',color:'#1565C0'},{key:'免許証（裏）',label:'免許証(裏)',color:'#1565C0'},{key:'免許証（表裏）',label:'免許証(表裏)',color:'#1565C0'},{key:'健康診断書',label:'健康診断',color:'#2e7d32'}];
   var vCats=[{key:'車検証',label:'車検証',color:'#E65100'},{key:'自賠責',label:'自賠責',color:'#E65100'},{key:'任意保険',label:'任意保険',color:'#E65100'}];
 
   var html = '<div style="padding:4px 0">';
