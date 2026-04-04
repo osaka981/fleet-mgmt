@@ -4126,18 +4126,18 @@ function openDriverModal(id){
       const selectedOffices = Array.isArray(d.offices) ? d.offices : (d.office ? [d.office] : []);
       renderOfficeMultiSelect('d-office-checks', selectedOffices);
       document.getElementById('d-tel').value=d.tel||'';
-      document.getElementById('d-birth').value=d.birth||'';
+      document.getElementById('d-birth').value=normalizeBirthDate(d.birth);
       document.getElementById('d-addr').value=d.addr||'';
       document.getElementById('d-zip').value=d.zip||'';
-      document.getElementById('d-license-exp').value=d.license?.exp||'';
+      document.getElementById('d-license-exp').value=normalizeBirthDate(d.license?.exp);
       document.getElementById('d-license-no').value=d.license?.no||'';
       document.getElementById('d-license-type').value=d.license?.type||'普通自動車';
       document.getElementById('d-license-cond').value=d.license?.cond||'';
       document.getElementById('d-status').value=d.status||'在籍';
       const docs=Array.isArray(d.otherDocs)?d.otherDocs:(d.other?.name?[d.other]:[]);
       docs.forEach(doc=>addOtherDoc(doc));
-      if(d.status==='退職'||d.status==='休止'){document.getElementById('archive-fields').style.display='block';document.getElementById('d-leave-date').value=d.leave?.date||'';document.getElementById('d-leave-reason').value=d.leave?.reason||'';document.getElementById('d-leave-note').value=d.leave?.note||'';}
-      if(d.type==='外注（個人）'){document.getElementById('subcon-fields').style.display='block';document.getElementById('d-sub-company').value=d.sub?.company||'';document.getElementById('d-sub-kana').value=d.sub?.kana||'';document.getElementById('d-sub-birth').value=d.sub?.birth||'';document.getElementById('d-sub-area').value=d.sub?.area||'';document.getElementById('d-sub-count').value=d.sub?.count||1;document.getElementById('d-sub-tel').value=d.sub?.tel||'';}
+      if(d.status==='退職'||d.status==='休止'){document.getElementById('archive-fields').style.display='block';document.getElementById('d-leave-date').value=normalizeBirthDate(d.leave?.date);document.getElementById('d-leave-reason').value=d.leave?.reason||'';document.getElementById('d-leave-note').value=d.leave?.note||'';}
+      if(d.type==='外注（個人）'){document.getElementById('subcon-fields').style.display='block';document.getElementById('d-sub-company').value=d.sub?.company||'';document.getElementById('d-sub-kana').value=d.sub?.kana||'';document.getElementById('d-sub-birth').value=normalizeBirthDate(d.sub?.birth);document.getElementById('d-sub-area').value=d.sub?.area||'';document.getElementById('d-sub-count').value=d.sub?.count||1;document.getElementById('d-sub-tel').value=d.sub?.tel||'';}
       document.getElementById('d-stamp').checked=!!d.stampEnabled;
       previewDriverStamp();
     }
@@ -4543,8 +4543,10 @@ function sfRemoveFile(i){sfFiles.splice(i,1);renderSfPreviews();}
 // 和暦: s600401, S600401, ｓ600401, h041016, r080302, 昭和60.4.1, H4/10/16 等
 function normalizeBirthDate(input){
   if(!input) return '';
-  var s=input.trim()
-    .replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xFEE0);})
+  var s=String(input).trim();
+  // ISO timestamp: 1977-05-17T15:00:00.000Z → 1977-05-17
+  if(s.indexOf('T')>0) s=s.split('T')[0];
+  s=s.replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xFEE0);})
     .replace(/[ａ-ｚ]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xFEE0);})
     .replace(/[Ａ-Ｚ]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xFEE0);})
     .replace(/[年月]/g,'-').replace(/日/g,'');
@@ -8000,7 +8002,7 @@ function openCompanyModal(id){
       document.getElementById('cm-name').value=c.name||'';
       document.getElementById('cm-rep').value=c.rep||'';
       document.getElementById('cm-rep-kana').value=c.repKana||'';
-      document.getElementById('cm-rep-birth').value=c.repBirth||'';
+      document.getElementById('cm-rep-birth').value=normalizeBirthDate(c.repBirth);
       document.getElementById('cm-addr').value=c.addr||'';
       document.getElementById('cm-zip').value=c.zip||'';
       document.getElementById('cm-tel').value=c.tel||'';
@@ -8096,10 +8098,10 @@ function openCompanyDriverModal(companyId, driverId){
       document.getElementById('cd-sei-kana').value=kp[0]||'';
       document.getElementById('cd-mei-kana').value=kp[1]||'';
       document.getElementById('cd-tel').value=d.tel||'';
-      document.getElementById('cd-birth').value=d.birth||'';
+      document.getElementById('cd-birth').value=normalizeBirthDate(d.birth);
       document.getElementById('cd-addr').value=d.addr||'';
       document.getElementById('cd-zip').value=d.zip||'';
-      document.getElementById('cd-license-exp').value=d.license?.exp||'';
+      document.getElementById('cd-license-exp').value=normalizeBirthDate(d.license?.exp);
       document.getElementById('cd-license-no').value=d.license?.no||'';
       document.getElementById('cd-license-type').value=d.license?.type||'普通自動車';
       document.getElementById('cd-license-cond').value=d.license?.cond||'';
