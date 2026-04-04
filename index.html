@@ -1225,7 +1225,7 @@ body.modal-open{overflow:hidden}
 </div>
 
 <!-- Mail Modal -->
-<div id="mail-modal" style="display:none" class="modal-bg">
+<div id="mail-modal" style="display:none" class="modal-bg" onclick="closeModal('mail-modal')">
   <div class="modal" style="max-width:600px" onclick="event.stopPropagation()">
     <div class="modal-header"><span class="modal-title" id="mail-modal-title">メール送信</span><button class="modal-close" onclick="closeModal('mail-modal')">✕</button></div>
     <div class="modal-body">
@@ -4324,6 +4324,17 @@ function toggleNavGroup(id){
   }
 }
 function showPage(name,el){
+  // 開いているモーダルを全てクリーンアップ
+  document.querySelectorAll('.modal-bg').forEach(function(m){
+    if(m.id==='mail-modal'||m.id==='driver-modal'||m.id==='vehicle-modal'||m.id==='office-modal'){
+      m.style.display='none'; // 静的モーダルはhide
+    } else {
+      m.remove(); // 動的モーダルは削除
+    }
+  });
+  document.body.style.overflow='';
+  document.body.classList.remove('modal-open');
+
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   // サイドバーのactive状態をリセット（営業所フィルター含む）
@@ -4356,7 +4367,7 @@ function rebuildPrintSelect(){
   const cur=sel.value;
   sel.innerHTML='<option value="">全営業所</option>'+getDocOffices().map(o=>`<option${o===cur?' selected':''}>${o}</option>`).join('');
 }
-function filterOffice(office,el){storageOfficeFilter=office;storageFromSidebar=true;document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));el.classList.add('active');document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-storage').classList.add('active');renderStorage();closeSidebar();window.scrollTo(0,0);}
+function filterOffice(office,el){storageOfficeFilter=office;storageFromSidebar=true;document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));el.classList.add('active');document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-storage').classList.add('active');document.querySelectorAll('.modal-bg').forEach(function(m){if(m.id)m.style.display='none';else m.remove();});document.body.style.overflow='';renderStorage();closeSidebar();window.scrollTo(0,0);}
 function filterVehicleChip(o){currentOfficeFilter=o==='全て'?null:o;renderVehicles(currentOfficeFilter);}
 function filterDriverChip(o){currentOfficeFilter=o==='全て'?null:o;renderDrivers(currentOfficeFilter);}
 
