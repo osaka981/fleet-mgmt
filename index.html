@@ -2287,7 +2287,7 @@ function renderDocPage(){
     }
     return `<div class="doc-card">
       <div class="doc-card-name" style="cursor:pointer" onclick="var b=this.parentElement.querySelector('.doc-card-body');b.style.display=b.style.display==='none'?'block':'none';this.querySelector('.doc-fold').textContent=b.style.display==='none'?'▶':'▼'">${office}営業所 <span class="badge badge-info" style="font-size:10px">${POST_OFFICE(office)}宛</span> <span class="doc-fold" style="font-size:10px;color:#aaa;margin-left:auto">${window.innerWidth<=768?'▶':'▼'}</span></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><div class="doc-card-info" style="margin-bottom:0">社員 ${employees.length}名 / 外注 ${subcons.length+coCompanies.length}件 / 車両 ${offV.length}台</div><button class="mail-btn" onclick="event.stopPropagation();openMailModal('${office}')" style="font-size:10px;padding:4px 10px">メール送信</button></div><div class="doc-card-body" style="display:${window.innerWidth<=768?'none':'block'}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><div class="doc-card-info" style="margin-bottom:0">社員 ${employees.length}名 / 外注 ${subcons.length+coCompanies.length}件 / 車両 ${offV.length}台</div><button class="btn btn-sm" onclick="event.stopPropagation();docSelectAll(''"${office}"'')" style="font-size:9px;padding:3px 8px;background:#E8F5E9;border-color:#A5D6A7;color:#2E7D32">全選択</button><button class="btn btn-sm btn-primary" id="doc-dl-'${office}'" onclick="event.stopPropagation();docDownloadAll(''${office}'')" style="font-size:9px;padding:3px 8px;display:none">DL</button><button class="mail-btn" onclick="event.stopPropagation();openMailModal('${office}')" style="font-size:10px;padding:4px 10px">メール送信</button></div></div><div class="doc-card-body" style="display:${window.innerWidth<=768?'none':'block'}">
       <div style="display:flex;gap:0;border-bottom:2px solid #e0e0e0;margin:6px 0 8px">
         <button class="doc-tab active" data-tab="${tabId}" data-idx="0" onclick="switchDocTab('${tabId}',0)">現況届</button>
         <button class="doc-tab" data-tab="${tabId}" data-idx="1" onclick="switchDocTab('${tabId}',1)">雇用証明書</button>
@@ -2357,6 +2357,37 @@ function getSelectedSubcons(office){
 function getStaffCount(office){
   var el=document.getElementById('staff-count-'+office);
   return el?el.value:'1';
+}
+
+// 全選択: 現況届・雇用証明書・報告書・誓約書/適合証明書（大阪急配）を一括選択
+function docSelectAll(office){
+  // カードを展開
+  document.querySelectorAll('#doc-office-cards .doc-card').forEach(function(c){
+    if(c.textContent.includes(office+'営業所')){
+      var body=c.querySelector('.doc-card-body');
+      if(body) body.style.display='block';
+      var fold=c.querySelector('.doc-fold');
+      if(fold) fold.textContent='▼';
+    }
+  });
+  // DLボタン表示
+  var dlBtn=document.getElementById('doc-dl-'+office);
+  if(dlBtn) dlBtn.style.display='inline-block';
+}
+
+// 一括DL: 全選択した書類を順次生成してダウンロード
+async function docDownloadAll(office){
+  var types=['genkyo','koyou','houkoku','seiyaku_osaka','tekigo_osaka'];
+  var labels={genkyo:'現況届',koyou:'雇用証明書',houkoku:'報告書',seiyaku_osaka:'誓約書（大阪急配）',tekigo_osaka:'適合証明書（大阪急配）'};
+  var prog=document.getElementById('prog-'+office);
+  if(prog) prog.textContent='一括生成開始...';
+  for(var i=0;i<types.length;i++){
+    var t=types[i];
+    if(prog) prog.textContent='生成中: '+(labels[t]||t)+' ('+(i+1)+'/'+types.length+')';
+    try{await generateDoc(office,t);}catch(e){console.error('生成エラー:',t,e);}
+    await new Promise(function(r){setTimeout(r,500);});
+  }
+  if(prog){prog.textContent='全'+types.length+'件の生成完了';setTimeout(function(){prog.textContent='';},3000);}
 }
 
 // ====== docx生成ユーティリティ ======
