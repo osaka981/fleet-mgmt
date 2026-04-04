@@ -893,8 +893,8 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
       <div class="form-group"><label>車種分類（現況届用）</label><select id="v-kind"><option>軽四</option><option>軽バン</option><option>軽トラ</option><option>普通車</option></select></div>
       <div class="form-group"><label>区分</label><select id="v-type"><option value="社有">社有車</option><option value="持込">持込車（外注）</option></select></div>
       <div class="form-group"><label>ステータス</label><select id="v-status"><option value="稼働">稼働中</option><option value="廃車">廃車</option></select></div>
-      <div class="form-group"><label>営業所</label><select id="v-office"></select></div>
-      <div class="form-group"><label>担当ドライバー</label><select id="v-driver"><option value="">未割当</option></select></div>
+      <div class="form-group" style="grid-column:1/-1"><label>営業所（複数選択可）</label><div id="v-offices" class="office-multi-select"></div></div>
+      <div class="form-group"><label>担当ドライバー</label><select id="v-driver" onchange="syncVehicleOfficesFromDriver()"><option value="">未割当</option></select></div>
       <div class="form-group"><label>メモ</label><input type="text" id="v-note"></div>
       <div class="section-title">書類登録</div>
       <div class="doc-section"><div class="doc-section-header"><div class="doc-section-title">車検証</div></div><div class="doc-fields"><div class="form-group"><label>有効期限</label><input type="date" id="v-shaken-exp"></div><div class="form-group"><label>車台番号</label><input type="text" id="v-shaken-chassis"></div><div class="form-group"><label>型式</label><input type="text" id="v-shaken-type"></div><div class="form-group"><label>車体色</label><input type="text" id="v-color" placeholder="白"></div><div class="form-group"><label>登録名義</label><input type="text" id="v-owner" placeholder="大阪急配株式会社"></div><div class="form-group"><label>使用者</label><input type="text" id="v-user" placeholder="大阪急配株式会社"></div><div class="form-group"><label>再委託先名（外注の場合）</label><input type="text" id="v-sub" placeholder="山田 太郎"></div></div></div>
@@ -1061,7 +1061,7 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
         <label>担当営業所（複数選択可）</label>
         <div id="cv-offices" class="office-multi-select"></div>
       </div>
-      <div class="form-group"><label>担当ドライバー</label><select id="cv-driver" class="modal-field"></select></div>
+      <div class="form-group"><label>担当ドライバー</label><select id="cv-driver" class="modal-field" onchange="syncCompanyVehicleOfficesFromDriver()"></select></div>
       <div class="section-title">書類登録</div>
       <div class="doc-section"><div class="doc-section-header"><div class="doc-section-title">車検証</div></div><div class="doc-fields"><div class="form-group"><label>有効期限</label><input type="date" id="cv-shaken-exp" class="modal-field"></div><div class="form-group"><label>車台番号</label><input type="text" id="cv-shaken-chassis" class="modal-field"></div></div></div>
       <div class="doc-section"><div class="doc-section-header"><div class="doc-section-title">🔵 自賠責保険</div></div><div class="doc-fields"><div class="form-group"><label>満了日</label><input type="date" id="cv-jibai-exp" class="modal-field"></div><div class="form-group"><label>証券番号</label><input type="text" id="cv-jibai-no" class="modal-field"></div><div class="form-group"><label>保険会社</label><input type="text" id="cv-jibai-company" class="modal-field"></div></div></div>
@@ -1670,7 +1670,7 @@ function execDeleteOffice(name){
   saveLocal();saveCompanies();renderAll();renderSettingsOffices();
   alert(`「${name}」を削除しました。${newOffice?'紐づきデータを「'+newOffice+'」に移行しました。':'紐づけを解除しました。'}`);
 }
-function rebuildOfficeSelects(){['v-office'].forEach(id=>{const sel=document.getElementById(id);if(!sel)return;const cur=sel.value;sel.innerHTML=offices.map(o=>`<option${o===cur?' selected':''}>${o}</option>`).join('');});}
+function rebuildOfficeSelects(){}
 
 // ====== テーブル ======
 function sortData(data,col,dir){return[...data].sort((a,b)=>{let av=a[col]??'',bv=b[col]??'';if(col==='shaken')av=a.shaken?.exp||'',bv=b.shaken?.exp||'';if(col==='jibai')av=a.jibai?.exp||'',bv=b.jibai?.exp||'';if(col==='nin')av=a.nin?.exp||'',bv=b.nin?.exp||'';if(col==='minexp')av=minExp([a.shaken?.exp,a.jibai?.exp,a.nin?.exp]),bv=minExp([b.shaken?.exp,b.jibai?.exp,b.nin?.exp]);if(col==='license')av=a.license?.exp??'',bv=b.license?.exp??'';if(!av&&bv)return 1;if(av&&!bv)return-1;return av<bv?-dir:av>bv?dir:0;});}
@@ -3864,13 +3864,13 @@ function toggleContractorField(){
 function openVehicleModal(id){
   editingVehicleId=id||null;
   document.getElementById('vm-title').textContent=id?'車両 編集':'車両 登録';
-  document.getElementById('v-office').innerHTML=offices.map(o=>`<option>${o}</option>`).join('');
+  renderOfficeMultiSelect('v-offices', []);
   var allDriverOpts=drivers.filter(d=>!d.status||d.status==='在籍').map(d=>`<option value="${d.id}">${d.name}（${d.type||'社員'}/${Array.isArray(d.offices)?d.offices[0]:d.office||''}）</option>`);
   companies.forEach(c=>{(c.drivers||[]).forEach(d=>{allDriverOpts.push(`<option value="cd:${d.name}">${d.name}（${c.name}）</option>`);});});
   document.getElementById('v-driver').innerHTML='<option value="">未割当</option>'+allDriverOpts.join('');
   ['v-plate','v-model','v-color','v-owner','v-user','v-sub','v-note','v-shaken-exp','v-shaken-chassis','v-shaken-type','v-jibai-exp','v-jibai-no','v-jibai-company','v-nin-exp','v-nin-no','v-nin-company'].forEach(f=>document.getElementById(f).value='');
   document.getElementById('v-type').value='社有';document.getElementById('v-kind').value='軽四';document.getElementById('v-status').value='稼働';
-  if(id){const v=vehicles.find(x=>x.id==id)||(function(){var found=null;companies.forEach(c=>{(c.vehicles||[]).forEach(cv=>{if(cv.id==id)found=cv;});});return found;})();if(v){document.getElementById('v-plate').value=v.plate||'';document.getElementById('v-model').value=v.model||'';document.getElementById('v-kind').value=v.kind||'軽四';document.getElementById('v-type').value=v.type||'社有';document.getElementById('v-status').value=v.status||'稼働';document.getElementById('v-office').value=v.office||(Array.isArray(v.offices)&&v.offices[0])||'';document.getElementById('v-driver').value=v.driverId||'';document.getElementById('v-color').value=v.color||'';document.getElementById('v-owner').value=v.owner||'';document.getElementById('v-user').value=v.vehicleUser||'';document.getElementById('v-sub').value=v.sub||'';document.getElementById('v-note').value=v.note||'';document.getElementById('v-shaken-exp').value=v.shaken?.exp||'';document.getElementById('v-shaken-chassis').value=v.shaken?.chassis||'';document.getElementById('v-shaken-type').value=v.shaken?.type||'';document.getElementById('v-jibai-exp').value=v.jibai?.exp||'';document.getElementById('v-jibai-no').value=v.jibai?.no||'';document.getElementById('v-jibai-company').value=v.jibai?.company||'';document.getElementById('v-nin-exp').value=v.nin?.exp||'';document.getElementById('v-nin-no').value=v.nin?.no||'';document.getElementById('v-nin-company').value=v.nin?.company||'';}}
+  if(id){const v=vehicles.find(x=>x.id==id)||(function(){var found=null;companies.forEach(c=>{(c.vehicles||[]).forEach(cv=>{if(cv.id==id)found=cv;});});return found;})();if(v){document.getElementById('v-plate').value=v.plate||'';document.getElementById('v-model').value=v.model||'';document.getElementById('v-kind').value=v.kind||'軽四';document.getElementById('v-type').value=v.type||'社有';document.getElementById('v-status').value=v.status||'稼働';renderOfficeMultiSelect('v-offices',v.offices||[v.office].filter(Boolean));document.getElementById('v-driver').value=v.driverId||'';document.getElementById('v-color').value=v.color||'';document.getElementById('v-owner').value=v.owner||'';document.getElementById('v-user').value=v.vehicleUser||'';document.getElementById('v-sub').value=v.sub||'';document.getElementById('v-note').value=v.note||'';document.getElementById('v-shaken-exp').value=v.shaken?.exp||'';document.getElementById('v-shaken-chassis').value=v.shaken?.chassis||'';document.getElementById('v-shaken-type').value=v.shaken?.type||'';document.getElementById('v-jibai-exp').value=v.jibai?.exp||'';document.getElementById('v-jibai-no').value=v.jibai?.no||'';document.getElementById('v-jibai-company').value=v.jibai?.company||'';document.getElementById('v-nin-exp').value=v.nin?.exp||'';document.getElementById('v-nin-no').value=v.nin?.no||'';document.getElementById('v-nin-company').value=v.nin?.company||'';}}
   document.getElementById('vehicle-modal').style.display='flex';
   initDateFields();
   modalFiles['v-files']=[];
@@ -3905,7 +3905,8 @@ function saveVehicle(){
     var dr=drivers.find(d=>d.id==driverVal);
     driverName=dr?dr.name:'';
   }
-  const obj={id:editingVehicleId||Date.now(),plate,status:vStatus,model:document.getElementById('v-model').value,kind:document.getElementById('v-kind').value,type:document.getElementById('v-type').value,office:document.getElementById('v-office').value,driver:driverName,driverId:driverVal||null,color:document.getElementById('v-color').value||'白',owner:document.getElementById('v-owner').value,vehicleUser:document.getElementById('v-user').value,sub:document.getElementById('v-sub').value,note:document.getElementById('v-note').value,shaken:{exp:normalizeBirthDate(document.getElementById('v-shaken-exp').value),chassis:document.getElementById('v-shaken-chassis').value,type:document.getElementById('v-shaken-type').value},jibai:{exp:normalizeBirthDate(document.getElementById('v-jibai-exp').value),no:document.getElementById('v-jibai-no').value,company:document.getElementById('v-jibai-company').value},nin:{exp:normalizeBirthDate(document.getElementById('v-nin-exp').value),no:document.getElementById('v-nin-no').value,company:document.getElementById('v-nin-company').value}};
+  var selectedOffices=getSelectedOffices('v-offices');
+  const obj={id:editingVehicleId||Date.now(),plate,status:vStatus,model:document.getElementById('v-model').value,kind:document.getElementById('v-kind').value,type:document.getElementById('v-type').value,office:selectedOffices[0]||'',offices:selectedOffices,driver:driverName,driverId:driverVal||null,color:document.getElementById('v-color').value||'白',owner:document.getElementById('v-owner').value,vehicleUser:document.getElementById('v-user').value,sub:document.getElementById('v-sub').value,note:document.getElementById('v-note').value,shaken:{exp:normalizeBirthDate(document.getElementById('v-shaken-exp').value),chassis:document.getElementById('v-shaken-chassis').value,type:document.getElementById('v-shaken-type').value},jibai:{exp:normalizeBirthDate(document.getElementById('v-jibai-exp').value),no:document.getElementById('v-jibai-no').value,company:document.getElementById('v-jibai-company').value},nin:{exp:normalizeBirthDate(document.getElementById('v-nin-exp').value),no:document.getElementById('v-nin-no').value,company:document.getElementById('v-nin-company').value}};
   if(editingVehicleId){const i=vehicles.findIndex(v=>v.id==editingVehicleId);if(i>=0)vehicles[i]=obj;else vehicles.push(obj);}else vehicles.push(obj);
   // ★ モーダルの添付ファイルをDriveにアップロード
   const vFiles = modalFiles['v-files'] || [];
@@ -5801,7 +5802,7 @@ function renderStorage(){
     ...companies.flatMap(co => (co.drivers||[]).map(d => ({...d, _src:co.name, _offices:Array.isArray(d.offices)?d.offices:[]})))
   ]);
   let allVehicles = dedup([
-    ...vehicles.map(v => ({...v, _src:'自社', _offices:v.office?[v.office]:[]})),
+    ...vehicles.map(v => ({...v, _src:'自社', _offices:Array.isArray(v.offices)&&v.offices.length?v.offices:v.office?[v.office]:[]})),
     ...companies.flatMap(co => (co.vehicles||[]).map(v => ({...v, _src:co.name, _offices:Array.isArray(v.offices)?v.offices:[]})))
   ]);
 
@@ -7844,6 +7845,34 @@ function getSelectedOffices(elId){
   const el=document.getElementById(elId);
   if(!el) return [];
   return Array.from(el.querySelectorAll('input:checked')).map(x=>x.value);
+}
+
+// ドライバー選択時に車両の営業所を自動同期
+function syncVehicleOfficesFromDriver(){
+  var driverVal=document.getElementById('v-driver')?.value||'';
+  if(!driverVal) return;
+  var driverOffices=[];
+  if(driverVal.startsWith('cd:')){
+    var dName=driverVal.replace('cd:','');
+    companies.forEach(function(c){(c.drivers||[]).forEach(function(d){if(d.name===dName)driverOffices=d.offices||[];});});
+  } else {
+    var dr=drivers.find(function(d){return d.id==driverVal;});
+    if(dr) driverOffices=Array.isArray(dr.offices)?dr.offices:dr.office?[dr.office]:[];
+  }
+  if(driverOffices.length){
+    renderOfficeMultiSelect('v-offices',driverOffices);
+  }
+}
+// 委託会社車両モーダル: ドライバー選択時に営業所同期
+function syncCompanyVehicleOfficesFromDriver(){
+  var driverVal=document.getElementById('cv-driver')?.value||'';
+  if(!driverVal) return;
+  var co=companies.find(function(c){return c.id==currentCompanyId;});
+  if(!co) return;
+  var dr=(co.drivers||[]).find(function(d){return d.id==driverVal;});
+  if(dr&&dr.offices&&dr.offices.length){
+    renderOfficeMultiSelect('cv-offices',dr.offices);
+  }
 }
 
 function saveCompanyDriver(){
