@@ -159,6 +159,8 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
 .archive-card-sub{font-size:11px;color:#888;margin-top:2px}
 .storage-link{cursor:pointer;color:#222;transition:color .15s}
 .storage-link:hover{color:#4a90e2;text-decoration:underline}
+.company-link{cursor:pointer;color:#6A1B9A;font-size:10px;font-weight:500;padding:1px 6px;border-radius:4px;background:#f3e5f5;transition:all .15s;display:inline-block}
+.company-link:hover{background:#6A1B9A;color:#fff}
 .status-select{padding:4px 8px;font-size:11px;border:1px solid #ddd;border-radius:5px;background:#fff;color:#1a1a1a;font-family:inherit;cursor:pointer}
 .hist-group{background:#fff;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;margin-bottom:12px}
 .hist-group-header{padding:10px 14px;background:#fafafa;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;gap:10px;cursor:pointer}
@@ -5922,13 +5924,17 @@ function renderStorage(){
       const vaf=cv?(cv.attachedFiles||[]):[];
       const hasLic=af.some(f=>(f.category||'').includes('免許'));
 
+      // 委託会社リンク
+      const companyLink=d._src&&d._src!=='自社'?'<span class="company-link" onclick="event.stopPropagation();navigateToCompany(\''+esc(d._src).replace(/'/g,"\\'")+'\')">'+esc(d._src)+'</span>':'';
+
       // --- 折り畳み版 ---
+      const officesFull=(d._offices.join('・')||'未設定')+(companyLink?' ・ '+companyLink:'');
       const fileInfo='<span style="font-size:10px;line-height:1.4;display:inline-block;text-align:right;background:#fff;color:#444;padding:2px 8px;border-radius:6px;border:1px solid #aab">ドライバー '+af.length+'件<br>車両 '+vaf.length+'件</span>';
       const collapsedHtml='<div id="sc-c-'+key+'" style="display:'+(expanded?'none':'block')+'"><div style="background:#d8dce3;border:1.5px solid #888;border-radius:8px;padding:8px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px" onclick="storageToggleExpand(\''+key+'\')">'+
           '<div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">'+
-            '<div style="width:28px;height:28px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;flex-shrink:0">'+typeIcon+'</div>'+
-            '<div style="min-width:0"><div style="font-weight:600;font-size:13px;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d.name+' <span style="font-size:9px;color:#999;font-weight:400">'+(d.kana||'')+'</span></div>'+
-            '<div style="font-size:10px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(d._offices.join('・')||'未設定')+'</div></div>'+
+            '<div style="width:28px;height:28px;min-width:28px;min-height:28px;max-width:28px;max-height:28px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;flex-shrink:0;align-self:flex-start">'+typeIcon+'</div>'+
+            '<div style="min-width:0;overflow:hidden"><div style="font-weight:600;font-size:13px;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d.name+'</div>'+
+            '<div style="font-size:10px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d._offices.join('・'))+'">'+officesFull+'</div></div>'+
           '</div>'+
           '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+
             expBadge(d.license?.exp,hasLic)+
@@ -5943,12 +5949,14 @@ function renderStorage(){
       const hasNin=vaf.some(f=>(f.category||'').includes('任意'));
 
       let cardHtml='<div id="sc-e-'+key+'" style="display:'+(expanded?'block':'none')+'"><div style="background:#cfd4dc;border:1.5px solid #777;border-radius:10px;padding:10px 16px 14px;overflow:hidden">';
-      cardHtml+='<div style="display:flex;align-items:center;margin-bottom:2px;cursor:pointer;gap:8px" onclick="storageToggleExpand(\''+key+'\')">';
-      cardHtml+='<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">';
-      cardHtml+='<div style="width:34px;height:34px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:500;font-size:12px">'+typeIcon+'</div>';
-      cardHtml+='<div><div style="font-weight:600;font-size:15px;color:#222"><span class="storage-link" onclick="event.stopPropagation();navigateToDriver(\''+esc(d.name)+'\')">'+d.name+'</span> <span style="font-size:10px;color:#999;font-weight:400">'+(d.kana||'')+'</span></div>';
+      cardHtml+='<div style="display:flex;align-items:flex-start;margin-bottom:2px;cursor:pointer;gap:8px" onclick="storageToggleExpand(\''+key+'\')">';
+      cardHtml+='<div style="display:flex;align-items:flex-start;gap:10px;flex:1;min-width:0">';
+      cardHtml+='<div style="width:34px;height:34px;min-width:34px;min-height:34px;max-width:34px;max-height:34px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:500;font-size:12px;flex-shrink:0;margin-top:2px">'+typeIcon+'</div>';
+      cardHtml+='<div style="min-width:0;overflow:hidden">';
+      cardHtml+='<div style="font-weight:600;font-size:15px;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span class="storage-link" onclick="event.stopPropagation();navigateToDriver(\''+esc(d.name)+'\')">'+d.name+'</span></div>';
+      if(d.kana) cardHtml+='<div style="font-size:10px;color:#999;margin-top:-1px">'+esc(d.kana)+'</div>';
       var plateLink=cv?'<span class="storage-link" onclick="event.stopPropagation();navigateToVehicle(\''+esc(cv.plate)+'\')">'+plateStr+'</span>':plateStr;
-      cardHtml+='<div style="font-size:11px;color:#555">'+(d._offices.join('・')||'未設定')+'</div></div>';
+      cardHtml+='<div style="font-size:11px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d._offices.join('・'))+'">'+officesFull+'</div></div>';
       cardHtml+='</div>';
       cardHtml+='<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">';
       var isSelf=d._src==='自社';
@@ -6070,11 +6078,12 @@ function renderStorage(){
 
 
       // --- 折り畳み版 ---
+      var vOfficesFull=(v._offices.join('・')||v.office||'未設定');
       var collapsedHtml='<div id="sc-c-'+key+'" style="display:'+(expanded?'none':'block')+'"><div style="background:#d8dce3;border:1.5px solid #888;border-radius:8px;padding:8px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px" onclick="storageToggleExpand(\''+key+'\')">'+
-          '<div style="min-width:0;display:flex;align-items:center;gap:8px">'+
-            '<div style="width:28px;height:28px;border-radius:50%;background:#546E7A;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;flex-shrink:0">車</div>'+
-            '<div><div style="font-weight:600;font-size:13px;color:#222">'+v.plate+' <span style="font-size:10px;color:#555;font-weight:400">'+(v.model||'')+'</span></div>'+
-            '<div style="font-size:10px;color:#555">'+(v._offices.join('・')||v.office||'未設定')+'</div></div>'+
+          '<div style="min-width:0;display:flex;align-items:center;gap:8px;flex:1">'+
+            '<div style="width:28px;height:28px;min-width:28px;min-height:28px;max-width:28px;max-height:28px;border-radius:50%;background:#546E7A;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;flex-shrink:0">車</div>'+
+            '<div style="min-width:0;overflow:hidden"><div style="font-weight:600;font-size:13px;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+v.plate+' <span style="font-size:10px;color:#555;font-weight:400">'+(v.model||'')+'</span></div>'+
+            '<div style="font-size:10px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(vOfficesFull)+'">'+vOfficesFull+'</div></div>'+
           '</div>'+
           '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+
             '<span style="font-size:9px;color:#666;margin-right:2px">車検</span>'+
@@ -6086,11 +6095,11 @@ function renderStorage(){
 
       // --- 展開版 ---
       var cardHtml='<div id="sc-e-'+key+'" style="display:'+(expanded?'block':'none')+'"><div style="background:#cfd4dc;border:1.5px solid #777;border-radius:10px;padding:4px 16px 14px;overflow:hidden">';
-      cardHtml+='<div style="display:flex;align-items:center;margin-bottom:6px;cursor:pointer;gap:8px" onclick="storageToggleExpand(\''+key+'\')">';
-      cardHtml+='<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">';
-      cardHtml+='<div style="width:34px;height:34px;border-radius:50%;background:#546E7A;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:12px">車</div>';
-      cardHtml+='<div><div style="font-weight:600;font-size:15px;color:#222"><span class="storage-link" onclick="event.stopPropagation();navigateToVehicle(\''+esc(v.plate)+'\')">'+v.plate+'</span> <span style="font-size:10px;color:#555;font-weight:400">'+(v.model||'')+'</span></div>';
-      cardHtml+='<div style="font-size:11px;color:#555">'+(v._offices.join('・')||v.office||'未設定')+'</div></div>';
+      cardHtml+='<div style="display:flex;align-items:flex-start;margin-bottom:6px;cursor:pointer;gap:8px" onclick="storageToggleExpand(\''+key+'\')">';
+      cardHtml+='<div style="display:flex;align-items:flex-start;gap:10px;flex:1;min-width:0">';
+      cardHtml+='<div style="width:34px;height:34px;min-width:34px;min-height:34px;max-width:34px;max-height:34px;border-radius:50%;background:#546E7A;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:12px;flex-shrink:0;margin-top:2px">車</div>';
+      cardHtml+='<div style="min-width:0;overflow:hidden"><div style="font-weight:600;font-size:15px;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span class="storage-link" onclick="event.stopPropagation();navigateToVehicle(\''+esc(v.plate)+'\')">'+v.plate+'</span> <span style="font-size:10px;color:#555;font-weight:400">'+(v.model||'')+'</span></div>';
+      cardHtml+='<div style="font-size:11px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(vOfficesFull)+'">'+vOfficesFull+'</div></div>';
       cardHtml+='</div>';
       cardHtml+='<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">';
       cardHtml+='<button class="btn btn-sm" style="font-size:10px;padding:2px 10px" onclick="event.stopPropagation();openVehicleModal('+v.id+')">編集</button>';
