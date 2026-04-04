@@ -5316,7 +5316,7 @@ function ufBulkClear(){
 function ufBulkDelete(){
   var idxs=ufGetSelectedIdxs();
   if(!idxs.length){alert('削除するファイルを選択してください');return;}
-  if(!confirm(idxs.length+'件の未分類ファイルを一括削除しますか？\n（削除済みフォルダに移動されます）'))return;
+  if(!confirm(idxs.length+'件の未分類ファイルを削除しますか？\n（削除済みフォルダに移動されます）'))return;
   // インデックスを大きい順にソートして削除（splice対策）
   idxs.sort(function(a,b){return b-a;});
   idxs.forEach(function(idx){
@@ -5351,7 +5351,7 @@ function ufBulkAssign(){
   var modal=document.createElement('div');
   modal.className='modal-bg';modal.style.display='flex';modal.id='uf-bulk-modal';
   modal.innerHTML='<div class="modal" style="max-width:500px" onclick="event.stopPropagation()">'+
-    '<div class="modal-header"><span class="modal-title">一括振り分け（'+idxs.length+'件）</span><button class="modal-close" onclick="this.closest(\'.modal-bg\').remove()">✕</button></div>'+
+    '<div class="modal-header"><span class="modal-title">振分（'+idxs.length+'件）</span><button class="modal-close" onclick="this.closest(\'.modal-bg\').remove()">✕</button></div>'+
     '<div class="modal-body" style="padding:8px 12px;max-height:65vh;overflow-y:auto">'+
       '<div style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:8px">'+namesHtml+'</div>'+
       '<div style="display:flex;gap:6px;margin-bottom:8px">'+
@@ -6053,8 +6053,8 @@ function renderStorage(){
     // 一括操作バー
     html+='<div id="uf-bulk-bar" style="display:none;padding:8px 12px;background:#fce4ec;border:1px solid #ef9a9a;border-radius:8px;margin-bottom:8px;align-items:center;gap:8px;flex-wrap:wrap">';
     html+='<span style="font-size:12px;font-weight:600;color:#c62828" id="uf-bulk-count">0件選択中</span>';
-    html+='<button class="btn btn-sm btn-primary" onclick="ufBulkAssign()" style="font-size:11px">📂 一括振り分け</button>';
-    html+='<button class="btn btn-sm btn-danger" onclick="ufBulkDelete()" style="font-size:11px">🗑 一括削除</button>';
+    html+='<button class="btn btn-sm btn-primary" onclick="ufBulkAssign()" style="font-size:11px">📂 振分</button>';
+    html+='<button class="btn btn-sm btn-danger" onclick="ufBulkDelete()" style="font-size:11px">🗑 削除</button>';
     html+='<button class="btn btn-sm" onclick="ufBulkClear()" style="font-size:11px">選択解除</button>';
     html+='<label style="margin-left:auto;font-size:11px;cursor:pointer;color:#888"><input type="checkbox" onchange="ufToggleAll(this.checked)" style="margin-right:4px">全選択</label>';
     html+='</div>';
@@ -6747,8 +6747,8 @@ function renderInbox(){
   // ★ 一括操作バー（display:noneのみ — inboxUpdateBulkBarで制御）
   const bulkBarHTML = '<div id="inbox-bulk-bar" style="display:none;padding:8px 12px;background:#e3f2fd;border:1px solid #90CAF9;border-radius:8px;margin-bottom:8px;align-items:center;gap:8px;flex-wrap:wrap">' +
     '<span style="font-size:12px;font-weight:600;color:#1565c0" id="inbox-bulk-count">0件選択中</span>' +
-    '<button class="btn btn-sm btn-primary" onclick="inboxBulkSave()" style="font-size:11px">💾 一括振り分け</button>' +
-    '<button class="btn btn-sm btn-danger" onclick="inboxBulkDelete()" style="font-size:11px">🗑 一括削除</button>' +
+    '<button class="btn btn-sm btn-primary" onclick="inboxBulkSave()" style="font-size:11px">💾 振分</button>' +
+    '<button class="btn btn-sm btn-danger" onclick="inboxBulkDelete()" style="font-size:11px">🗑 削除</button>' +
     '<button class="btn btn-sm" onclick="inboxBulkClearSelection()" style="font-size:11px">選択解除</button>' +
     '<label style="margin-left:auto;font-size:11px;cursor:pointer;color:#888"><input type="checkbox" onchange="inboxToggleAll(this.checked)" style="margin-right:4px">全選択</label>' +
   '</div>';
@@ -6802,7 +6802,7 @@ function inboxBulkClearSelection(){
 function inboxBulkDelete(){
   const ids = inboxGetSelectedIds();
   if(!ids.length){alert('削除する項目を選択してください');return;}
-  if(!confirm(ids.length+'件を一括削除しますか？'))return;
+  if(!confirm(ids.length+'件を削除しますか？'))return;
   let inbox=JSON.parse(localStorage.getItem('fleet_inbox')||'[]');
   const deletedIds=JSON.parse(localStorage.getItem('fleet_inbox_deleted')||'[]');
   ids.forEach(id=>{
@@ -6832,7 +6832,7 @@ function inboxBulkSave(){
   modal.className = 'modal-bg';
   modal.style.display = 'flex';
   modal.innerHTML = '<div class="modal" style="max-width:500px" onclick="event.stopPropagation()">'+
-    '<div class="modal-header"><span class="modal-title">添付 一括振り分け（'+ids.length+'件）</span><button class="modal-close" onclick="this.closest(\'.modal-bg\').remove()">✕</button></div>'+
+    '<div class="modal-header"><span class="modal-title">添付 振分（'+ids.length+'件）</span><button class="modal-close" onclick="this.closest(\'.modal-bg\').remove()">✕</button></div>'+
     '<div class="modal-body">'+
       '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">'+namesHtml+'</div>'+
       '<div style="font-size:11px;color:#888;margin-bottom:10px">合計 '+totalFiles+' ファイル → 全て同じ先に振り分け</div>'+
