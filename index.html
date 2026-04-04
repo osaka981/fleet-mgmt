@@ -2486,7 +2486,7 @@ async function injectStampsIntoDocx(zip, driver){
     }
     if(coRId){
       var drawing=wStamp(coRId,600000);
-      docXml=docXml.replace(/\{\{会社印\}\}/g,'</w:t></w:r><w:r><w:rPr><w:position w:val="-8"/></w:rPr>'+drawing+'</w:r><w:r><w:rPr></w:rPr><w:t xml:space="preserve">');
+      docXml=docXml.replace(/\{\{会社印\}\}/g,'</w:t></w:r><w:r><w:rPr><w:position w:val="-24"/></w:rPr>'+drawing+'</w:r><w:r><w:rPr></w:rPr><w:t xml:space="preserve">');
     } else {
       docXml=docXml.replace(/\{\{会社印\}\}/g,'');
     }
@@ -2513,7 +2513,7 @@ async function injectStampsIntoDocx(zip, driver){
     }
     if(repRId){
       var drawing2=wStamp(repRId,460000);
-      docXml=docXml.replace(/\{\{代表印\}\}/g,'</w:t></w:r><w:r><w:rPr><w:position w:val="-6"/></w:rPr>'+drawing2+'</w:r><w:r><w:rPr></w:rPr><w:t xml:space="preserve">');
+      docXml=docXml.replace(/\{\{代表印\}\}/g,'</w:t></w:r><w:r><w:rPr><w:position w:val="-16"/></w:rPr>'+drawing2+'</w:r><w:r><w:rPr></w:rPr><w:t xml:space="preserve">');
     } else {
       docXml=docXml.replace(/\{\{代表印\}\}/g,'');
     }
