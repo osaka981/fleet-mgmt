@@ -2911,7 +2911,20 @@ function execCreateMailTask(){
 }
 
 // 送信モーダル
-// メール送信モーダル内タブ切替
+// 書類生成ページ メール送信モーダル内タブ切替（openMailModal用）
+function switchMmTab(el){
+  var tabId=el.dataset.mmtab;
+  el.parentElement.querySelectorAll('.mm-tab').forEach(function(t){
+    t.style.borderBottom='none';t.style.color='#888';t.classList.remove('active');
+  });
+  el.style.borderBottom='2px solid #1565C0';el.style.color='#1565C0';el.classList.add('active');
+  var container=el.closest('#mail-attachments')||el.parentElement.parentElement;
+  container.querySelectorAll('.mm-tab-panel').forEach(function(p){p.style.display='none';});
+  var panel=document.getElementById(tabId);
+  if(panel) panel.style.display='block';
+}
+
+// メール送信モーダル内タブ切替（openMailSendModal用）
 function switchMsTab(el){
   var tabId=el.dataset.mstab;
   // タブスタイル切替
@@ -8822,15 +8835,27 @@ function renderMailAttachments(office){
 
   let html='';
 
+  // === タブナビゲーション ===
+  html+='<div style="display:flex;gap:0;border-bottom:2px solid #ddd;margin-bottom:8px">';
+  html+='<div class="mm-tab active" data-mmtab="mm-genpdf" onclick="switchMmTab(this)" style="padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid #1565C0;margin-bottom:-2px;color:#1565C0">現況・雇用・報告</div>';
+  html+='<div class="mm-tab" data-mmtab="mm-files" onclick="switchMmTab(this)" style="padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;color:#888">ドライバー・車両書類</div>';
+  html+='<div class="mm-tab" data-mmtab="mm-subdocs" onclick="switchMmTab(this)" style="padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;color:#888">再委託先書類</div>';
+  html+='</div>';
+
+  // === タブ1: 現況・雇用・報告 ===
+  html+='<div id="mm-genpdf" class="mm-tab-panel">';
   // 1. 生成PDF（常に3種表示、現況届・雇用証明書はデフォルトON）
   html+='<div style="margin-bottom:8px;padding:6px 8px;background:#E3F2FD;border-radius:6px">';
-  html+='<div style="font-size:10px;font-weight:600;color:#1565C0;margin-bottom:4px">生成PDF（送信時に自動生成）</div>';
+  html+='<div style="font-size:10px;font-weight:600;color:#1565C0;margin-bottom:4px">現況・雇用・報告（送信時に自動生成）</div>';
   html+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
   html+='<label style="display:flex;align-items:center;gap:3px;font-size:11px;cursor:pointer"><input type="checkbox" checked class="mail-attach-check" data-group="pdf" data-pdf-type="genkyo"> 現況届</label>';
   html+='<label style="display:flex;align-items:center;gap:3px;font-size:11px;cursor:pointer"><input type="checkbox" checked class="mail-attach-check" data-group="pdf" data-pdf-type="koyou"> 雇用証明書</label>';
   html+='<label style="display:flex;align-items:center;gap:3px;font-size:11px;cursor:pointer"><input type="checkbox" class="mail-attach-check" data-group="pdf" data-pdf-type="houkoku"> 報告書</label>';
   html+='</div></div>';
+  html+='</div>'; // タブ1閉じ
 
+  // === タブ2: ドライバー・車両書類選択 ===
+  html+='<div id="mm-files" class="mm-tab-panel" style="display:none">';
   // 2. 絞り込みバッジ＋委託会社チェックリスト
   html+='<div style="margin-bottom:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">';
   html+='<span style="font-size:10px;font-weight:600;color:#555">絞込：</span>';
@@ -8882,6 +8907,10 @@ function renderMailAttachments(office){
     html+='</div></div>';
   });
 
+  html+='</div>'; // タブ2閉じ
+
+  // === タブ3: 再委託先書類 ===
+  html+='<div id="mm-subdocs" class="mm-tab-panel" style="display:none">';
   // 4. 委託会社チェックリスト＋再委託先書類セクション
   // --- 委託会社チェックリスト ---
   if(companyEntries.length){
@@ -8933,6 +8962,7 @@ function renderMailAttachments(office){
   html+='</div>';
 
   html+='</div>'; // 再委託先セクション閉じ
+  html+='</div>'; // タブ3閉じ
 
   el.innerHTML=html;
 }
