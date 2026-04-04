@@ -45,6 +45,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f
 .nav-add-btn:hover{background:#f5f5f5}
 .nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;cursor:pointer;color:#666;transition:all .15s;margin:1px 6px;font-size:12px}
 .nav-item:hover{background:#f5f5f5;color:#1a1a1a}
+@media(hover:none){.nav-item:hover{background:transparent;color:inherit}}
 .nav-item.active{background:#eaf2ff;color:#4a90e2;font-weight:500}
 .nav-item svg{width:14px;height:14px;flex-shrink:0}
 .nav-del{margin-left:auto;width:16px;height:16px;border-radius:3px;border:none;background:transparent;cursor:pointer;color:#ccc;font-size:12px;display:none;align-items:center;justify-content:center}
@@ -788,7 +789,7 @@ body.modal-open{overflow:hidden}
       </div>
       <div id="page-settings" class="page">
         <div class="topbar"><h1>設定</h1><div class="topbar-sync" onclick="syncAll(true)"><span class="sync-dot"></span><span class="sync-time"></span></div></div>
-        <div class="content" style="max-width:540px">
+        <div class="content" style="max-width:540px;overflow-x:hidden;box-sizing:border-box">
           <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:#888">営業所管理</div>
           <div class="office-list" id="settings-office-list"></div>
           <button class="btn btn-primary" style="margin-top:12px;width:100%;justify-content:center" onclick="openOfficeModal()">＋ 営業所を追加</button>
@@ -884,12 +885,12 @@ body.modal-open{overflow:hidden}
                   <input type="email" id="alert-email-3" placeholder="メール③（任意）" style="width:100%;padding:6px 10px;font-size:12px;border:1px solid #ffcc80;border-radius:6px">
                 </div>
               </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-size:12px;font-weight:500;min-width:80px">通知タイミング</span>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="font-size:12px;font-weight:500">通知タイミング</span>
                 <span style="font-size:12px;color:#E65100">30日前（1回目）→ 10日前（2回目）</span>
               </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-size:12px;font-weight:500;min-width:80px">対象書類</span>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="font-size:12px;font-weight:500">対象書類</span>
                 <span style="font-size:11px;color:#555">免許証・車検証・自賠責保険・任意保険</span>
               </div>
             </div>
@@ -4791,10 +4792,16 @@ async function processTopFiles(files){
 function toggleSidebar(){
   document.querySelector('.sidebar').classList.toggle('open');
   document.getElementById('sidebar-overlay').classList.toggle('open');
+  // スマホ: サイドバー展開時は背景スクロールロック
+  if(window.innerWidth<=768){
+    var isOpen=document.querySelector('.sidebar').classList.contains('open');
+    document.body.style.overflow=isOpen?'hidden':'';
+  }
 }
 function closeSidebar(){
   document.querySelector('.sidebar').classList.remove('open');
   document.getElementById('sidebar-overlay').classList.remove('open');
+  if(window.innerWidth<=768) document.body.style.overflow='';
 }
 
 // ====== セルフ入力フォーム ======
@@ -10053,19 +10060,6 @@ if(window.innerWidth<=768){
     h1.addEventListener('click',function(){syncAll(true);});
   });
 }
-
-// サイドバー各ページタイトルタップで同期
-document.querySelectorAll('.nav-item').forEach(function(nav){
-  var clickCount=0;var clickTimer=null;
-  nav.addEventListener('click',function(){
-    clickCount++;
-    if(clickTimer)clearTimeout(clickTimer);
-    clickTimer=setTimeout(function(){
-      if(clickCount>=2){syncFromSheet();}
-      clickCount=0;
-    },400);
-  });
-});
 </script>
 </body>
 </html>
