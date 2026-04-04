@@ -7011,6 +7011,29 @@ function saveInboxFilesToDriver(inboxId){
     return driverAutoVal;
   }
 
+  // doctypeからカテゴリを推測（旧QRフォーム対応）
+  if(item.doctype && files.some(function(f){return !f.category;})){
+    var dtCats=item.doctype.split('・').map(function(s){return s.trim();});
+    files.forEach(function(f,i){
+      if(!f.category && dtCats[i]) f.category=dtCats[i];
+    });
+  }
+
+  // 既存ファイルの取得（差替え警告用）
+  var driverTarget=autoTarget;
+  var vehicleTarget=null;
+  if(vehicleAutoVal){
+    var vid=vehicleAutoVal.split(':')[1];
+    vehicleTarget=vehicles.find(function(v){return String(v.id)===vid;});
+    if(!vehicleTarget) companies.forEach(function(c){(c.vehicles||[]).forEach(function(v){if(String(v.id)===vid)vehicleTarget=v;});});
+  }
+  function getExistingCat(cat, kind){
+    if(!cat) return null;
+    var t=cat.includes('免許')||cat.includes('健康')?driverTarget:(cat.includes('車検')||cat.includes('自賠')||cat.includes('任意')?vehicleTarget:driverTarget);
+    if(!t||!t.attachedFiles) return null;
+    return t.attachedFiles.find(function(ef){return ef.category===cat;});
+  }
+
   // 各ファイルUI
   const filesHtml = files.map((f,i)=>{
     const fid = f.fileId||'';
@@ -7022,12 +7045,16 @@ function saveInboxFilesToDriver(inboxId){
     var catLabel=f.category||'';
     var catBg=catLabel.includes('免許')?'#1565C0':catLabel.includes('車検')?'#E65100':catLabel.includes('自賠')?'#0277BD':catLabel.includes('任意')?'#2E7D32':catLabel.includes('健康')?'#6A1B9A':'#888';
     var catBadge=catLabel?'<span style="font-size:10px;padding:2px 8px;border-radius:99px;background:'+catBg+';color:#fff">'+esc(catLabel==='その他'?(f.otherName||'その他'):catLabel)+'</span>':'<span style="font-size:10px;color:#888">カテゴリなし</span>';
-    return '<div style="padding:10px;background:#f9fbff;border:1px solid #e0e0e0;border-radius:8px;margin-bottom:8px">'+
+    // 差替え警告
+    var existing=getExistingCat(catLabel);
+    var replaceWarning=existing?'<div style="font-size:10px;color:#e65100;margin-top:4px;padding:4px 8px;background:#fff3e0;border-radius:4px">🔄 差替え: 既存の「'+esc(catLabel)+'」('+esc(existing.name||'')+') → 削除済みフォルダに移動</div>':'';
+    return '<div style="padding:10px;background:#f9fbff;border:1px solid '+(existing?'#ffcc80':'#e0e0e0')+';border-radius:8px;margin-bottom:8px">'+
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'+
         thumb+
         '<div style="flex:1;min-width:0">'+
           '<div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:4px">'+esc(f.name||'file')+'</div>'+
           catBadge+
+          replaceWarning+
         '</div>'+
       '</div>'+
       buildCascadeHTML('isp-'+i, '')+
@@ -7066,7 +7093,7 @@ function execInboxSavePerFile(inboxId, fileCount){
   if(!item) return;
   const files = (item.files||[]).filter(f=>typeof f==='object'&&(f.url||f.dataUrl||f.fileId));
 
-  let savedCount=0, skippedCount=0;
+  let savedCount=0, skippedCount=0, replacedCount=0;
   for(let i=0;i<Math.min(files.length,fileCount);i++){
     const val = getCascadeVal('isp-'+i);
     if(!val){ skippedCount++; continue; }
@@ -7082,26 +7109,41 @@ function execInboxSavePerFile(inboxId, fileCount){
     if(!target){ skippedCount++; continue; }
     if(!Array.isArray(target.attachedFiles)) target.attachedFiles=[];
     const f = files[i];
-    // カテゴリ推測＋自動リネーム
-    const catBuf=kind==='driver'?'d-files':'v-files';
-    const cat=guessFileCategory(f.name,catBuf);
+    // カテゴリ: QRフォームのメタデータ優先、なければファイル名から推測
+    var cat=f.category||guessFileCategory(f.name,kind==='driver'?'d-files':'v-files')||'';
     const ownerName=kind==='driver'?(target.name||''):(target.plate||'');
     const renamedName=cat?autoRenameFile(f.name,cat,'',ownerName):f.name;
-    target.attachedFiles.push({name:renamedName,type:f.type||'',url:f.url||'',fileId:f.fileId||'',dataUrl:f.dataUrl||'',category:cat,uploadedAt:item.timestamp});
+    var newFile={name:renamedName,type:f.type||'',url:f.url||'',fileId:f.fileId||'',dataUrl:f.dataUrl||'',category:cat,uploadedAt:item.timestamp};
+    // ★ 同カテゴリの既存ファイルがあれば差替え（ソフト削除→置換）
+    if(cat){
+      var existIdx=target.attachedFiles.findIndex(function(ef){return ef.category===cat;});
+      if(existIdx>=0){
+        var oldFile=target.attachedFiles[existIdx];
+        // 旧ファイルをDriveのソフト削除
+        if(oldFile.fileId){
+          fetch(API_URL,{method:'POST',body:JSON.stringify({action:'softDelete',fileId:oldFile.fileId})}).catch(function(){});
+        }
+        target.attachedFiles[existIdx]=newFile; // 置換
+        replacedCount++;
+        savedCount++;
+        continue;
+      }
+    }
+    target.attachedFiles.push(newFile);
     savedCount++;
   }
 
   saveLocal(); saveCompanies();
 
-  // ステータス更新: 登録完了→登録済、それ以外→登録済
   if(savedCount>0){
     item.status='登録済';
     localStorage.setItem('fleet_inbox',JSON.stringify(inbox));
     fetch(API_URL,{method:'POST',body:JSON.stringify({action:'updateInboxStatus',id:item.id,status:'登録済'})}).catch(()=>{});
   }
 
-  let msg = `${savedCount}件を保存しました。`;
-  if(skippedCount) msg += `\n${skippedCount}件は振り分け先が未選択のためスキップしました。`;
+  let msg = savedCount+'件を保存しました。';
+  if(replacedCount) msg += '\n（うち'+replacedCount+'件は既存書類を差替え。旧ファイルは削除済みフォルダに移動）';
+  if(skippedCount) msg += '\n'+skippedCount+'件は振り分け先が未選択のためスキップしました。';
   alert(msg);
   renderInbox(); renderFileMgr();
 }
