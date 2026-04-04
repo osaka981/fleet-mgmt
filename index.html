@@ -2911,6 +2911,20 @@ function execCreateMailTask(){
 }
 
 // 送信モーダル
+// メール送信モーダル内タブ切替
+function switchMsTab(el){
+  var tabId=el.dataset.mstab;
+  // タブスタイル切替
+  el.parentElement.querySelectorAll('.ms-tab').forEach(function(t){
+    t.style.borderBottom='none';t.style.color='#888';t.classList.remove('active');
+  });
+  el.style.borderBottom='2px solid #1565C0';el.style.color='#1565C0';el.classList.add('active');
+  // パネル切替
+  el.closest('.modal-body').querySelectorAll('.ms-tab-panel').forEach(function(p){p.style.display='none';});
+  var panel=document.getElementById('ms-'+tabId);
+  if(panel) panel.style.display='block';
+}
+
 function openMailSendModal(taskId){
   const t=mailTasks.find(x=>x.id===taskId);
   if(!t)return;
@@ -2938,37 +2952,61 @@ function openMailSendModal(taskId){
   const isShaIn=t.driverType==='社員';
   const vPlateLabel=t.vehiclePlate?' ('+esc(t.vehiclePlate)+')':'';
 
-  // 添付ファイルセクション組み立て
+  // 添付ファイルセクション組み立て（タブ方式）
   let attachHtml='';
-  if(dFilesHtml){
-    attachHtml+='<div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #eee"><div style="font-size:10px;color:#888;margin-bottom:4px">ドライバー書類</div>'+dFilesHtml+'</div>';
-  } else {
-    attachHtml+='<div style="font-size:11px;color:#e65100;margin-bottom:6px">ドライバーの添付ファイルがありません</div>';
-  }
-  if(vFilesHtml){
-    attachHtml+='<div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #eee"><div style="font-size:10px;color:#888;margin-bottom:4px">車両書類'+vPlateLabel+'</div>'+vFilesHtml+'</div>';
-  } else {
-    attachHtml+='<div style="font-size:11px;color:#e65100;margin-bottom:6px">車両の添付ファイルがありません</div>';
-  }
 
-  // 生成PDF選択セクション（チェックボックス方式、ダブりなし）
+  // === タブナビゲーション ===
+  attachHtml+='<div style="display:flex;gap:0;border-bottom:2px solid #ddd;margin-bottom:10px">';
+  attachHtml+='<div class="ms-tab active" data-mstab="tab-genpdf" onclick="switchMsTab(this)" style="padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid #1565C0;margin-bottom:-2px;color:#1565C0">現況・雇用・報告</div>';
+  attachHtml+='<div class="ms-tab" data-mstab="tab-files" onclick="switchMsTab(this)" style="padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;color:#888">ドライバー・車両書類</div>';
+  attachHtml+='<div class="ms-tab" data-mstab="tab-subdocs" onclick="switchMsTab(this)" style="padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;color:#888">再委託先書類</div>';
+  attachHtml+='</div>';
+
+  // === タブ1: 現況・雇用・報告 ===
+  attachHtml+='<div id="ms-tab-genpdf" class="ms-tab-panel">';
+  attachHtml+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
   var existPdfs=(t.genPdfs||[]).map(p=>p.type);
-  attachHtml+='<div style="margin-top:8px;padding:8px;background:#E3F2FD;border:1px solid #BBDEFB;border-radius:8px">';
-  attachHtml+='<div style="font-size:10px;font-weight:600;color:#1565C0;margin-bottom:6px">生成PDF（送信時に自動生成）</div>';
-  // 営業所書類
-  attachHtml+='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">';
   var officePdfs=[
-    {type:'現況届',icon:'📋',chk:existPdfs.includes('現況届')},
-    {type:'雇用証明書',icon:'📝',chk:existPdfs.includes('雇用証明書')},
-    {type:'報告書',icon:'📊',chk:existPdfs.includes('報告書')},
+    {type:'現況届',chk:existPdfs.includes('現況届')},
+    {type:'雇用証明書',chk:existPdfs.includes('雇用証明書')},
+    {type:'報告書',chk:existPdfs.includes('報告書')},
   ];
   officePdfs.forEach(p=>{
-    attachHtml+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:4px 8px;background:#fff;border:1px solid #BBDEFB;border-radius:6px;flex:1;min-width:90px"><input type="checkbox" '+(p.chk?'checked':'')+' class="ms-gen-pdf" data-pdf-type="'+p.type+'" data-office="'+esc(t.office)+'"> '+p.icon+' '+p.type+'</label>';
+    attachHtml+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:4px 8px;background:#E3F2FD;border:1px solid #BBDEFB;border-radius:6px;flex:1;min-width:90px"><input type="checkbox" '+(p.chk?'checked':'')+' class="ms-gen-pdf" data-pdf-type="'+p.type+'" data-office="'+esc(t.office)+'"> '+p.type+'</label>';
   });
+  attachHtml+='</div></div>';
+
+  // === タブ2: ドライバー・車両書類選択 ===
+  attachHtml+='<div id="ms-tab-files" class="ms-tab-panel" style="display:none">';
+  // ドライバー書類（折り畳み）
+  attachHtml+='<div style="margin-bottom:8px">';
+  attachHtml+='<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:6px 8px;background:#E3F2FD;border-radius:6px" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'.ms-arrow\').textContent=this.nextElementSibling.style.display===\'none\'?\'▶\':\'▼\'">';
+  attachHtml+='<span style="font-size:11px;font-weight:600;color:#1565C0">ドライバー書類（'+esc(t.driverName)+'）<span style="font-size:10px;font-weight:400;color:#888"> '+((t.driverFiles||[]).length)+'件</span></span>';
+  attachHtml+='<span class="ms-arrow" style="font-size:10px;color:#888">▼</span></div>';
+  attachHtml+='<div style="padding:4px 8px">';
+  if(dFilesHtml){
+    attachHtml+=dFilesHtml;
+  } else {
+    attachHtml+='<div style="font-size:11px;color:#e65100;padding:4px 0">添付ファイルなし</div>';
+  }
+  attachHtml+='</div></div>';
+
+  // 車両書類（折り畳み）
+  attachHtml+='<div>';
+  attachHtml+='<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:6px 8px;background:#E8F5E9;border-radius:6px" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'.ms-arrow\').textContent=this.nextElementSibling.style.display===\'none\'?\'▶\':\'▼\'">';
+  attachHtml+='<span style="font-size:11px;font-weight:600;color:#2E7D32">車両書類'+(t.vehiclePlate?' ('+esc(t.vehiclePlate)+')':'')+'<span style="font-size:10px;font-weight:400;color:#888"> '+((t.vehicleFiles||[]).length)+'件</span></span>';
+  attachHtml+='<span class="ms-arrow" style="font-size:10px;color:#888">▼</span></div>';
+  attachHtml+='<div style="padding:4px 8px">';
+  if(vFilesHtml){
+    attachHtml+=vFilesHtml;
+  } else {
+    attachHtml+='<div style="font-size:11px;color:#e65100;padding:4px 0">添付ファイルなし</div>';
+  }
+  attachHtml+='</div></div>';
   attachHtml+='</div>';
-  // 再委託先書類
-  attachHtml+='<div style="font-size:9px;font-weight:600;color:#7B1FA2;margin-bottom:3px">再委託先書類</div>';
-  attachHtml+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+
+  // === タブ3: 再委託先書類 ===
+  attachHtml+='<div id="ms-tab-subdocs" class="ms-tab-panel" style="display:none">';
   var subDocPdfs=[
     {type:'再委託承認願',chk:existPdfs.includes('再委託承認願')},
     {type:'誓約書（大阪急配）',chk:existPdfs.includes('誓約書（大阪急配）')},
@@ -2976,6 +3014,7 @@ function openMailSendModal(taskId){
     {type:'適合証明書（大阪急配）',chk:existPdfs.includes('適合証明書（大阪急配）')},
     {type:'適合証明書（再委託先）',chk:existPdfs.includes('適合証明書（再委託先）')},
   ];
+  attachHtml+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
   subDocPdfs.forEach(p=>{
     attachHtml+='<label style="display:flex;align-items:center;gap:3px;font-size:10px;cursor:pointer;padding:3px 6px;background:#f5f0ff;border:1px solid #e0d5f5;border-radius:4px"><input type="checkbox" '+(p.chk?'checked':'')+' class="ms-gen-pdf" data-pdf-type="'+p.type+'" data-office="'+esc(t.office)+'"> '+p.type+'</label>';
   });
