@@ -120,6 +120,7 @@ body.modal-open{overflow:hidden}
 .doc-card-name{font-size:13px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
 .doc-card-info{font-size:11px;color:#888;margin-bottom:10px;line-height:1.6}
 .doc-card-btns{display:flex;gap:6px;flex-wrap:wrap}
+.doc-card-body{overflow:hidden}
 .doc-tab{padding:6px 12px;font-size:11px;border:none;background:none;cursor:pointer;color:#888;border-bottom:2px solid transparent;margin-bottom:-2px;font-weight:500;white-space:nowrap}
 .doc-tab.active{color:#1565C0;border-bottom-color:#1565C0}
 .doc-tab:hover{color:#333}
@@ -286,12 +287,18 @@ body.modal-open{overflow:hidden}
   .doc-date-bar>*{display:none!important}
   .doc-date-bar>#doc-judge-date{display:inline-block!important;width:130px;font-size:12px!important;padding:4px 8px}
   .doc-date-bar>.mobile-judge-label{display:inline-block!important}
-  .doc-card{padding:10px;border-radius:8px}
+  .doc-card{padding:10px;border-radius:8px;overflow:hidden}
   .doc-card-name{font-size:13px}
   .doc-card-info{font-size:10px;margin-bottom:6px}
-  .doc-card-btns{gap:4px}
-  .doc-card-btns .btn{font-size:10px;padding:4px 6px;flex:1;text-align:center;min-height:30px}
-  .doc-tab{padding:6px 8px;font-size:10px}
+  .doc-card-btns{gap:4px;flex-direction:column}
+  .doc-card-btns .btn{font-size:10px;padding:6px 8px;text-align:center;min-height:30px;width:100%}
+  .doc-tab{padding:6px 6px;font-size:9px;white-space:nowrap}
+  /* 委託会社ページ */
+  #page-company-detail .topbar,div[id^="page-company-"] .topbar{flex-wrap:wrap;gap:4px}
+  div[id^="page-company-"] .topbar h1{max-width:60vw;overflow:hidden;text-overflow:ellipsis}
+  div[id^="page-company-"] .topbar .btn{font-size:9px!important;padding:3px 6px!important}
+  div[id^="page-company-"] .table-wrap{max-width:calc(100vw - 16px)}
+  .company-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch}
 
   /* ===== メール送信モーダル ===== */
   #mail-attachments{max-height:40vh;font-size:11px;overflow-y:auto;-webkit-overflow-scrolling:touch}
@@ -789,7 +796,20 @@ body.modal-open{overflow:hidden}
       </div>
       <div id="page-settings" class="page">
         <div class="topbar"><h1>設定</h1><div class="topbar-sync" onclick="syncAll(true)"><span class="sync-dot"></span><span class="sync-time"></span></div></div>
-        <div class="content" style="max-width:540px;overflow-x:hidden;box-sizing:border-box">
+        <div class="content" style="max-width:540px;overflow-x:hidden;box-sizing:border-box;width:100%">
+          <style>
+            #page-settings .content>div{box-sizing:border-box;max-width:100%}
+            #page-settings input[type="text"],#page-settings input[type="email"],#page-settings input[type="password"],#page-settings input[type="number"]{box-sizing:border-box;max-width:100%}
+            @media(max-width:768px){
+              #page-settings .content{max-width:100%!important;padding:8px!important}
+              #page-settings .office-row{flex-wrap:wrap;gap:6px}
+              #page-settings .office-row .btn{font-size:9px!important;padding:3px 6px!important}
+              #page-settings div[style*="background:#fce4ec"],
+              #page-settings div[style*="background:#e3f2fd"],
+              #page-settings div[style*="background:#fff3e0"],
+              #page-settings div[style*="background:#f0f4ff"]{padding:10px!important;overflow:hidden}
+            }
+          </style>
           <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:#888">営業所管理</div>
           <div class="office-list" id="settings-office-list"></div>
           <button class="btn btn-primary" style="margin-top:12px;width:100%;justify-content:center" onclick="openOfficeModal()">＋ 営業所を追加</button>
@@ -1441,6 +1461,8 @@ async function syncAll(saveFirst){
             if(parsed.unassignedFiles&&Array.isArray(parsed.unassignedFiles)){unassignedFiles=parsed.unassignedFiles;}
             if(parsed.docExclude&&Array.isArray(parsed.docExclude)){docExclude=parsed.docExclude;}
             if(parsed.mailSettings&&typeof parsed.mailSettings==='object'){localStorage.setItem('fleet_mail_settings',JSON.stringify(parsed.mailSettings));}
+            if(parsed.stampSettings&&typeof parsed.stampSettings==="object"){localStorage.setItem("fleet_stamp_settings",JSON.stringify(parsed.stampSettings));}
+            if(parsed.alertSettings&&typeof parsed.alertSettings==="object"){localStorage.setItem("fleet_alert_settings",JSON.stringify(parsed.alertSettings));}
             if(parsed.password){PASSWORD=parsed.password;localStorage.setItem('fleet_pw',PASSWORD);}
           }catch(e){}
         }
@@ -1470,6 +1492,8 @@ function buildSavePayload(){
     mailTasks:mailTasks,officeAreas:officeAreas,officePostMap:officePostMap,
     unassignedFiles:unassignedFiles,docExclude:docExclude,
     mailSettings:JSON.parse(localStorage.getItem('fleet_mail_settings')||'{}'),
+    stampSettings:JSON.parse(localStorage.getItem('fleet_stamp_settings')||'{}'),
+    alertSettings:JSON.parse(localStorage.getItem('fleet_alert_settings')||'{}'),
     password:PASSWORD
   }};
 }
@@ -8188,9 +8212,9 @@ function renderCompanyPage(companyId, pageId){
     : '<div style="padding:16px;text-align:center;color:#888;font-size:12px">車両が登録されていません</div>';
 
   var html = '';
-  html += '<div class="topbar" style="position:sticky;top:0;z-index:5;background:#fff">';
-  html += '<h1>' + c.name + '</h1>';
-  html += '<div style="display:flex;gap:6px">';
+  html += '<div class="topbar" style="position:sticky;top:0;z-index:5;background:#fff;flex-wrap:wrap;gap:4px">';
+  html += '<h1 style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + c.name + '</h1>';
+  html += '<div style="display:flex;gap:6px;flex-shrink:0">';
   html += '<button class="btn btn-sm" onclick="openCompanyModal(' + c.id + ')">編集</button>';
   html += '<button class="btn btn-sm btn-danger" onclick="deleteCompany(' + c.id + ')">削除</button>';
   html += '</div></div>';
@@ -9950,6 +9974,8 @@ setInterval(function(){
             if(parsed.unassignedFiles&&Array.isArray(parsed.unassignedFiles)){unassignedFiles=parsed.unassignedFiles;}
             if(parsed.docExclude&&Array.isArray(parsed.docExclude)){docExclude=parsed.docExclude;}
             if(parsed.mailSettings&&typeof parsed.mailSettings==='object'){localStorage.setItem('fleet_mail_settings',JSON.stringify(parsed.mailSettings));}
+            if(parsed.stampSettings&&typeof parsed.stampSettings==="object"){localStorage.setItem("fleet_stamp_settings",JSON.stringify(parsed.stampSettings));}
+            if(parsed.alertSettings&&typeof parsed.alertSettings==="object"){localStorage.setItem("fleet_alert_settings",JSON.stringify(parsed.alertSettings));}
             if(parsed.password){PASSWORD=parsed.password;localStorage.setItem('fleet_pw',PASSWORD);}
           }
         }catch(e){}
