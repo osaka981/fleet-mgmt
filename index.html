@@ -829,9 +829,13 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
           <div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:10px;padding:16px">
             <div style="font-size:12px;color:#555;margin-bottom:10px">書類の期限切れ前に自動でメール通知します（毎朝9時チェック）</div>
             <div style="display:flex;flex-direction:column;gap:8px">
-              <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-size:12px;font-weight:500;min-width:80px">通知先メール</span>
-                <input type="email" id="alert-email" placeholder="admin@example.com" style="flex:1;padding:6px 10px;font-size:12px;border:1px solid #ffcc80;border-radius:6px">
+              <div>
+                <span style="font-size:12px;font-weight:500">通知先メール（最大3件）</span>
+                <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px">
+                  <input type="email" id="alert-email-1" placeholder="メール①（必須）" style="width:100%;padding:6px 10px;font-size:12px;border:1px solid #ffcc80;border-radius:6px">
+                  <input type="email" id="alert-email-2" placeholder="メール②（任意）" style="width:100%;padding:6px 10px;font-size:12px;border:1px solid #ffcc80;border-radius:6px">
+                  <input type="email" id="alert-email-3" placeholder="メール③（任意）" style="width:100%;padding:6px 10px;font-size:12px;border:1px solid #ffcc80;border-radius:6px">
+                </div>
               </div>
               <div style="display:flex;align-items:center;gap:8px">
                 <span style="font-size:12px;font-weight:500;min-width:80px">通知タイミング</span>
@@ -8939,29 +8943,39 @@ function renderSettingsAll(){renderSettingsOffices();generateQR();loadAiSettings
 // ====== 期限アラートメール設定 ======
 function loadAlertSettings(){
   var s=JSON.parse(localStorage.getItem('fleet_alert_settings')||'{}');
-  var el=document.getElementById('alert-email');
-  if(el) el.value=s.email||'';
+  var emails=s.emails||[s.email||''];
+  for(var i=0;i<3;i++){
+    var el=document.getElementById('alert-email-'+(i+1));
+    if(el) el.value=emails[i]||'';
+  }
+}
+function getAlertEmails(){
+  var emails=[];
+  for(var i=0;i<3;i++){
+    var v=(document.getElementById('alert-email-'+(i+1))?.value||'').trim();
+    if(v) emails.push(v);
+  }
+  return emails;
 }
 function saveAlertSettings(){
-  var email=(document.getElementById('alert-email')?.value||'').trim();
-  if(!email){alert('通知先メールアドレスを入力してください');return;}
-  var s={email:email,alertDays:[30,10]};
+  var emails=getAlertEmails();
+  if(!emails.length){alert('通知先メールアドレスを1件以上入力してください');return;}
+  var s={emails:emails,email:emails.join(','),alertDays:[30,10]};
   localStorage.setItem('fleet_alert_settings',JSON.stringify(s));
-  // GASの設定シートにも保存
   fetch(API_URL,{method:'POST',body:JSON.stringify({action:'saveSettings',key:'alertSettings',value:JSON.stringify(s)})}).catch(function(){});
   var msg=document.getElementById('alert-settings-msg');
-  if(msg){msg.textContent='設定を保存しました';msg.style.color='#2e7d32';}
+  if(msg){msg.textContent=emails.length+'件の通知先を保存しました';msg.style.color='#2e7d32';}
 }
 async function testExpiryAlert(){
-  var email=(document.getElementById('alert-email')?.value||'').trim();
-  if(!email){alert('通知先メールアドレスを入力してください');return;}
+  var emails=getAlertEmails();
+  if(!emails.length){alert('通知先メールアドレスを1件以上入力してください');return;}
   var msg=document.getElementById('alert-settings-msg');
-  if(msg){msg.textContent='テスト送信中...';msg.style.color='#E65100';}
+  if(msg){msg.textContent='テスト送信中（'+emails.length+'件）...';msg.style.color='#E65100';}
   try{
-    var res=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'checkExpiryAlerts',testMode:true,email:email})});
+    var res=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'checkExpiryAlerts',testMode:true,email:emails.join(',')})});
     var json=await res.json();
     if(json.ok){
-      if(msg){msg.textContent='テスト送信完了（'+json.alertCount+'件のアラート）';msg.style.color='#2e7d32';}
+      if(msg){msg.textContent='テスト送信完了 → '+emails.length+'アドレスに送信（'+json.alertCount+'件のアラート）';msg.style.color='#2e7d32';}
     } else {
       if(msg){msg.textContent='エラー: '+(json.error||'不明');msg.style.color='#e53935';}
     }
