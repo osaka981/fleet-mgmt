@@ -2911,6 +2911,44 @@ function execCreateMailTask(){
 }
 
 // 送信モーダル
+// 免許証・健康診断書・車検証・自賠責・任意保険以外の書類チェック時に警告
+function mailCheckSensitiveFile(cb){
+  if(!cb.checked) return;
+  var cat=(cb.dataset.cat||'').toLowerCase();
+  var safeList=['免許','健康診断','車検','自賠責','任意保険'];
+  var isSafe=safeList.some(function(k){return cat.includes(k);});
+  if(!isSafe&&cat){
+    var existBanner=document.getElementById('mail-sensitive-alert');
+    if(existBanner) existBanner.remove();
+    var banner=document.createElement('div');
+    banner.id='mail-sensitive-alert';
+    banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100000;background:#D32F2F;color:#fff;padding:16px 20px;font-size:13px;box-shadow:0 4px 20px rgba(0,0,0,.3)';
+    banner.innerHTML='<div style="display:flex;align-items:flex-start;gap:12px;max-width:600px;margin:0 auto">'+
+      '<span style="font-size:24px;line-height:1">⚠️</span>'+
+      '<div style="flex:1">'+
+        '<div style="font-weight:700;font-size:14px;margin-bottom:6px">注意：通常書類以外のファイルが選択されています</div>'+
+        '<div style="font-size:12px;line-height:1.6;opacity:.95">'+
+          '「<strong>'+esc(cb.dataset.cat)+'</strong>」が添付対象に含まれています。<br>'+
+          '送信前に以下を必ずご確認ください：<br>'+
+          '・<strong>契約書・念書等の不要部分が黒塗り処理済みか</strong><br>'+
+          '・<strong>金額・報酬額が記載された書類が含まれていないか</strong><br>'+
+          '・<strong>個人情報（マイナンバー等）が露出していないか</strong>'+
+        '</div>'+
+        '<div style="margin-top:10px;display:flex;gap:8px">'+
+          '<button onclick="this.closest(\'#mail-sensitive-alert\').remove()" style="padding:6px 16px;border:none;border-radius:4px;background:#fff;color:#D32F2F;font-weight:600;font-size:12px;cursor:pointer">確認しました</button>'+
+          '<button onclick="mailUnsafeCbUncheck()" style="padding:6px 16px;border:none;border-radius:4px;background:rgba(255,255,255,.2);color:#fff;font-size:12px;cursor:pointer">チェックを外す</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+    document.body.appendChild(banner);
+    window._lastSensitiveCb=cb;
+  }
+}
+function mailUnsafeCbUncheck(){
+  if(window._lastSensitiveCb){window._lastSensitiveCb.checked=false;window._lastSensitiveCb=null;}
+  var b=document.getElementById('mail-sensitive-alert');if(b)b.remove();
+}
+
 // 書類生成ページ メール送信モーダル内タブ切替（openMailModal用）
 function switchMmTab(el){
   var tabId=el.dataset.mmtab;
@@ -8889,21 +8927,34 @@ function renderMailAttachments(office){
     html+='<span style="cursor:pointer;flex:1;font-weight:500" onclick="mailToggleFold('+di+')">'+d.name+' <span style="font-size:10px;color:#888;font-weight:400">'+typeLabel+' / '+totalFiles+'件</span></span>';
     html+='<span style="cursor:pointer;font-size:9px;color:#4a90e2" onclick="mailToggleFold('+di+')" id="mail-fold-icon-'+di+'">▶</span>';
     html+='</div>';
-    html+='<div id="mail-fold-'+di+'" style="display:none;padding:2px 0 0 20px">';
+    html+='<div id="mail-fold-'+di+'" style="display:none;padding:4px 0 0 8px">';
+    // ドライバー書類セクション（折り畳み）
     if(dFiles.length){
+      html+='<div style="margin-bottom:4px">';
+      html+='<div style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:3px 6px;background:#E3F2FD;border-radius:4px;font-size:10px;font-weight:500;color:#1565C0" onclick="var t=this.nextElementSibling;t.style.display=t.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'span\').textContent=t.style.display===\'none\'?\'▶\':\'▼\'">ドライバー書類 <span style="font-size:9px;color:#888;font-weight:400;margin-left:2px">'+dFiles.length+'件</span> <span style="margin-left:auto;font-size:9px">▼</span></div>';
+      html+='<div style="padding:2px 0 0 12px">';
       dFiles.forEach(f=>{
         var chk=isDefaultCat(f.category)?'checked':'';
-        html+='<label style="display:flex;align-items:center;gap:4px;font-size:10px;padding:1px 0;cursor:pointer"><input type="checkbox" '+chk+' class="mail-attach-check" data-file-id="'+f.fileId+'" data-group="driver" data-driver-idx="'+di+'"> '+(f.category||f.name)+'</label>';
+        html+='<label style="display:flex;align-items:center;gap:4px;font-size:10px;padding:1px 0;cursor:pointer"><input type="checkbox" '+chk+' class="mail-attach-check" data-file-id="'+f.fileId+'" data-group="driver" data-driver-idx="'+di+'" data-cat="'+esc(f.category||f.name)+'" onchange="mailCheckSensitiveFile(this)"> '+(f.category||f.name)+'</label>';
       });
+      html+='</div></div>';
     }
+    // 車両書類セクション（折り畳み）
     if(cv){
-      html+='<div style="font-size:9px;color:#666;margin:2px 0">車両: '+cv.plate+'</div>';
-      vFiles.forEach(f=>{
-        var chk=isDefaultCat(f.category)?'checked':'';
-        html+='<label style="display:flex;align-items:center;gap:4px;font-size:10px;padding:1px 0;cursor:pointer"><input type="checkbox" '+chk+' class="mail-attach-check" data-file-id="'+f.fileId+'" data-group="vehicle" data-driver-idx="'+di+'"> '+(f.category||f.name)+'</label>';
-      });
+      html+='<div>';
+      html+='<div style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:3px 6px;background:#E8F5E9;border-radius:4px;font-size:10px;font-weight:500;color:#2E7D32" onclick="var t=this.nextElementSibling;t.style.display=t.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'span\').textContent=t.style.display===\'none\'?\'▶\':\'▼\'">車両: '+cv.plate+' <span style="font-size:9px;color:#888;font-weight:400;margin-left:2px">'+vFiles.length+'件</span> <span style="margin-left:auto;font-size:9px">▼</span></div>';
+      html+='<div style="padding:2px 0 0 12px">';
+      if(vFiles.length){
+        vFiles.forEach(f=>{
+          var chk=isDefaultCat(f.category)?'checked':'';
+          html+='<label style="display:flex;align-items:center;gap:4px;font-size:10px;padding:1px 0;cursor:pointer"><input type="checkbox" '+chk+' class="mail-attach-check" data-file-id="'+f.fileId+'" data-group="vehicle" data-driver-idx="'+di+'" data-cat="'+esc(f.category||f.name)+'" onchange="mailCheckSensitiveFile(this)"> '+(f.category||f.name)+'</label>';
+        });
+      } else {
+        html+='<span style="color:#aaa;font-size:10px">車両書類なし</span>';
+      }
+      html+='</div></div>';
     }
-    if(!dFiles.length&&!vFiles.length) html+='<span style="color:#aaa;font-size:10px">書類なし</span>';
+    if(!dFiles.length&&!vFiles.length&&!cv) html+='<span style="color:#aaa;font-size:10px">書類なし</span>';
     html+='</div></div>';
   });
 
