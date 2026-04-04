@@ -821,19 +821,29 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
 
           <div style="margin-top:28px;font-size:12px;font-weight:600;margin-bottom:10px;color:#888">自社電子印設定</div>
           <div style="background:#fce4ec;border:1px solid #ef9a9a;border-radius:10px;padding:16px">
-            <div style="font-size:12px;color:#555;margin-bottom:10px">書類生成時に捺印する自社の電子印を設定します</div>
-            <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:12px;color:#555;margin-bottom:10px">書類生成時に捺印する自社の電子印を設定します（画像アップロード優先、未アップロード時は社名/姓から自動生成）</div>
+            <div style="display:flex;flex-direction:column;gap:12px">
               <div style="display:flex;align-items:center;gap:10px">
                 <div style="flex:1">
-                  <label style="font-size:11px;color:#666;font-weight:500;display:block;margin-bottom:3px">会社印（社名）</label>
-                  <input type="text" id="stamp-company-name" placeholder="大阪急配" style="width:100%;padding:6px 10px;font-size:12px;border:1px solid #ef9a9a;border-radius:6px" oninput="previewSettingsStamp()">
+                  <label style="font-size:11px;color:#666;font-weight:500;display:block;margin-bottom:3px">会社印</label>
+                  <input type="text" id="stamp-company-name" placeholder="自動生成用の社名（例：大阪急配）" style="width:100%;padding:6px 10px;font-size:12px;border:1px solid #ef9a9a;border-radius:6px" oninput="previewSettingsStamp()">
+                  <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+                    <label class="btn btn-sm" style="font-size:10px;padding:2px 8px;border:1px solid #ef9a9a;cursor:pointer">画像アップロード<input type="file" id="stamp-company-file" accept="image/*" style="display:none" onchange="handleStampUpload('company',this)"></label>
+                    <span id="stamp-company-file-name" style="font-size:10px;color:#888"></span>
+                    <span id="stamp-company-file-clear" style="font-size:10px;color:#e53935;cursor:pointer;display:none" onclick="clearStampUpload('company')">✕ 削除</span>
+                  </div>
                 </div>
                 <div id="stamp-company-preview" style="flex-shrink:0"></div>
               </div>
               <div style="display:flex;align-items:center;gap:10px">
                 <div style="flex:1">
-                  <label style="font-size:11px;color:#666;font-weight:500;display:block;margin-bottom:3px">代表者印（姓）</label>
-                  <input type="text" id="stamp-rep-name" placeholder="川村" style="width:100%;padding:6px 10px;font-size:12px;border:1px solid #ef9a9a;border-radius:6px" oninput="previewSettingsStamp()">
+                  <label style="font-size:11px;color:#666;font-weight:500;display:block;margin-bottom:3px">代表者印</label>
+                  <input type="text" id="stamp-rep-name" placeholder="自動生成用の姓（例：川村）" style="width:100%;padding:6px 10px;font-size:12px;border:1px solid #ef9a9a;border-radius:6px" oninput="previewSettingsStamp()">
+                  <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+                    <label class="btn btn-sm" style="font-size:10px;padding:2px 8px;border:1px solid #ef9a9a;cursor:pointer">画像アップロード<input type="file" id="stamp-rep-file" accept="image/*" style="display:none" onchange="handleStampUpload('rep',this)"></label>
+                    <span id="stamp-rep-file-name" style="font-size:10px;color:#888"></span>
+                    <span id="stamp-rep-file-clear" style="font-size:10px;color:#e53935;cursor:pointer;display:none" onclick="clearStampUpload('rep')">✕ 削除</span>
+                  </div>
                 </div>
                 <div id="stamp-rep-preview" style="flex-shrink:0"></div>
               </div>
@@ -2440,21 +2450,22 @@ async function injectStampsIntoDocx(zip, driver){
   var stamps=[];// [{rId, data, fileName}]
   var imgIdx=0;
 
-  function addStamp(name){
-    if(!name) return null;
+  function addStamp(name, customImage){
     imgIdx++;
     var rId='rIdStamp'+imgIdx;
-    var data=generateStamp(name,200);
+    var data=customImage||generateStamp(name||'?',200);
     stamps.push({rId:rId,data:data,fileName:'media/stamp'+imgIdx+'.png'});
     return rId;
   }
 
-  // {{会社印}} — 自社会社印 or 委託会社印
+  // {{会社印}} — アップロード画像 > 自動生成 > 委託会社印
   if(docXml.indexOf('{{会社印}}')!==-1){
     var coRId=null;
-    if(ss.companyEnabled&&ss.companyName){
-      coRId=addStamp(ss.companyName);
-    } else if(driver){
+    if(ss.companyEnabled){
+      if(ss.companyImage) coRId=addStamp(null,ss.companyImage);
+      else if(ss.companyName) coRId=addStamp(ss.companyName);
+    }
+    if(!coRId&&driver){
       var co=companies.find(function(c){return(c.drivers||[]).some(function(x){return x.id==driver.id;});});
       if(co&&co.stampCompany){
         var short=(co.name||'').replace(/^(株式会社|有限会社|合同会社)/,'');
@@ -2483,9 +2494,10 @@ async function injectStampsIntoDocx(zip, driver){
         repRId=addStamp(getStampName(co2.rep));
       }
     }
-    // 3. 自社代表者印（フォールバック）
-    if(!repRId&&ss.repEnabled&&ss.repName){
-      repRId=addStamp(ss.repName);
+    // 3. 自社代表者印（アップロード画像 > 自動生成）
+    if(!repRId&&ss.repEnabled){
+      if(ss.repImage) repRId=addStamp(null,ss.repImage);
+      else if(ss.repName) repRId=addStamp(ss.repName);
     }
     if(repRId){
       var drawing2=wStamp(repRId,460000);
@@ -9293,6 +9305,21 @@ function loadStampSettings(){
   if(el2) el2.value=s.repName||'';
   if(el3) el3.checked=!!s.companyEnabled;
   if(el4) el4.checked=!!s.repEnabled;
+  // アップロード画像復元
+  if(s.companyImage){
+    window._stampCompanyImage=s.companyImage;
+    var fn=document.getElementById('stamp-company-file-name');
+    var fc=document.getElementById('stamp-company-file-clear');
+    if(fn) fn.textContent='アップロード済み';
+    if(fc) fc.style.display='inline';
+  }
+  if(s.repImage){
+    window._stampRepImage=s.repImage;
+    var fn2=document.getElementById('stamp-rep-file-name');
+    var fc2=document.getElementById('stamp-rep-file-clear');
+    if(fn2) fn2.textContent='アップロード済み';
+    if(fc2) fc2.style.display='inline';
+  }
   previewSettingsStamp();
 }
 function saveStampSettings(){
@@ -9300,29 +9327,72 @@ function saveStampSettings(){
     companyName:(document.getElementById('stamp-company-name')?.value||'').trim(),
     repName:(document.getElementById('stamp-rep-name')?.value||'').trim(),
     companyEnabled:!!document.getElementById('stamp-company-enabled')?.checked,
-    repEnabled:!!document.getElementById('stamp-rep-enabled')?.checked
+    repEnabled:!!document.getElementById('stamp-rep-enabled')?.checked,
+    companyImage:window._stampCompanyImage||'',
+    repImage:window._stampRepImage||''
   };
   localStorage.setItem('fleet_stamp_settings',JSON.stringify(s));
   var msg=document.getElementById('stamp-settings-msg');
   if(msg){msg.textContent='電子印設定を保存しました';msg.style.color='#2e7d32';}
 }
 function previewSettingsStamp(){
+  var ss=JSON.parse(localStorage.getItem('fleet_stamp_settings')||'{}');
   var name1=(document.getElementById('stamp-company-name')?.value||'').trim();
   var name2=(document.getElementById('stamp-rep-name')?.value||'').trim();
   var el1=document.getElementById('stamp-company-preview');
   var el2=document.getElementById('stamp-rep-preview');
   if(el1){
-    if(name1){
-      var img=generateStamp(name1,160);
-      el1.innerHTML='<img src="'+img+'" style="width:50px;height:50px">';
-    } else { el1.innerHTML=''; }
+    var img1=window._stampCompanyImage||ss.companyImage||'';
+    if(img1) el1.innerHTML='<img src="'+img1+'" style="width:50px;height:50px;object-fit:contain">';
+    else if(name1) el1.innerHTML='<img src="'+generateStamp(name1,160)+'" style="width:50px;height:50px">';
+    else el1.innerHTML='';
   }
   if(el2){
-    if(name2){
-      var img=generateStamp(name2,160);
-      el2.innerHTML='<img src="'+img+'" style="width:50px;height:50px">';
-    } else { el2.innerHTML=''; }
+    var img2=window._stampRepImage||ss.repImage||'';
+    if(img2) el2.innerHTML='<img src="'+img2+'" style="width:50px;height:50px;object-fit:contain">';
+    else if(name2) el2.innerHTML='<img src="'+generateStamp(name2,160)+'" style="width:50px;height:50px">';
+    else el2.innerHTML='';
   }
+}
+function handleStampUpload(type,input){
+  if(!input.files||!input.files[0]) return;
+  var file=input.files[0];
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var dataUrl=e.target.result;
+    if(type==='company'){
+      window._stampCompanyImage=dataUrl;
+      document.getElementById('stamp-company-file-name').textContent=file.name;
+      document.getElementById('stamp-company-file-clear').style.display='inline';
+    } else {
+      window._stampRepImage=dataUrl;
+      document.getElementById('stamp-rep-file-name').textContent=file.name;
+      document.getElementById('stamp-rep-file-clear').style.display='inline';
+    }
+    previewSettingsStamp();
+  };
+  reader.readAsDataURL(file);
+}
+function clearStampUpload(type){
+  if(type==='company'){
+    window._stampCompanyImage='';
+    document.getElementById('stamp-company-file').value='';
+    document.getElementById('stamp-company-file-name').textContent='';
+    document.getElementById('stamp-company-file-clear').style.display='none';
+    // localStorageからも削除
+    var ss=JSON.parse(localStorage.getItem('fleet_stamp_settings')||'{}');
+    ss.companyImage='';
+    localStorage.setItem('fleet_stamp_settings',JSON.stringify(ss));
+  } else {
+    window._stampRepImage='';
+    document.getElementById('stamp-rep-file').value='';
+    document.getElementById('stamp-rep-file-name').textContent='';
+    document.getElementById('stamp-rep-file-clear').style.display='none';
+    var ss=JSON.parse(localStorage.getItem('fleet_stamp_settings')||'{}');
+    ss.repImage='';
+    localStorage.setItem('fleet_stamp_settings',JSON.stringify(ss));
+  }
+  previewSettingsStamp();
 }
 
 // ====== 期限アラートメール設定 ======
