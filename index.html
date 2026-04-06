@@ -570,8 +570,8 @@ body.modal-open{overflow:hidden}
   <div class="layout">
     <aside class="sidebar">
       <div class="logo" style="cursor:pointer" onclick="location.reload()"><div class="logo-title" style="display:flex;align-items:center;gap:6px"><img src="" id="sidebar-logo" style="width:22px;height:22px;object-fit:contain">大阪急配 フリート管理</div></div>
-      <div style="padding:8px 4px 4px;flex:1;overflow-y:auto">
-        <div class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard',this)" data-page="dashboard" ondragover="event.preventDefault();this.style.background='#e3f2fd';this.style.border='2px dashed #4a90e2'" ondragleave="this.style.background='';this.style.border=''" ondrop="event.preventDefault();this.style.background='';this.style.border='';handleSidebarDrop(event)"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg>ダッシュボード</div>
+      <div style="padding:8px 4px 4px;flex:1;overflow-y:auto" ondragover="event.preventDefault();document.getElementById('sidebar-upload-status').style.display='block';document.getElementById('sidebar-upload-status').textContent='ここにドロップでアップロード';document.getElementById('sidebar-upload-status').style.color='#4a90e2'" ondragleave="if(!this.contains(event.relatedTarget)){document.getElementById('sidebar-upload-status').style.display='none'}" ondrop="event.preventDefault();document.getElementById('sidebar-upload-status').style.display='none';handleSidebarDrop(event)">
+        <div class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard',this)" data-page="dashboard"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg>ダッシュボード</div>
         <div id="sidebar-upload-status" style="display:none;padding:2px 10px 4px 32px;font-size:10px;color:#4a90e2;background:#eaf2ff;margin:-1px 6px 2px;border-radius:0 0 6px 6px"></div>
         <div class="nav-item" onclick="showPage('storage',this)" data-page="storage"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 3h5l1.5 2H13v7H1z"/><path d="M5 9h4M7 7v4"/></svg>データ管理</div>
         <div class="nav-item" onclick="showPage('documents',this)" data-page="documents"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="10" height="12" rx="1.5"/><path d="M4 5h6M4 8h6M4 11h4"/></svg>書類生成</div>
@@ -653,7 +653,8 @@ body.modal-open{overflow:hidden}
               <option value="その他">その他</option>
             </select>
           </div>
-          <div style="margin:10px 0;display:flex;justify-content:flex-end">
+          <div style="margin:10px 0;display:flex;justify-content:flex-end;gap:8px">
+            <button class="btn btn-sm" onclick="downloadAllZip()" style="font-size:12px" id="zip-all-btn">📦 全営業所ZIP</button>
             <button class="btn btn-primary" onclick="sendMailAllOffices()" style="font-size:12px">全営業所に一括送信</button>
           </div>
           <div class="doc-gen-grid" id="doc-office-cards"></div>
@@ -729,6 +730,7 @@ body.modal-open{overflow:hidden}
         <div class="topbar">
           <h1>提出履歴</h1><div class="topbar-sync" onclick="syncAll(true)"><span class="sync-dot"></span><span class="sync-time"></span></div>
           <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" onclick="exportHistoryCSV()" style="font-size:11px">📥 CSV出力</button>
             <button class="btn btn-sm" onclick="clearOldHistory()">1年以上前を削除</button>
             <button class="btn btn-sm btn-danger" onclick="clearAllHistory()">全件削除</button>
           </div>
@@ -1445,12 +1447,21 @@ async function syncInboxFromSheet(){
 }
 async function syncToSheet(){
   if(!isSafeToSave()){setSyncStatus('データなし - 保存スキップ','sync-err');return;}
+  // 競合検知
+  if(await checkConflict()){
+    setSyncStatus('⚠ 競合検知','sync-err');
+    if(!confirm('⚠ 別の端末でデータが更新されています。\n\n「OK」→ 上書き保存\n「キャンセル」→ 最新データを取得')){
+      await syncAll(false);return;
+    }
+  }
   setSyncStatus('保存中...','');
   try{
     const res=await fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())});
     const json=await res.json();
     if(json.ok){
       isDirty=false;
+      lastServerTimestamp=json.timestamp||new Date().toISOString();
+      localStorage.setItem('fleet_server_ts',lastServerTimestamp);
       const ts=new Date().toLocaleTimeString();
       localStorage.setItem('fleet_last_sync',ts);
       setSyncStatus('保存完了 '+ts,'sync-ok');
@@ -1527,6 +1538,7 @@ async function syncAll(saveFirst){
             if(parsed.stampSettings&&typeof parsed.stampSettings==="object"){localStorage.setItem("fleet_stamp_settings",JSON.stringify(parsed.stampSettings));}
             if(parsed.alertSettings&&typeof parsed.alertSettings==="object"){localStorage.setItem("fleet_alert_settings",JSON.stringify(parsed.alertSettings));}
             if(parsed.password){PASSWORD=parsed.password;localStorage.setItem('fleet_pw',PASSWORD);}
+            if(parsed._lastSaveTs){lastServerTimestamp=parsed._lastSaveTs;localStorage.setItem('fleet_server_ts',lastServerTimestamp);}
           }catch(e){}
         }
       }
@@ -1551,7 +1563,9 @@ async function syncAll(saveFirst){
 }
 
 function buildSavePayload(){
-  return {action:'saveAll',drivers,vehicles,companies,settings:{
+  var ts=new Date().toISOString();
+  return {action:'saveAll',drivers,vehicles,companies,clientTimestamp:ts,settings:{
+    _lastSaveTs:ts,
     mailTasks:mailTasks,officeAreas:officeAreas,officePostMap:officePostMap,
     unassignedFiles:unassignedFiles,docExclude:docExclude,
     mailSettings:JSON.parse(localStorage.getItem('fleet_mail_settings')||'{}'),
@@ -5129,6 +5143,108 @@ async function handleSidebarDrop(event){
   }
   // 5秒後に通知を消す
   setTimeout(function(){statusEl.style.display='none';},5000);
+}
+
+// ====== 全営業所ZIP一括生成 ======
+async function downloadAllZip(){
+  const btn=document.getElementById('zip-all-btn');
+  if(btn){btn.disabled=true;btn.textContent='生成中...';}
+  try{
+    const JSZip=await loadJSZip();
+    const zip=new JSZip();
+    const dateStr=getDocDate();
+    const targetOffices=getDocOffices();
+    let totalFiles=0;
+    for(const office of targetOffices){
+      if(btn) btn.textContent='生成中: '+office+'...';
+      const offD=drivers.filter(d=>belongsToOffice(d,office)&&(!d.status||d.status==='在籍'));
+      const offV=vehicles.filter(v=>belongsToOffice(v,office));
+      const coD=[],coV=[];
+      companies.forEach(c=>{
+        (c.drivers||[]).forEach(d=>{if((d.offices||[]).includes(office))coD.push({...d,type:'外注',subCompany:c.name});});
+        (c.vehicles||[]).forEach(v=>{if((v.offices||[]).includes(office))coV.push({...v,sub:c.name});});
+      });
+      const allD=[...offD,...coD], allV=[...offV,...coV];
+      const folder=zip.folder(office+'営業所');
+      // 現況届PDF
+      try{
+        const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'generatePdf',docType:'genkyo',office,dateStr,drivers:allD,vehicles:allV})});
+        const json=await res.json();
+        if(json.ok&&json.fileId){
+          const dl=await fetch('https://drive.google.com/uc?export=download&id='+json.fileId);
+          if(dl.ok){folder.file(office+'_現況届_'+dateStr+'.pdf',await dl.blob());totalFiles++;}
+        }
+      }catch(e){console.error('ZIP genkyo error:',office,e);}
+      // 雇用証明書
+      if(allD.some(d=>d.type==='社員')){
+        try{
+          const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'generatePdf',docType:'koyou',office,dateStr,drivers:allD,vehicles:allV})});
+          const json=await res.json();
+          if(json.ok&&json.fileId){
+            const dl=await fetch('https://drive.google.com/uc?export=download&id='+json.fileId);
+            if(dl.ok){folder.file(office+'_雇用証明書_'+dateStr+'.pdf',await dl.blob());totalFiles++;}
+          }
+        }catch(e){}
+      }
+      // ドライバー添付
+      for(const d of allD){
+        for(const f of (d.attachedFiles||[])){
+          if(!f.fileId)continue;
+          try{
+            const dl=await fetch('https://drive.google.com/uc?export=download&id='+f.fileId);
+            if(dl.ok){folder.file('ドライバー_'+d.name+'_'+f.name,await dl.blob());totalFiles++;}
+          }catch(e){}
+        }
+      }
+      // 車両添付
+      for(const v of allV){
+        for(const f of (v.attachedFiles||[])){
+          if(!f.fileId)continue;
+          try{
+            const dl=await fetch('https://drive.google.com/uc?export=download&id='+f.fileId);
+            if(dl.ok){folder.file('車両_'+v.plate+'_'+f.name,await dl.blob());totalFiles++;}
+          }catch(e){}
+        }
+      }
+    }
+    if(totalFiles===0){alert('ダウンロード可能なファイルがありません');return;}
+    if(btn) btn.textContent='ZIP圧縮中...';
+    const blob=await zip.generateAsync({type:'blob'});
+    downloadBlob(blob,'大阪急配_全営業所_'+dateStr+'.zip');
+    alert('ZIP生成完了（'+totalFiles+'ファイル）');
+  }catch(e){alert('ZIPエラー: '+e.message);}
+  finally{if(btn){btn.disabled=false;btn.textContent='📦 全営業所ZIP';}}
+}
+
+// ====== メール送信履歴CSVエクスポート ======
+function exportHistoryCSV(){
+  if(!submitHistory.length){alert('履歴がありません');return;}
+  const bom='\uFEFF';
+  const header='日付,時間,営業所,種別,ファイル名\n';
+  const rows=submitHistory.map(h=>{
+    const files=(h.files||[]).map(f=>f.name||'').join('; ');
+    return [h.date,h.time||'',h.office||'',h.tag||'','"'+files.replace(/"/g,'""')+'"'].join(',');
+  }).join('\n');
+  const blob=new Blob([bom+header+rows],{type:'text/csv;charset=utf-8'});
+  downloadBlob(blob,'提出履歴_'+new Date().toISOString().slice(0,10)+'.csv');
+}
+
+// ====== 複数端末競合検知 ======
+var lastServerTimestamp=localStorage.getItem('fleet_server_ts')||'';
+async function checkConflict(){
+  try{
+    const res=await fetch(API_URL+'?action=getAll');
+    const json=await res.json();
+    if(!json.ok||!json.data?.settings?.length) return false;
+    var st=json.data.settings[0]||{};
+    if(!st.value) return false;
+    var parsed=JSON.parse(st.value);
+    var serverTs=parsed._lastSaveTs||'';
+    if(lastServerTimestamp && serverTs && serverTs!==lastServerTimestamp){
+      return true;
+    }
+    return false;
+  }catch(e){return false;}
 }
 
 // ====== セルフ入力フォーム ======
@@ -10306,6 +10422,7 @@ setInterval(function(){
             if(parsed.stampSettings&&typeof parsed.stampSettings==="object"){localStorage.setItem("fleet_stamp_settings",JSON.stringify(parsed.stampSettings));}
             if(parsed.alertSettings&&typeof parsed.alertSettings==="object"){localStorage.setItem("fleet_alert_settings",JSON.stringify(parsed.alertSettings));}
             if(parsed.password){PASSWORD=parsed.password;localStorage.setItem('fleet_pw',PASSWORD);}
+            if(parsed._lastSaveTs){lastServerTimestamp=parsed._lastSaveTs;localStorage.setItem('fleet_server_ts',lastServerTimestamp);}
           }
         }catch(e){}
       }
