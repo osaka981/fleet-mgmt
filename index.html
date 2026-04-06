@@ -930,6 +930,27 @@ body.modal-open{overflow:hidden}
           <div class="form-group" style="margin-bottom:12px"><label>確認</label><input type="password" id="pw-new2" style="width:100%"></div>
           <button class="btn btn-primary" onclick="changePw()">変更する</button>
           <div id="pw-msg" style="font-size:11px;margin-top:7px;min-height:14px"></div>
+
+          <div style="margin-top:28px;font-size:12px;font-weight:600;margin-bottom:10px;color:#888">セッションタイムアウト</div>
+          <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:10px;padding:16px">
+            <div style="font-size:12px;color:#555;margin-bottom:8px">無操作時に自動ログアウトします（スマホ紛失時のリスク対策）</div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-size:12px;font-weight:500">タイムアウト時間</span>
+              <select id="session-timeout-select" style="padding:4px 8px;font-size:12px;border:1px solid #a5d6a7;border-radius:6px" onchange="updateSessionTimeout(this.value)">
+                <option value="15">15分</option>
+                <option value="30" selected>30分</option>
+                <option value="60">60分</option>
+                <option value="120">2時間</option>
+              </select>
+              <span style="font-size:10px;color:#888">※ クリック・キー操作・タッチでタイマーリセット</span>
+            </div>
+          </div>
+
+          <div style="margin-top:28px;font-size:12px;font-weight:600;margin-bottom:10px;color:#888">操作ログ（直近100件）</div>
+          <div style="background:#fafafa;border:1px solid #e0e0e0;border-radius:10px;padding:12px;max-height:300px;overflow-y:auto">
+            <div id="op-log-list"></div>
+            <button class="btn btn-sm" style="margin-top:8px;font-size:10px" onclick="if(confirm('操作ログを全件削除しますか？')){operationLogs=[];localStorage.setItem('fleet_op_logs','[]');renderOperationLogs();}">ログをクリア</button>
+          </div>
         </div>
       </div>
     </main>
@@ -1298,6 +1319,46 @@ function toggleDocExclude(office){
 }
 
 let isDirty=false;
+
+// ====== 操作ログ ======
+var operationLogs=JSON.parse(localStorage.getItem('fleet_op_logs')||'[]');
+function addLog(action,detail){
+  var entry={time:new Date().toISOString(),action:action,detail:detail||''};
+  operationLogs.unshift(entry);
+  if(operationLogs.length>500) operationLogs=operationLogs.slice(0,500);
+  localStorage.setItem('fleet_op_logs',JSON.stringify(operationLogs));
+}
+function renderOperationLogs(){
+  var el=document.getElementById('op-log-list');
+  if(!el) return;
+  if(!operationLogs.length){el.innerHTML='<div style="color:#888;font-size:12px;text-align:center;padding:16px">操作ログはありません</div>';return;}
+  var html=operationLogs.slice(0,100).map(function(log){
+    var dt=new Date(log.time);
+    var ts=dt.toLocaleDateString('ja-JP',{month:'2-digit',day:'2-digit'})+' '+dt.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+    var icon={'追加':'🟢','編集':'🔵','削除':'🔴','送信':'📧','同期':'🔄','ログイン':'🔑','退職':'📤','アーカイブ':'📦','設定':'⚙'}[log.action]||'📝';
+    return '<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid #f0f0f0;font-size:11px;align-items:flex-start"><span style="color:#999;white-space:nowrap;min-width:70px">'+ts+'</span><span>'+icon+'</span><span style="color:#333"><strong>'+log.action+'</strong> '+log.detail+'</span></div>';
+  }).join('');
+  el.innerHTML=html;
+}
+
+// ====== セッションタイムアウト ======
+var SESSION_TIMEOUT_MS=30*60*1000; // 30分
+var sessionTimer=null;
+function resetSessionTimer(){
+  if(sessionTimer) clearTimeout(sessionTimer);
+  if(sessionStorage.getItem('fleet_session')!=='ok') return;
+  sessionTimer=setTimeout(function(){
+    if(sessionStorage.getItem('fleet_session')==='ok'){
+      addLog('ログアウト','セッションタイムアウト（30分無操作）');
+      alert('30分間操作がなかったため自動ログアウトします');
+      doLogout();
+    }
+  },SESSION_TIMEOUT_MS);
+}
+['click','keydown','touchstart','scroll'].forEach(function(evt){
+  document.addEventListener(evt,function(){resetSessionTimer();},{passive:true});
+});
+
 function dedup(arr){if(!Array.isArray(arr))return[];const seen={};return arr.filter(x=>{const k=String(x.id);if(seen[k])return false;seen[k]=true;return true;});}
 function cleanUnassignedFiles(){
   // 全登録済みfileIdを収集
@@ -1479,7 +1540,7 @@ async function syncAll(saveFirst){
     const ts=new Date().toLocaleTimeString();
     localStorage.setItem('fleet_last_sync',ts);
     isDirty=false;
-    setSyncStatus('一括同期完了 '+ts,'sync-ok');
+    setSyncStatus('一括同期完了 '+ts,'sync-ok');addLog('同期','一括同期完了');
     // テンプレートをDriveから同期
     syncTemplatesFromDrive();
   }catch(e){
@@ -1531,6 +1592,7 @@ async function doLogin(){
   // まずローカルのパスワードで確認
   if(pw===PASSWORD){
     sessionStorage.setItem('fleet_session','ok');
+    addLog('ログイン','パスワード認証成功');resetSessionTimer();
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-screen').style.display='block';
     renderAll();syncAll(false);
@@ -1557,6 +1619,7 @@ async function doLogin(){
     if(pw===PASSWORD){
       sessionStorage.setItem('fleet_session','ok');
       document.getElementById('login-screen').style.display='none';
+      addLog('ログイン','Sheet同期後パスワード認証成功');resetSessionTimer();
       document.getElementById('app-screen').style.display='block';
       renderAll();syncAll(false);
     } else {
@@ -1577,7 +1640,7 @@ async function doLogout(){
   }
   sessionStorage.removeItem('fleet_session');document.getElementById('app-screen').style.display='none';document.getElementById('login-screen').style.display='flex';document.getElementById('pw-input').value='';document.getElementById('login-err').textContent='';
 }
-function changePw(){const o=document.getElementById('pw-old').value,n=document.getElementById('pw-new').value,n2=document.getElementById('pw-new2').value,msg=document.getElementById('pw-msg');if(o!==PASSWORD){msg.style.color='#e53935';msg.textContent='現在のパスワードが違います';return;}if(!n){msg.style.color='#e53935';msg.textContent='新しいパスワードを入力';return;}if(n!==n2){msg.style.color='#e53935';msg.textContent='確認用が一致しません';return;}PASSWORD=n;localStorage.setItem('fleet_pw',n);isDirty=true;scheduleAutoSave();['pw-old','pw-new','pw-new2'].forEach(id=>document.getElementById(id).value='');msg.style.color='#43a047';msg.textContent='変更しました';}
+function changePw(){const o=document.getElementById('pw-old').value,n=document.getElementById('pw-new').value,n2=document.getElementById('pw-new2').value,msg=document.getElementById('pw-msg');if(o!==PASSWORD){msg.style.color='#e53935';msg.textContent='現在のパスワードが違います';return;}if(!n){msg.style.color='#e53935';msg.textContent='新しいパスワードを入力';return;}if(n!==n2){msg.style.color='#e53935';msg.textContent='確認用が一致しません';return;}PASSWORD=n;localStorage.setItem('fleet_pw',n);isDirty=true;scheduleAutoSave();addLog('設定','パスワード変更');['pw-old','pw-new','pw-new2'].forEach(id=>document.getElementById(id).value='');msg.style.color='#43a047';msg.textContent='変更しました';}
 
 // ====== 営業所 ======
 function renderOfficeNav(){document.getElementById('office-nav').innerHTML=offices.map(o=>`<div class="nav-item" onclick="filterOffice('${o}',this)"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="10" height="8" rx="1"/><path d="M5 13V9h4v4"/><path d="M1 5l6-4 6 4"/></svg>${o}<button class="nav-del" onclick="event.stopPropagation();deleteOffice('${o}')">×</button></div>`).join('');}
@@ -1685,7 +1748,7 @@ function migrateOrphan(oldName, selId){
   alert(`「${oldName}」→「${newOffice||'(解除)'}」に${count}件移行しました。`);
 }
 function openOfficeModal(){document.getElementById('office-name-input').value='';document.getElementById('office-area-input').value='';document.getElementById('office-modal').style.display='flex';setTimeout(()=>document.getElementById('office-name-input').focus(),50);}
-function saveOffice(){const n=document.getElementById('office-name-input').value.trim();if(!n||offices.includes(n)){alert(n?'既に存在します':'営業所名を入力');return;}offices.push(n);const area=document.getElementById('office-area-input').value.trim();if(area)officeAreas[n]=area;saveLocal();closeModal('office-modal');renderOfficeNav();renderSettingsOffices();rebuildOfficeSelects();renderDocPage();}
+function saveOffice(){const n=document.getElementById('office-name-input').value.trim();if(!n||offices.includes(n)){alert(n?'既に存在します':'営業所名を入力');return;}offices.push(n);addLog('追加','営業所: '+n);const area=document.getElementById('office-area-input').value.trim();if(area)officeAreas[n]=area;saveLocal();closeModal('office-modal');renderOfficeNav();renderSettingsOffices();rebuildOfficeSelects();renderDocPage();}
 function saveOfficeArea(officeName,area){officeAreas[officeName]=area.trim();saveLocal();}
 function saveOfficePost(officeName,post){officePostMap[officeName]=post.trim();saveLocal();}
 
@@ -4523,7 +4586,7 @@ function saveVehicle(){
       saveLocal(); renderFileMgr();
     })();
   }
-  saveLocal();closeModal('vehicle-modal');renderVehicles(currentOfficeFilter);renderDashboard();renderDocPage();
+  saveLocal();addLog(document.getElementById('v-id').value?'編集':'追加','車両: '+document.getElementById('v-plate').value);closeModal('vehicle-modal');renderVehicles(currentOfficeFilter);renderDashboard();renderDocPage();
   // 未分類ファイルからの新規登録時: ファイルを自動添付
   if(window._pendingFileAssign&&window._pendingFileAssign.kind==='vehicle'){
     var pf=window._pendingFileAssign;
@@ -4740,7 +4803,7 @@ function saveDriver(){
       renderFileMgr();
     })();
   }
-  saveLocal();closeModal('driver-modal');renderDrivers(currentOfficeFilter);renderDashboard();renderDocPage();
+  saveLocal();addLog(document.getElementById('d-id').value?'編集':'追加','ドライバー: '+document.getElementById('d-name').value);closeModal('driver-modal');renderDrivers(currentOfficeFilter);renderDashboard();renderDocPage();
   // 未分類ファイルからの新規登録時: ファイルを自動添付
   if(window._pendingFileAssign&&window._pendingFileAssign.kind==='driver'){
     var pf=window._pendingFileAssign;
@@ -9084,7 +9147,7 @@ function saveMailSettings(){
     if(el && el.value.trim()) settings[office] = el.value.trim();
   });
   localStorage.setItem('fleet_mail_settings', JSON.stringify(settings));
-  isDirty=true;scheduleAutoSave();
+  isDirty=true;scheduleAutoSave();addLog('設定','メール送信設定を保存');
   alert('メール設定を保存しました');
 }
 function renderMailSettings(){
@@ -9763,7 +9826,21 @@ function previewCompanyStamps(){
   }
 }
 
-function renderSettingsAll(){renderSettingsOffices();generateQR();loadAiSettings();renderMailSettings();loadAlertSettings();loadStampSettings();}
+function renderSettingsAll(){renderSettingsOffices();generateQR();loadAiSettings();renderMailSettings();loadAlertSettings();loadStampSettings();renderOperationLogs();loadSessionTimeout();}
+
+function updateSessionTimeout(minutes){
+  SESSION_TIMEOUT_MS=parseInt(minutes)*60*1000;
+  localStorage.setItem('fleet_session_timeout',minutes);
+  resetSessionTimer();
+}
+function loadSessionTimeout(){
+  var saved=localStorage.getItem('fleet_session_timeout');
+  if(saved){
+    SESSION_TIMEOUT_MS=parseInt(saved)*60*1000;
+    var sel=document.getElementById('session-timeout-select');
+    if(sel) sel.value=saved;
+  }
+}
 
 // ====== 自社電子印設定 ======
 function loadStampSettings(){
@@ -9803,7 +9880,7 @@ function saveStampSettings(){
     repImage:window._stampRepImage||''
   };
   localStorage.setItem('fleet_stamp_settings',JSON.stringify(s));
-  isDirty=true;scheduleAutoSave();
+  isDirty=true;scheduleAutoSave();addLog('設定','電子印設定を保存');
   var msg=document.getElementById('stamp-settings-msg');
   if(msg){msg.textContent='電子印設定を保存しました';msg.style.color='#2e7d32';}
 }
@@ -9889,7 +9966,7 @@ function saveAlertSettings(){
   if(!emails.length){alert('通知先メールアドレスを1件以上入力してください');return;}
   var s={emails:emails,email:emails.join(','),alertDays:[30,10]};
   localStorage.setItem('fleet_alert_settings',JSON.stringify(s));
-  isDirty=true;scheduleAutoSave();
+  isDirty=true;scheduleAutoSave();addLog('設定','期限アラートメール設定を保存');
   fetch(API_URL,{method:'POST',body:JSON.stringify({action:'saveSettings',key:'alertSettings',value:JSON.stringify(s)})}).catch(function(){});
   var msg=document.getElementById('alert-settings-msg');
   if(msg){msg.textContent=emails.length+'件の通知先を保存しました';msg.style.color='#2e7d32';}
@@ -10240,6 +10317,7 @@ document.addEventListener('click',function(e){
     }
     // ★ 自動でSheetsから最新データを読み込む
     syncAll();
+    resetSessionTimer();
   }
 })();
 
