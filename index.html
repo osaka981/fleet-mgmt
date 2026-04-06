@@ -6579,6 +6579,7 @@ function renderStorage(){
 
       // 委託会社リンク
       const companyLink=d._src&&d._src!=='自社'?'<span class="company-link" onclick="event.stopPropagation();navigateToCompany(\''+esc(d._src).replace(/'/g,"\\'")+'\')">'+esc(d._src)+'</span>':'';
+      const companyBadge=d._src&&d._src!=='自社'?'<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:#f3e5f5;color:#6A1B9A;white-space:nowrap;font-weight:500;border:1px solid #CE93D8" onclick="event.stopPropagation();navigateToCompany(\''+esc(d._src).replace(/'/g,"\\'")+'\')">'+esc(d._src)+'</span>':'';
 
       // 搭乗車両バッジ（折り畳み時のみ表示）
       const plateNum=cv?parsePlate(cv.plate).num:'';
@@ -6587,15 +6588,16 @@ function renderStorage(){
         :'<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:#e0e0e0;color:#888;white-space:nowrap">未搭乗</span>';
 
       // --- 折り畳み版 ---
-      const officesFull=(d._offices.join('・')||'未設定')+(companyLink?' ・ '+companyLink:'');
+      const officesOnly=(d._offices.join('・')||'未設定');
       const fileInfo='<span style="font-size:10px;line-height:1.4;display:inline-block;text-align:right;background:#fff;color:#444;padding:2px 8px;border-radius:6px;border:1px solid #aab">ドライバー '+af.length+'件<br>車両 '+vaf.length+'件</span>';
       const collapsedHtml='<div id="sc-c-'+key+'" style="display:'+(expanded?'none':'block')+'"><div style="background:#d8dce3;border:1.5px solid #888;border-radius:8px;padding:8px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px" onclick="storageToggleExpand(\''+key+'\')">'+
           '<div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">'+
             '<div style="width:28px;height:28px;min-width:28px;min-height:28px;max-width:28px;max-height:28px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;flex-shrink:0;align-self:flex-start">'+typeIcon+'</div>'+
             '<div style="min-width:0;overflow:hidden"><div style="font-weight:600;font-size:13px;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d.name+'</div>'+
-            '<div style="font-size:10px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d._offices.join('・'))+'">'+officesFull+'</div></div>'+
+            '<div style="font-size:10px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d._offices.join('・'))+'">'+officesOnly+'</div></div>'+
           '</div>'+
-          '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+
+          '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">'+
+            companyBadge+
             expBadge(d.license?.exp,hasLic)+
             plateBadge+
             fileInfo+
@@ -6616,7 +6618,7 @@ function renderStorage(){
       cardHtml+='<div style="font-weight:600;font-size:15px;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span class="storage-link" onclick="event.stopPropagation();navigateToDriver(\''+esc(d.name)+'\')">'+d.name+'</span></div>';
       if(d.kana) cardHtml+='<div style="font-size:10px;color:#999;margin-top:-1px">'+esc(d.kana)+'</div>';
       var plateLink=cv?'<span class="storage-link" onclick="event.stopPropagation();navigateToVehicle(\''+esc(cv.plate)+'\')">'+plateStr+'</span>':plateStr;
-      cardHtml+='<div style="font-size:11px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d._offices.join('・'))+'">'+officesFull+'</div></div>';
+      cardHtml+='<div style="font-size:11px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d._offices.join('・'))+'">'+officesOnly+(companyLink?' ・ '+companyLink:'')+'</div></div>';
       cardHtml+='</div>';
       cardHtml+='<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">';
       var isSelf=d._src==='自社';
@@ -10227,6 +10229,20 @@ if(window.innerWidth<=768){
   document.querySelectorAll('.topbar h1').forEach(function(h1){
     h1.addEventListener('click',function(){syncAll(true);});
   });
+}
+
+// PWAスタンドアロンモード: デスクトップ中央に配置
+if(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone){
+  try{
+    var sw=screen.availWidth||screen.width;
+    var sh=screen.availHeight||screen.height;
+    var ww=Math.min(1200,Math.round(sw*0.75));
+    var wh=Math.min(900,Math.round(sh*0.85));
+    var left=Math.round((sw-ww)/2);
+    var top=Math.round((sh-wh)/2);
+    window.resizeTo(ww,wh);
+    window.moveTo(left,top);
+  }catch(e){}
 }
 </script>
 </body>
