@@ -1561,11 +1561,67 @@ function buildSavePayload(){
   }};
 }
 // 空データでシートを上書きしない安全ガード
-function isSafeToSave(){
+function isSafeToSave(silent){
+  // 完全空データは常にブロック
   if(drivers.length===0&&vehicles.length===0&&companies.length===0){
     console.warn('空データの保存をブロックしました');
+    addLog('同期','空データ保存をブロック');
     return false;
   }
+  // 前回保存時の件数と比較
+  var prev=JSON.parse(localStorage.getItem('fleet_save_counts')||'{}');
+  var prevD=prev.drivers||0, prevV=prev.vehicles||0, prevF=prev.files||0;
+  // 現在の添付ファイル総数
+  var curF=0;
+  drivers.forEach(function(d){curF+=(d.attachedFiles||[]).length;});
+  vehicles.forEach(function(v){curF+=(v.attachedFiles||[]).length;});
+  companies.forEach(function(c){
+    (c.drivers||[]).forEach(function(d){curF+=(d.attachedFiles||[]).length;});
+    (c.vehicles||[]).forEach(function(v){curF+=(v.attachedFiles||[]).length;});
+  });
+  // 初回保存（前回データなし）は常に許可
+  if(!prev.drivers&&!prev.vehicles) return updateSaveCounts(curF);
+
+  // === 複数カテゴリ同時急減チェック ===
+  // 1カテゴリだけの減少 = 正常な退職/廃車の可能性が高い → 許可
+  // 2カテゴリ以上の同時急減 = データ破損の疑い → ブロック
+  var drasticCount=0;
+  var warn=[];
+  // ドライバー急減チェック
+  if(prevD>0 && drivers.length===0){drasticCount++;warn.push('ドライバー: '+prevD+'→0名');}
+  else if(prevD>5 && drivers.length<prevD*0.3){drasticCount++;warn.push('ドライバー: '+prevD+'→'+drivers.length+'名(70%以上減)');}
+  // 車両急減チェック
+  if(prevV>0 && vehicles.length===0){drasticCount++;warn.push('車両: '+prevV+'→0台');}
+  else if(prevV>5 && vehicles.length<prevV*0.3){drasticCount++;warn.push('車両: '+prevV+'→'+vehicles.length+'台(70%以上減)');}
+  // 添付ファイル急減チェック
+  if(prevF>5 && curF===0){drasticCount++;warn.push('添付ファイル: '+prevF+'→0件');}
+  else if(prevF>10 && curF<prevF*0.3){drasticCount++;warn.push('添付ファイル: '+prevF+'→'+curF+'件(70%以上減)');}
+
+  // 2カテゴリ以上が同時に急減 → 危険（データ破損の疑い）
+  if(drasticCount>=2){
+    if(silent){
+      console.warn('複数カテゴリ同時急減検知（自動保存ブロック）:',warn.join(', '));
+      addLog('同期','複数カテゴリ同時急減で自動保存ブロック: '+warn.join(', '));
+      return false;
+    }
+    var ok=confirm('⚠ 複数カテゴリのデータが同時に大幅減少しています:\n\n'+warn.join('\n')+'\n\nデータ破損の可能性があります。\n正当な変更であれば「OK」、不明な場合は「キャンセル」を押してください。');
+    if(!ok){
+      addLog('同期','ユーザーが同時急減保存をキャンセル');
+      return false;
+    }
+    addLog('同期','ユーザーが同時急減保存を承認: '+warn.join(', '));
+  }
+  // 1カテゴリだけの減少はログのみ（退職/廃車として許可）
+  else if(drasticCount===1){
+    addLog('同期','1カテゴリ減少（許可）: '+warn.join(', '));
+  }
+  return updateSaveCounts(curF);
+}
+function updateSaveCounts(curF){
+  localStorage.setItem('fleet_save_counts',JSON.stringify({
+    drivers:drivers.length, vehicles:vehicles.length, files:curF,
+    time:new Date().toISOString()
+  }));
   return true;
 }
 
