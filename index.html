@@ -7278,10 +7278,19 @@ function renderStorage(){
       cardHtml+='<div><span style="color:#666;font-weight:500">免許条件</span> '+(d.license?.cond||'—')+'</div>';
       cardHtml+='</div>';
 
-      // ドライバー書類サムネ
+      // ドライバー書類サムネ（免許証→健康診断書→その他 順）
       if(af.length){
+        var catOrder={'免許証（表）':0,'免許証（裏）':1,'免許証（表裏）':2,'健康診断書':3,'その他':9};
+        var sortedAf=af.map(function(f,i){return {f:f,idx:i};}).sort(function(a,b){
+          var ca=a.f.category||guessFileCategoryByName(a.f.name,'driver')||'';
+          var cb=b.f.category||guessFileCategoryByName(b.f.name,'driver')||'';
+          var oa=catOrder[ca]!==undefined?catOrder[ca]:(ca.includes('免許')?0.5:5);
+          var ob=catOrder[cb]!==undefined?catOrder[cb]:(cb.includes('免許')?0.5:5);
+          return oa-ob;
+        });
         cardHtml+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">';
-        af.forEach(function(f,i){
+        sortedAf.forEach(function(item){
+          var f=item.f,i=item.idx;
           var fid=f.fileId||(f.url&&f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)?f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1]:'');
           var isImg=f.name&&f.name.match(/\.(jpg|jpeg|png|gif)$/i);
           var thumbSrc=f.dataUrl||(fid?'https://drive.google.com/thumbnail?id='+fid+'&sz=w200':'');
