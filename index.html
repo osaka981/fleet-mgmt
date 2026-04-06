@@ -4731,7 +4731,7 @@ function saveVehicle(){
       saveLocal(); renderFileMgr();
     })();
   }
-  saveLocal();addLog(document.getElementById('v-id').value?'編集':'追加','車両: '+document.getElementById('v-plate').value);closeModal('vehicle-modal');renderVehicles(currentOfficeFilter);renderDashboard();renderDocPage();
+  saveLocal();addLog(editingVehicleId?'編集':'追加','車両: '+plate);closeModal('vehicle-modal');renderVehicles(currentOfficeFilter);renderDashboard();renderDocPage();
   // 未分類ファイルからの新規登録時: ファイルを自動添付
   if(window._pendingFileAssign&&window._pendingFileAssign.kind==='vehicle'){
     var pf=window._pendingFileAssign;
@@ -5123,7 +5123,7 @@ function saveDriver(keepOpen){
       renderFileMgr();
     })();
   }
-  saveLocal();addLog(document.getElementById('d-id').value?'編集':'追加','ドライバー: '+document.getElementById('d-name').value);if(!keepOpen){closeModal('driver-modal');}renderDrivers(currentOfficeFilter);renderDashboard();renderDocPage();
+  saveLocal();addLog(editingDriverId?'編集':'追加','ドライバー: '+name);if(!keepOpen){closeModal('driver-modal');}renderDrivers(currentOfficeFilter);renderDashboard();renderDocPage();
   // 未分類ファイルからの新規登録時: ファイルを自動添付
   if(window._pendingFileAssign&&window._pendingFileAssign.kind==='driver'){
     var pf=window._pendingFileAssign;
