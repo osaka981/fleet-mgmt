@@ -2414,18 +2414,44 @@ function updateVehicleExpInline(id,field,val){
 function renderDashboard(){
   const d=new Date();document.getElementById('today-label').textContent=`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} 現在`;
   const activeDrivers=drivers.filter(d=>!d.status||d.status==='在籍');
-  const ev=vehicles.filter(v=>[v.shaken?.exp,v.jibai?.exp,v.nin?.exp].some(e=>e&&daysUntil(e)<0)).length;
-  const wv=vehicles.filter(v=>[v.shaken?.exp,v.jibai?.exp,v.nin?.exp].some(e=>{const dd=daysUntil(e);return dd!==null&&dd>=0&&dd<=30;})).length;
+  // 全車両（自社＋委託会社）を集約
+  const coVehicles=[];companies.forEach(c=>(c.vehicles||[]).forEach(v=>coVehicles.push({...v,_co:c.name})));
+  const allVehicles=[...vehicles,...coVehicles];
+  const selfSyayu=vehicles.filter(v=>v.type==='社有').length;
+  const selfMochikomi=vehicles.filter(v=>v.type==='持込').length;
+  const selfOther=vehicles.length-selfSyayu-selfMochikomi;
+  const ev=allVehicles.filter(v=>[v.shaken?.exp,v.jibai?.exp,v.nin?.exp].some(e=>e&&daysUntil(e)<0)).length;
+  const wv=allVehicles.filter(v=>[v.shaken?.exp,v.jibai?.exp,v.nin?.exp].some(e=>{const dd=daysUntil(e);return dd!==null&&dd>=0&&dd<=30;})).length;
   const ed=activeDrivers.filter(d=>d.license?.exp&&daysUntil(d.license.exp)<0).length;
-  document.getElementById('dash-stats').innerHTML=`<div class="stat-card"><div class="stat-label">総車両数</div><div class="stat-value">${vehicles.length}</div><div class="stat-sub">社有 ${vehicles.filter(v=>v.type==='社有').length} / 持込 ${vehicles.filter(v=>v.type==='持込').length}</div></div><div class="stat-card"><div class="stat-label">車両書類 期限切れ</div><div class="stat-value" style="color:#e53935">${ev}</div><div class="stat-sub">要対応</div></div><div class="stat-card"><div class="stat-label">車両書類 30日以内</div><div class="stat-value" style="color:#fb8c00">${wv}</div><div class="stat-sub">要注意</div></div><div class="stat-card"><div class="stat-label">免許証 期限切れ</div><div class="stat-value" style="color:#e53935">${ed}</div><div class="stat-sub">要対応</div></div>`;
-  let alerts=[];
-  vehicles.forEach(v=>[{l:'車検証',e:v.shaken?.exp,k:'shaken'},{l:'自賠責',e:v.jibai?.exp,k:'jibai'},{l:'任意保険',e:v.nin?.exp,k:'nin'}].forEach(x=>{const dd=daysUntil(x.e);if(x.e&&dd!==null&&dd<=60)alerts.push({name:v.plate,doc:x.l,exp:x.e,days:dd,type:'vehicle',id:v.id,docKey:x.k});}));
-  activeDrivers.forEach(d=>{const dd=daysUntil(d.license?.exp);if(d.license?.exp&&dd!==null&&dd<=60)alerts.push({name:d.name,doc:'運転免許証',exp:d.license.exp,days:dd,type:'driver',id:d.id,docKey:'license'});});
-  alerts.sort((a,b)=>a.days-b.days);
-  document.getElementById('alert-list').innerHTML=alerts.length?`<table><thead><tr><th>対象</th><th>書類</th><th>期限日</th><th>状態</th><th></th></tr></thead><tbody>${alerts.map(a=>{
-    const editClick=a.type==='vehicle'?'openVehicleModal('+a.id+')':'openDriverModal('+a.id+')';
-    const pageName=a.type==='vehicle'?'vehicles':'drivers';
-    return `<tr><td style="cursor:pointer;color:#4a90e2" onclick="${editClick}">${a.name}</td><td>${a.doc}</td><td>${a.exp.replace(/-/g,'/')}</td><td>${expBadge(a.exp)}</td><td><button class="btn btn-sm" style="font-size:10px" onclick="${editClick}">編集</button></td></tr>`;
+  // ドライバー集計
+  const activeEmp=activeDrivers.filter(d=>d.type==='社員').length;
+  const activeGai=activeDrivers.filter(d=>d.type==='外注').length;
+  const coDrCount=companies.reduce((s,c)=>s+(c.drivers||[]).length,0);
+  document.getElementById('dash-stats').innerHTML=`<div class="stat-card"><div class="stat-label">総車両数</div><div class="stat-value">${allVehicles.length}</div><div class="stat-sub" style="line-height:1.6">自社 ${vehicles.length}台<span style="color:#999;font-size:10px">（社有${selfSyayu} 持込${selfMochikomi}${selfOther?' 他'+selfOther:''}）</span><br>委託会社 ${coVehicles.length}台</div></div><div class="stat-card"><div class="stat-label">総ドライバー数</div><div class="stat-value">${activeDrivers.length+coDrCount}</div><div class="stat-sub" style="line-height:1.6">社員${activeEmp} 外注${activeGai}<br>委託会社 ${coDrCount}名</div></div><div class="stat-card"><div class="stat-label">書類 期限切れ</div><div class="stat-value" style="color:#e53935">${ev+ed}</div><div class="stat-sub">車両${ev} / 免許${ed}</div></div><div class="stat-card"><div class="stat-label">車両書類 30日以内</div><div class="stat-value" style="color:#fb8c00">${wv}</div><div class="stat-sub">要注意</div></div>`;
+  // === 期限カウントダウン ===
+  let cdItems=[];
+  allVehicles.forEach(v=>{
+    [{l:'車検',e:v.shaken?.exp},{l:'自賠責',e:v.jibai?.exp},{l:'任意保険',e:v.nin?.exp}].forEach(x=>{
+      if(!x.e)return;const dd=daysUntil(x.e);if(dd===null)return;
+      cdItems.push({name:(v._co?'['+v._co+'] ':'')+v.plate,doc:x.l,exp:x.e,days:dd,type:'vehicle',id:v.id});
+    });
+  });
+  activeDrivers.forEach(dr=>{
+    if(!dr.license?.exp)return;const dd=daysUntil(dr.license.exp);if(dd===null)return;
+    cdItems.push({name:dr.name,doc:'免許証',exp:dr.license.exp,days:dd,type:'driver',id:dr.id});
+  });
+  companies.forEach(c=>(c.drivers||[]).forEach(dr=>{
+    if(!dr.license?.exp)return;const dd=daysUntil(dr.license.exp);if(dd===null)return;
+    cdItems.push({name:'['+c.name+'] '+dr.name,doc:'免許証',exp:dr.license.exp,days:dd,type:'co-driver'});
+  }));
+  cdItems.sort((a,b)=>a.days-b.days);
+  const urgentItems=cdItems.filter(x=>x.days<=60);
+  // アラートテーブル
+  let alerts=urgentItems;
+  document.getElementById('alert-list').innerHTML=alerts.length?`<table><thead><tr><th>対象</th><th>書類</th><th>期限日</th><th>残日数</th><th>状態</th><th></th></tr></thead><tbody>${alerts.map(a=>{
+    const editClick=a.type==='vehicle'?'openVehicleModal('+a.id+')':a.type==='driver'?'openDriverModal('+a.id+')':'';
+    const cdBadge=a.days<0?'<span style="color:#e53935;font-weight:700">'+a.days+'日</span>':a.days<=7?'<span style="color:#d32f2f;font-weight:700">'+a.days+'日</span>':a.days<=30?'<span style="color:#fb8c00;font-weight:600">'+a.days+'日</span>':'<span style="color:#888">'+a.days+'日</span>';
+    return `<tr><td style="${editClick?'cursor:pointer;color:#4a90e2':''}" ${editClick?'onclick="'+editClick+'"':''}>${a.name}</td><td>${a.doc}</td><td>${a.exp.replace(/-/g,'/')}</td><td style="text-align:center">${cdBadge}</td><td>${expBadge(a.exp)}</td><td>${editClick?'<button class="btn btn-sm" style="font-size:10px" onclick="'+editClick+'">編集</button>':''}</td></tr>`;
   }).join('')}</tbody></table>`:'<div style="padding:20px;text-align:center;color:#888;font-size:12px">期限アラートなし ✓</div>';
 }
 
