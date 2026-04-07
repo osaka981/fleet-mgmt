@@ -1263,18 +1263,17 @@ body.modal-open{overflow:hidden}
 </div>
 
 <!-- File Preview Modal -->
-<div id="file-preview-modal" style="display:none;z-index:200" class="modal-bg" onclick="closeModal('file-preview-modal')">
-  <div class="modal" style="max-width:900px;max-height:92vh" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <span class="modal-title" id="file-preview-title">ファイルプレビュー</span>
+<div id="file-preview-modal" style="display:none;z-index:200;padding:8px;padding-top:8px;align-items:center" class="modal-bg" onclick="closeModal('file-preview-modal')">
+  <div class="modal" id="file-preview-modal-inner" style="max-width:96vw;max-height:96vh;width:96vw;height:90vh;border-radius:8px" onclick="event.stopPropagation()">
+    <div class="modal-header" style="padding:6px 12px;min-height:0;background:#222;border-bottom:1px solid #333">
+      <span class="modal-title" id="file-preview-title" style="font-size:12px;color:#ccc">ファイルプレビュー</span>
       <div style="display:flex;gap:6px;align-items:center">
-        <a id="file-preview-dl" href="#" download style="font-size:11px;color:#4a90e2;text-decoration:none;padding:4px 10px;border:1px solid #4a90e2;border-radius:5px">ダウンロード</a>
-        <a id="file-preview-open" href="#" target="_blank" style="display:none;font-size:11px;color:#888;text-decoration:none;padding:4px 10px;border:1px solid #ccc;border-radius:5px">Driveで開く</a>
-        <button class="modal-close" onclick="closeModal('file-preview-modal')">✕</button>
+        <a id="file-preview-dl" href="#" download style="font-size:10px;color:#4a90e2;text-decoration:none;padding:3px 8px;border:1px solid #4a90e2;border-radius:4px">ダウンロード</a>
+        <a id="file-preview-open" href="#" target="_blank" style="display:none;font-size:10px;color:#aaa;text-decoration:none;padding:3px 8px;border:1px solid #666;border-radius:4px">Driveで開く</a>
+        <button class="modal-close" onclick="closeModal('file-preview-modal')" style="color:#aaa">✕</button>
       </div>
     </div>
-    <div class="modal-body" style="padding:0;background:#333;display:flex;align-items:center;justify-content:center;min-height:400px" id="file-preview-body">
-      <!-- コンテンツはJSで挿入 -->
+    <div class="modal-body" style="padding:0;background:#1a1a1a;display:flex;align-items:center;justify-content:center;flex:1;overflow:auto" id="file-preview-body">
     </div>
   </div>
 </div>
@@ -6314,23 +6313,23 @@ function openFilePreview(url, name, dataUrl, fileId){
         for(let i=0;i<byteStr.length;i++) bytes[i]=byteStr.charCodeAt(i);
         const blob = new Blob([bytes],{type:'application/pdf'});
         const blobUrl = URL.createObjectURL(blob);
-        body.innerHTML = '<iframe src="'+blobUrl+'" style="width:100%;height:70vh;border:none;display:block"></iframe>';
+        body.innerHTML = '<iframe src="'+blobUrl+'" style="width:100%;height:100%;border:none;display:block"></iframe>';
       }catch(e){
         body.innerHTML = '<div style="color:#fff;padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:12px">PDF</div><div style="margin-bottom:16px">'+name+'</div></div>';
       }
     } else if(driveFileId){
       const previewUrl = 'https://drive.google.com/file/d/'+driveFileId+'/preview';
-      body.innerHTML = '<iframe src="'+previewUrl+'" style="width:100%;height:70vh;border:none;display:block" allow="autoplay"></iframe>';
+      body.innerHTML = '<iframe src="'+previewUrl+'" style="width:100%;height:100%;border:none;display:block" allow="autoplay"></iframe>';
     } else {
       body.innerHTML = '<div style="color:#fff;padding:32px;text-align:center"><div style="font-size:64px;margin-bottom:16px">PDF</div><div style="font-size:14px;margin-bottom:8px">'+name+'</div><div style="font-size:12px;color:#aaa;margin-bottom:20px">PDFプレビューを表示できません</div>'+(url?'<a href="'+url+'" target="_blank" style="color:#4a90e2;padding:10px 20px;border:1px solid #4a90e2;border-radius:6px;text-decoration:none">別タブで開く</a>':'')+'</div>';
     }
   } else if(isImg){
     const imgSrc = src||'';
     if(driveFileId && !imgSrc.startsWith('data:')){
-      const thumbUrl = 'https://drive.google.com/thumbnail?id='+driveFileId+'&sz=w800';
-      body.innerHTML = '<img src="'+thumbUrl+'" style="max-width:100%;max-height:70vh;object-fit:contain;display:block;margin:auto;padding:12px" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div style=color:#fff;padding:32px;text-align:center>IMG '+name+'</div>\'"><div id="img-fallback" style="display:none"></div>';
+      const thumbUrl = 'https://drive.google.com/thumbnail?id='+driveFileId+'&sz=w1600';
+      body.innerHTML = '<img src="'+thumbUrl+'" style="max-width:100%;max-height:100%;object-fit:contain;display:block;margin:auto;padding:8px;cursor:zoom-in" onclick="this.style.cursor=this.style.maxWidth===\'none\'?\'zoom-in\':\'zoom-out\';this.style.maxWidth=this.style.maxWidth===\'none\'?\'100%\':\'none\';this.style.maxHeight=this.style.maxHeight===\'none\'?\'100%\':\'none\'" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div style=color:#fff;padding:32px;text-align:center>IMG '+name+'</div>\'"><div id="img-fallback" style="display:none"></div>';
     } else {
-      body.innerHTML = '<img src="'+imgSrc+'" style="max-width:100%;max-height:70vh;object-fit:contain;display:block;margin:auto;padding:12px" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div style=color:#fff;padding:32px;text-align:center>IMG '+name+'</div>\'"><div id="img-fallback" style="display:none"></div>';
+      body.innerHTML = '<img src="'+imgSrc+'" style="max-width:100%;max-height:100%;object-fit:contain;display:block;margin:auto;padding:8px;cursor:zoom-in" onclick="this.style.cursor=this.style.maxWidth===\'none\'?\'zoom-in\':\'zoom-out\';this.style.maxWidth=this.style.maxWidth===\'none\'?\'100%\':\'none\';this.style.maxHeight=this.style.maxHeight===\'none\'?\'100%\':\'none\'" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div style=color:#fff;padding:32px;text-align:center>IMG '+name+'</div>\'"><div id="img-fallback" style="display:none"></div>';
     }
   } else {
     const openUrl = hasDriveUrl ? url : src;
