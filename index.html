@@ -12,6 +12,25 @@
 <link rel="apple-touch-icon" sizes="180x180">
 <title>大阪急配 フリート管理</title>
 <style>
+:root{--bg:#ffffff;--bg-card:#ffffff;--bg-input:#f8f9fa;--bg-sidebar:#f9fafb;--text:#333333;--text-sub:#888888;--border:#e8e8e8;--topbar-bg:#ffffff;--modal-bg:rgba(0,0,0,.45);--hover:#f0f4ff;--accent:#4a90e2}
+.dark-mode{--bg:#1a1a2e;--bg-card:#16213e;--bg-input:#0f3460;--bg-sidebar:#16213e;--text:#e0e0e0;--text-sub:#999;--border:#2a2a4a;--topbar-bg:#1a1a2e;--modal-bg:rgba(0,0,0,.7);--hover:#1a2a4a;--accent:#64b5f6}
+.dark-mode html,.dark-mode body,.dark-mode{background:var(--bg)!important;color:var(--text)!important}
+.dark-mode .sidebar{background:var(--bg-sidebar)!important;border-color:var(--border)!important}
+.dark-mode .topbar{background:var(--topbar-bg)!important;border-color:var(--border)!important}
+.dark-mode .topbar h1{color:var(--text)!important}
+.dark-mode .content,.dark-mode .page{background:var(--bg)!important}
+.dark-mode .modal{background:var(--bg-card)!important;color:var(--text)!important}
+.dark-mode .modal-header{border-color:var(--border)!important}
+.dark-mode .modal-footer{border-color:var(--border)!important}
+.dark-mode input:not([type=checkbox]):not([type=radio]),.dark-mode select,.dark-mode textarea{background:var(--bg-input)!important;color:var(--text)!important;border-color:var(--border)!important}
+.dark-mode .nav-item{color:var(--text-sub)!important}
+.dark-mode .nav-item.active,.dark-mode .nav-item:hover{background:var(--hover)!important;color:var(--accent)!important}
+.dark-mode .btn{border-color:var(--border)!important;color:var(--text)!important}
+.dark-mode .table-wrap table th{background:var(--bg-input)!important;color:var(--text)!important;border-color:var(--border)!important}
+.dark-mode .table-wrap table td{border-color:var(--border)!important;color:var(--text)!important}
+.dark-mode .sync-bar{background:var(--bg-card)!important;border-color:var(--border)!important}
+.dark-mode #global-search-wrap{background:var(--bg-card)!important;border-color:var(--border)!important}
+.dark-mode .office-badge{border-color:var(--border)!important}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scrollbar-gutter:stable;overflow-y:scroll}
 html,body{overflow-x:hidden;max-width:100vw}
@@ -603,6 +622,13 @@ body.modal-open{overflow:hidden}
       </div>
     </aside>
     <main class="main">
+      <!-- グローバル検索バー -->
+      <div id="global-search-wrap" style="padding:6px 12px;background:var(--bg-card,#fff);border-bottom:1px solid var(--border,#e8e8e8);position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:8px">
+        <div style="position:relative;flex:1;max-width:360px">
+          <input type="text" id="global-search-input" placeholder="🔍 ドライバー・車両・委託会社を検索..." oninput="globalSearch(this.value)" onfocus="this.select();globalSearch(this.value)" style="width:100%;padding:6px 10px 6px 10px;font-size:12px;border:1px solid var(--border,#ddd);border-radius:20px;background:var(--bg-input,#f8f9fa);color:var(--text,#333);outline:none" autocomplete="off">
+          <div id="global-search-results" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:300px;overflow-y:auto;background:var(--bg-card,#fff);border:1px solid var(--border,#ddd);border-radius:8px;margin-top:4px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:99"></div>
+        </div>
+      </div>
       <div id="page-dashboard" class="page active">
         <div class="topbar"><h1>ダッシュボード</h1><span id="today-label" style="font-size:11px;color:#888"></span></div>
         <div class="content">
@@ -960,6 +986,26 @@ body.modal-open{overflow:hidden}
           <div class="form-group" style="margin-bottom:12px"><label>確認</label><input type="password" id="pw-new2" style="width:100%"></div>
           <button class="btn btn-primary" onclick="changePw()">変更する</button>
           <div id="pw-msg" style="font-size:11px;margin-top:7px;min-height:14px"></div>
+
+          <div style="margin-top:28px;font-size:12px;font-weight:600;margin-bottom:10px;color:#888">外観</div>
+          <div style="background:var(--bg-card,#f5f5f5);border:1px solid var(--border,#e0e0e0);border-radius:10px;padding:16px;display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:13px;font-weight:500">🌙 ダークモード</div>
+              <div style="font-size:10px;color:var(--text-sub,#888);margin-top:2px">夜間作業の目の負担を軽減</div>
+            </div>
+            <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
+              <input type="checkbox" id="dark-mode-toggle" onchange="toggleDarkMode()" style="opacity:0;width:0;height:0">
+              <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#ccc;border-radius:24px;transition:.3s"></span>
+              <span style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>
+              <style>#dark-mode-toggle:checked+span{background:#4a90e2}#dark-mode-toggle:checked+span+span{transform:translateX(20px)}</style>
+            </label>
+          </div>
+
+          <div style="margin-top:28px;font-size:12px;font-weight:600;margin-bottom:10px;color:#888">CSVインポート</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn" onclick="openCsvImportModal('driver')" style="flex:1;padding:10px;font-size:12px">👤 ドライバー一括取込</button>
+            <button class="btn" onclick="openCsvImportModal('vehicle')" style="flex:1;padding:10px;font-size:12px">🚗 車両一括取込</button>
+          </div>
 
           <div style="margin-top:28px;font-size:12px;font-weight:600;margin-bottom:10px;color:#888">セッションタイムアウト</div>
           <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:10px;padding:16px">
@@ -10669,6 +10715,182 @@ function previewCompanyStamps(){
   }
 }
 
+// ====== グローバル検索 ======
+function globalSearch(q){
+  var results=document.getElementById('global-search-results');
+  if(!results) return;
+  q=(q||'').trim().toLowerCase();
+  if(!q){results.style.display='none';return;}
+  var hits=[];
+  // ドライバー検索
+  drivers.forEach(function(d){
+    if((d.name||'').toLowerCase().includes(q)||(d.kana||'').toLowerCase().includes(q)||(d.phone||'').includes(q)){
+      hits.push({icon:'👤',label:d.name,sub:(d.offices||[d.office]).filter(Boolean).join(',')||'',kind:'driver',id:d.id,status:d.status});
+    }
+  });
+  // 車両検索
+  vehicles.forEach(function(v){
+    if((v.plate||'').toLowerCase().includes(q)||(v.model||'').toLowerCase().includes(q)){
+      hits.push({icon:'🚗',label:v.plate+(v.model?' '+v.model:''),sub:v.office||'',kind:'vehicle',id:v.id});
+    }
+  });
+  // 委託会社検索
+  companies.forEach(function(c){
+    if((c.name||'').toLowerCase().includes(q)||(c.rep||'').toLowerCase().includes(q)){
+      hits.push({icon:'🏢',label:c.name,sub:c.rep||'',kind:'company',id:c.id});
+    }
+    (c.drivers||[]).forEach(function(d){
+      if((d.name||'').toLowerCase().includes(q)) hits.push({icon:'👤',label:d.name+' ['+c.name+']',sub:'委託',kind:'company-driver',companyId:c.id,id:d.id});
+    });
+    (c.vehicles||[]).forEach(function(v){
+      if((v.plate||'').toLowerCase().includes(q)) hits.push({icon:'🚗',label:v.plate+' ['+c.name+']',sub:'委託',kind:'company-vehicle',companyId:c.id,id:v.id});
+    });
+  });
+  if(!hits.length){results.innerHTML='<div style="padding:12px;text-align:center;color:var(--text-sub,#888);font-size:12px">該当なし</div>';results.style.display='block';return;}
+  results.innerHTML=hits.slice(0,15).map(function(h){
+    var statusBadge=h.status==='退職'?'<span style="font-size:9px;background:#eee;color:#888;padding:1px 5px;border-radius:99px;margin-left:4px">退職</span>':'';
+    return '<div style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border,#f0f0f0);display:flex;align-items:center;gap:8px" onmouseenter="this.style.background=\'var(--hover,#f0f4ff)\'" onmouseleave="this.style.background=\'\'" onclick="globalSearchSelect(\''+h.kind+'\','+h.id+','+(h.companyId||0)+')">'+
+      '<span style="font-size:14px">'+h.icon+'</span>'+
+      '<div style="flex:1;min-width:0"><div style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(h.label)+statusBadge+'</div><div style="font-size:10px;color:var(--text-sub,#888)">'+esc(h.sub)+'</div></div>'+
+    '</div>';
+  }).join('');
+  results.style.display='block';
+}
+function globalSearchSelect(kind,id,companyId){
+  document.getElementById('global-search-results').style.display='none';
+  document.getElementById('global-search-input').value='';
+  if(kind==='driver') openDriverModal(id);
+  else if(kind==='vehicle') openVehicleModal(id);
+  else if(kind==='company') openCompanyModal(id);
+  else if(kind==='company-driver'){ var c=companies.find(function(x){return x.id==companyId;}); if(c){ var d=(c.drivers||[]).find(function(x){return x.id==id;}); if(d) openCompanyDriverModal(d,c);} }
+  else if(kind==='company-vehicle'){ var c2=companies.find(function(x){return x.id==companyId;}); if(c2){ var v=(c2.vehicles||[]).find(function(x){return x.id==id;}); if(v) openCompanyVehicleModal(v,c2);} }
+}
+// 検索バー外クリックで閉じる
+document.addEventListener('click',function(e){
+  var wrap=document.getElementById('global-search-wrap');
+  if(wrap&&!wrap.contains(e.target)){var r=document.getElementById('global-search-results');if(r)r.style.display='none';}
+});
+
+// ====== ダークモード ======
+function initDarkMode(){
+  var saved=localStorage.getItem('fleet_dark_mode');
+  if(saved==='true') document.documentElement.classList.add('dark-mode');
+}
+function toggleDarkMode(){
+  var html=document.documentElement;
+  html.classList.toggle('dark-mode');
+  var isDark=html.classList.contains('dark-mode');
+  localStorage.setItem('fleet_dark_mode',isDark?'true':'false');
+  var toggle=document.getElementById('dark-mode-toggle');
+  if(toggle) toggle.checked=isDark;
+}
+initDarkMode();
+
+// ====== CSVインポート ======
+function openCsvImportModal(kind){
+  var modal=document.createElement('div');
+  modal.className='modal-bg';modal.style.display='flex';modal.id='csv-import-modal';
+  modal.innerHTML='<div class="modal" style="max-width:700px" onclick="event.stopPropagation()">'+
+    '<div class="modal-header"><span class="modal-title">'+(kind==='driver'?'ドライバー':'車両')+' CSVインポート</span><button class="modal-close" onclick="this.closest(\'.modal-bg\').remove()">✕</button></div>'+
+    '<div class="modal-body" style="padding:12px">'+
+      '<div style="padding:16px;border:2px dashed var(--border,#ccc);border-radius:8px;text-align:center;margin-bottom:12px;cursor:pointer" onclick="document.getElementById(\'csv-file-input\').click()">'+
+        '<div style="font-size:13px;color:var(--text-sub,#888);margin-bottom:4px">CSVファイルをクリックで選択</div>'+
+        '<div style="font-size:10px;color:#aaa">UTF-8 / Shift-JIS 対応</div>'+
+        '<input type="file" id="csv-file-input" accept=".csv,.tsv,.txt" style="display:none" onchange="parseCsvFile(this,\''+kind+'\')">'+
+      '</div>'+
+      '<div id="csv-preview-area"></div>'+
+    '</div>'+
+    '<div class="modal-footer">'+
+      '<button class="btn" onclick="this.closest(\'.modal-bg\').remove()">キャンセル</button>'+
+      '<button class="btn btn-primary" id="csv-import-btn" style="display:none" onclick="execCsvImport(\''+kind+'\')">インポート実行</button>'+
+    '</div>'+
+  '</div>';
+  document.body.appendChild(modal);
+  modal.onclick=function(e){if(e.target===modal)modal.remove();};
+}
+function parseCsvFile(input,kind){
+  var file=input.files[0];if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var text=e.target.result;
+    // Shift-JIS detection: if garbled, try again with Shift-JIS
+    if(text.includes('\ufffd')){
+      var reader2=new FileReader();
+      reader2.onload=function(e2){renderCsvPreview(e2.target.result,kind);};
+      reader2.readAsText(file,'Shift_JIS');
+    } else {
+      renderCsvPreview(text,kind);
+    }
+  };
+  reader.readAsText(file,'UTF-8');
+}
+function renderCsvPreview(text,kind){
+  var sep=text.includes('\t')?'\t':',';
+  var lines=text.split(/\r?\n/).filter(function(l){return l.trim();});
+  if(lines.length<2){document.getElementById('csv-preview-area').innerHTML='<div style="color:#e53935;font-size:12px">データが2行以上必要です（ヘッダー+データ）</div>';return;}
+  var headers=lines[0].split(sep).map(function(h){return h.replace(/^"|"$/g,'').trim();});
+  var rows=lines.slice(1).map(function(l){return l.split(sep).map(function(c){return c.replace(/^"|"$/g,'').trim();});});
+  window._csvData={headers:headers,rows:rows,kind:kind};
+  // 列マッピングUI
+  var targetCols=kind==='driver'?
+    [{key:'sei',label:'姓'},{key:'mei',label:'名'},{key:'office',label:'営業所'},{key:'type',label:'区分(社員/外注)'},{key:'phone',label:'電話番号'},{key:'licenseExpiry',label:'免許証期限'},{key:'healthExpiry',label:'健康診断期限'}]:
+    [{key:'plate',label:'ナンバー'},{key:'office',label:'営業所'},{key:'model',label:'車種'},{key:'shakenExpiry',label:'車検期限'},{key:'jibaisekiExpiry',label:'自賠責期限'},{key:'insuranceExpiry',label:'任意保険期限'}];
+  var html='<div style="font-size:11px;font-weight:600;margin-bottom:8px">列マッピング（CSVの列→アプリの項目）</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px">';
+  targetCols.forEach(function(tc){
+    var opts=headers.map(function(h,i){
+      var auto=h.includes(tc.label)||h.toLowerCase().includes(tc.key.toLowerCase())||(tc.key==='sei'&&h.includes('姓'))||(tc.key==='mei'&&h.includes('名'))||(tc.key==='plate'&&h.includes('ナンバー'))||(tc.key==='office'&&h.includes('営業所'));
+      return '<option value="'+i+'"'+(auto?' selected':'')+'>'+esc(h)+'</option>';
+    }).join('');
+    html+='<div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;min-width:80px">'+tc.label+'</span><select class="csv-col-map" data-key="'+tc.key+'" style="flex:1;padding:4px 6px;font-size:11px;border:1px solid var(--border,#ddd);border-radius:4px"><option value="-1">（無視）</option>'+opts+'</select></div>';
+  });
+  html+='</div>';
+  // プレビューテーブル
+  html+='<div style="font-size:11px;font-weight:600;margin-bottom:4px">プレビュー（先頭5件）</div>';
+  html+='<div style="overflow-x:auto;max-height:200px;overflow-y:auto;border:1px solid var(--border,#ddd);border-radius:6px"><table style="width:100%;border-collapse:collapse;font-size:10px">';
+  html+='<tr>'+headers.map(function(h){return '<th style="padding:4px 6px;background:var(--bg-input,#f5f5f5);border:1px solid var(--border,#eee);white-space:nowrap">'+esc(h)+'</th>';}).join('')+'</tr>';
+  rows.slice(0,5).forEach(function(r){
+    html+='<tr>'+r.map(function(c){return '<td style="padding:3px 6px;border:1px solid var(--border,#eee);white-space:nowrap">'+esc(c)+'</td>';}).join('')+'</tr>';
+  });
+  html+='</table></div>';
+  html+='<div style="font-size:11px;color:var(--text-sub,#888);margin-top:6px">合計 '+rows.length+' 件</div>';
+  document.getElementById('csv-preview-area').innerHTML=html;
+  document.getElementById('csv-import-btn').style.display='';
+}
+function execCsvImport(kind){
+  var data=window._csvData;if(!data) return;
+  var mapping={};
+  document.querySelectorAll('.csv-col-map').forEach(function(sel){
+    var key=sel.dataset.key;var val=parseInt(sel.value);
+    if(val>=0) mapping[key]=val;
+  });
+  var count=0,skipCount=0;
+  data.rows.forEach(function(row){
+    if(kind==='driver'){
+      var sei=mapping.sei!==undefined?row[mapping.sei]:'';
+      var mei=mapping.mei!==undefined?row[mapping.mei]:'';
+      var name=(sei+' '+mei).trim();
+      if(!name){skipCount++;return;}
+      // 重複チェック
+      if(drivers.some(function(d){return d.name===name;})){skipCount++;return;}
+      var obj={id:Date.now()+count,name:name,office:mapping.office!==undefined?row[mapping.office]:'',offices:mapping.office!==undefined?[row[mapping.office]]:[],type:mapping.type!==undefined?row[mapping.type]:'社員',phone:mapping.phone!==undefined?row[mapping.phone]:'',licenseExpiry:mapping.licenseExpiry!==undefined?row[mapping.licenseExpiry]:'',healthExpiry:mapping.healthExpiry!==undefined?row[mapping.healthExpiry]:'',status:'在籍',attachedFiles:[],archivedFiles:[]};
+      drivers.push(obj);count++;
+    } else {
+      var plate=mapping.plate!==undefined?row[mapping.plate]:'';
+      if(!plate){skipCount++;return;}
+      if(vehicles.some(function(v){return v.plate===plate;})){skipCount++;return;}
+      var vobj={id:Date.now()+count,plate:plate,office:mapping.office!==undefined?row[mapping.office]:'',model:mapping.model!==undefined?row[mapping.model]:'',shakenExpiry:mapping.shakenExpiry!==undefined?row[mapping.shakenExpiry]:'',jibaisekiExpiry:mapping.jibaisekiExpiry!==undefined?row[mapping.jibaisekiExpiry]:'',insuranceExpiry:mapping.insuranceExpiry!==undefined?row[mapping.insuranceExpiry]:'',status:'',attachedFiles:[],archivedFiles:[]};
+      vehicles.push(vobj);count++;
+    }
+  });
+  saveLocal();isDirty=true;scheduleAutoSave();
+  var modal=document.getElementById('csv-import-modal');if(modal)modal.remove();
+  addLog('CSVインポート',(kind==='driver'?'ドライバー':'車両')+' '+count+'件追加');
+  alert(count+'件をインポートしました。'+(skipCount?'\n'+skipCount+'件は重複または空データのためスキップ。':''));
+  if(kind==='driver') renderDrivers(null); else renderVehicles(null);
+  renderDashboard();
+}
+
 // ====== 書類カレンダー ======
 var calYear, calMonth;
 function calendarGoToday(){ var d=new Date(); calYear=d.getFullYear(); calMonth=d.getMonth(); renderCalendar(); }
@@ -10805,7 +11027,7 @@ function calendarShowDetail(dateKey){
   detail.style.display='block';
 }
 
-function renderSettingsAll(){renderSettingsOffices();generateQR();loadAiSettings();renderMailSettings();loadAlertSettings();loadStampSettings();renderOperationLogs();loadSessionTimeout();}
+function renderSettingsAll(){renderSettingsOffices();generateQR();loadAiSettings();renderMailSettings();loadAlertSettings();loadStampSettings();renderOperationLogs();loadSessionTimeout();var dt=document.getElementById('dark-mode-toggle');if(dt)dt.checked=document.documentElement.classList.contains('dark-mode');}
 
 function updateSessionTimeout(minutes){
   SESSION_TIMEOUT_MS=parseInt(minutes)*60*1000;
