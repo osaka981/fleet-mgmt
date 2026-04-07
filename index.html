@@ -588,7 +588,7 @@ body.modal-open{overflow:hidden}
   </button>
   <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
   <div class="layout">
-    <aside class="sidebar" ondragover="event.preventDefault();document.getElementById('sidebar-upload-status').style.display='block';document.getElementById('sidebar-upload-status').textContent='ここにドロップでアップロード';document.getElementById('sidebar-upload-status').style.color='#4a90e2'" ondragleave="if(!this.contains(event.relatedTarget)){document.getElementById('sidebar-upload-status').style.display='none'}" ondrop="event.preventDefault();handleSidebarDrop(event)">
+    <aside class="sidebar" ondragover="event.preventDefault();document.getElementById('sidebar-upload-status').style.display='block';document.getElementById('sidebar-upload-status').textContent='ここにドロップでアップロード';document.getElementById('sidebar-upload-status').style.color='#4a90e2'" ondragleave="if(!this.contains(event.relatedTarget)){document.getElementById('sidebar-upload-status').style.display='none'}" ondrop="handleSidebarDrop(event)">
       <div class="logo" style="cursor:pointer" onclick="location.reload()"><div class="logo-title" style="display:flex;align-items:center;gap:6px"><img src="" id="sidebar-logo" style="width:22px;height:22px;object-fit:contain">大阪急配 フリート管理</div></div>
       <div style="padding:8px 4px 4px;flex:1;overflow-y:auto">
         <div class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard',this)" data-page="dashboard"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg>ダッシュボード</div>
@@ -5508,8 +5508,31 @@ function closeSidebar(){
 
 // サイドバー ダッシュボードへのファイルドロップアップロード
 async function handleSidebarDrop(event){
-  var files=event.dataTransfer.files;
-  if(!files||!files.length) return;
+  event.preventDefault();
+  var dt=event.dataTransfer;
+  var files=[];
+  // フォルダとファイルを分離（DataTransferItemでフォルダ判定）
+  if(dt.items){
+    for(var k=0;k<dt.items.length;k++){
+      var item=dt.items[k];
+      if(item.kind==='file'){
+        var entry=item.webkitGetAsEntry&&item.webkitGetAsEntry();
+        if(entry&&entry.isDirectory) continue; // フォルダはスキップ
+        var f=item.getAsFile();
+        if(f&&f.size>0) files.push(f);
+      }
+    }
+  } else {
+    for(var k2=0;k2<dt.files.length;k2++){
+      var f2=dt.files[k2];
+      if(f2&&f2.size>0) files.push(f2);
+    }
+  }
+  if(!files.length){
+    var statusEl=document.getElementById('sidebar-upload-status');
+    if(statusEl){statusEl.style.display='block';statusEl.textContent='ファイルが見つかりません（フォルダは不可）';statusEl.style.color='#e53935';setTimeout(function(){statusEl.style.display='none';},4000);}
+    return;
+  }
   var statusEl=document.getElementById('sidebar-upload-status');
   if(!statusEl) return;
   var total=files.length;
