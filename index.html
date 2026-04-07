@@ -2169,7 +2169,7 @@ async function processQuickUpload(file,kind,entityId,docKey){
       if(json.ok){
         target.attachedFiles.push({name:renamedName,type:file.type,url:json.url||'',fileId:json.fileId||'',dataUrl:'',category:catMap[docKey]||'',uploadedAt:new Date().toISOString()});
         saveLocal();saveCompanies();
-        document.querySelectorAll('.modal-bg').forEach(m=>m.remove());
+        document.querySelectorAll('.modal-bg:not([id])').forEach(m=>m.remove());
         renderVehicles(currentOfficeFilter);renderDrivers(currentOfficeFilter);
         alert(''+file.name+' をアップロードしました');
       } else {
@@ -2227,7 +2227,7 @@ function execAssignDriver(vehicleId){
   v.driver=dName;
   v.driverId=String(dId);
   saveLocal();
-  document.querySelectorAll('.modal-bg').forEach(m=>m.remove());
+  document.querySelectorAll('.modal-bg:not([id])').forEach(m=>m.remove());
   renderVehicles(currentOfficeFilter);
   alert(''+v.plate+' の担当を '+dName+' に設定しました');
 }
@@ -3303,7 +3303,7 @@ function execCreateMailTask(){
     taskCount++;
   });
   saveMailTasks();renderMailTasks();
-  document.querySelectorAll('.modal-bg').forEach(m=>m.remove());
+  document.querySelectorAll('.modal-bg:not([id])').forEach(m=>m.remove());
   var msg=taskCount+'件のメール送信タスクを作成しました（'+checked.length+'名分）';
   if(skipCount) msg+='\n※ '+skipCount+'件は同一営業所・同一タイプの未送信タスクが既にあるためスキップしました';
   alert(msg);
@@ -3595,7 +3595,7 @@ function execAddExtraVehicle(taskId){
   t.vehiclePlate=(t.vehiclePlate?t.vehiclePlate+', ':'')+v.plate;
   saveMailTasks();
   // 送信モーダルを閉じて再度開く
-  document.querySelectorAll('.modal-bg').forEach(m=>m.remove());
+  document.querySelectorAll('.modal-bg:not([id])').forEach(m=>m.remove());
   openMailSendModal(taskId);
 }
 
@@ -3605,7 +3605,7 @@ function addGenPdfToMail(taskId, pdfType){
   if(!t.genPdfs)t.genPdfs=[];
   t.genPdfs.push({name:pdfType+'_'+t.office+'.pdf',type:pdfType,office:t.office});
   saveMailTasks();
-  document.querySelectorAll('.modal-bg').forEach(m=>m.remove());
+  document.querySelectorAll('.modal-bg:not([id])').forEach(m=>m.remove());
   openMailSendModal(taskId);
 }
 
@@ -3719,7 +3719,7 @@ async function execMailSend(taskId){
     if(json.ok){
       t.status='sent';t.sentAt=new Date().toISOString();
       saveMailTasks();renderMailTasks();
-      document.querySelectorAll('.modal-bg').forEach(m=>m.remove());
+      document.querySelectorAll('.modal-bg:not([id])').forEach(m=>m.remove());
 
       // 退職の場合: ドライバーをアーカイブ、車両を本社に移動
       if(t.type==='退職'){
@@ -3873,7 +3873,7 @@ async function execBulkSendByOffice(){
     }catch(e){errorCount++;}
   }
 
-  document.querySelectorAll('.modal-bg').forEach(m=>m.remove());
+  document.querySelectorAll('.modal-bg:not([id])').forEach(m=>m.remove());
   alert('一括送信完了\n成功: '+successCount+'件 / エラー: '+errorCount+'件');
 }
 
