@@ -1044,7 +1044,7 @@ body.modal-open{overflow:hidden}
 <!-- Vehicle Modal -->
 <div id="vehicle-modal" style="display:none" class="modal-bg">
   <div class="modal" onclick="event.stopPropagation()">
-    <div class="modal-header"><span class="modal-title" id="vm-title">車両 登録</span><div id="vm-nav" style="display:none;align-items:center;gap:6px;font-size:11px"><button class="btn btn-sm" onclick="navVehicle(-1)" style="padding:2px 8px;font-size:11px">◀ 前</button><span id="vm-nav-label"></span><button class="btn btn-sm" onclick="navVehicle(1)" style="padding:2px 8px;font-size:11px">次 ▶</button></div><button class="modal-close" onclick="closeModal('vehicle-modal')">✕</button></div>
+    <div class="modal-header"><span class="modal-title" id="vm-title">車両 登録</span><div id="vm-nav" style="display:none;margin-left:auto;align-items:center;gap:4px"><button class="btn btn-sm" onclick="navVehicle(-1)" style="padding:2px 8px;font-size:11px">◀ 前</button><span id="vm-nav-label" style="font-size:11px;color:#888;min-width:50px;text-align:center"></span><button class="btn btn-sm" onclick="navVehicle(1)" style="padding:2px 8px;font-size:11px">次 ▶</button></div><button class="modal-close" onclick="closeModal('vehicle-modal')">✕</button></div>
     <div id="vm-flex-wrap" style="display:flex;flex:1;overflow:hidden;min-height:0">
       <div id="vm-preview-pane" style="width:0;min-width:0;background:#1a1a1a;display:none;flex-direction:column;overflow:hidden;border-right:1px solid #333;transition:width .2s">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#222;border-bottom:1px solid #333">
