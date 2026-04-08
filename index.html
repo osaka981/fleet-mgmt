@@ -35,7 +35,7 @@
 html{scrollbar-gutter:stable;overflow-y:scroll}
 html,body{overflow-x:hidden;max-width:100vw}
 html{background:#fff}
-body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f5f5;color:#1a1a1a;font-size:13px}
+body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f5f5;color:#1a1a1a;font-size:15px}
 #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh}
 .login-card{background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:40px;width:340px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.08)}
 .login-logo{font-size:16px;font-weight:600;margin-bottom:4px}
@@ -48,7 +48,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f
 .login-err{font-size:11px;color:#e53935;margin-top:10px;min-height:16px}
 #app-screen{display:none;min-height:100vh}
 .layout{display:flex;min-height:100vh}
-.sidebar{width:200px;background:#fff;border-right:1px solid #e0e0e0;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;z-index:10}
+.sidebar{width:230px;background:#fff;border-right:1px solid #e0e0e0;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;z-index:10}
 .logo{padding:14px 16px 12px;border-bottom:1px solid #e0e0e0}
 .logo-title{font-size:13px;font-weight:600;white-space:nowrap}
 .logo-sub{font-size:10px;color:#888;margin-top:2px}
@@ -62,7 +62,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f
 .storage-grid>.storage-col{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
 .nav-add-btn{width:20px;height:20px;border:1px solid #ddd;border-radius:4px;background:transparent;cursor:pointer;color:#888;font-size:14px;display:flex;align-items:center;justify-content:center}
 .nav-add-btn:hover{background:#f5f5f5}
-.nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;cursor:pointer;color:#666;transition:all .15s;margin:1px 6px;font-size:12px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:6px;cursor:pointer;color:#666;transition:all .15s;margin:1px 6px;font-size:13.5px}
 .nav-item:hover{background:#f5f5f5;color:#1a1a1a}
 @media(hover:none){.nav-item:hover{background:transparent;color:inherit}}
 .nav-item.active{background:#eaf2ff;color:#4a90e2;font-weight:500}
@@ -70,11 +70,11 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f
 .nav-del{margin-left:auto;width:16px;height:16px;border-radius:3px;border:none;background:transparent;cursor:pointer;color:#ccc;font-size:12px;display:none;align-items:center;justify-content:center}
 .nav-item:hover .nav-del{display:flex}
 .nav-del:hover{background:#fde8e8;color:#e53935}
-.main{flex:1;margin-left:200px;min-height:100vh;display:flex;flex-direction:column}
-.topbar{padding:12px 20px;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;justify-content:space-between;background:#fff;position:sticky;top:0;z-index:5}
-.topbar h1{font-size:15px;font-weight:600;cursor:pointer}
+.main{flex:1;margin-left:230px;min-height:100vh;display:flex;flex-direction:column}
+.topbar{padding:14px 24px;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;justify-content:space-between;background:#fff;position:sticky;top:0;z-index:5}
+.topbar h1{font-size:17px;font-weight:600;cursor:pointer}
 .content{flex:1;padding:16px 20px}
-.btn{padding:6px 12px;font-size:12px;font-weight:500;border-radius:6px;border:1px solid #ddd;background:#fff;color:#1a1a1a;cursor:pointer;transition:background .15s;display:inline-flex;align-items:center;gap:4px}
+.btn{padding:7px 14px;font-size:13px;font-weight:500;border-radius:6px;border:1px solid #ddd;background:#fff;color:#1a1a1a;cursor:pointer;transition:background .15s;display:inline-flex;align-items:center;gap:4px}
 .btn:hover{background:#f5f5f5}
 .btn-primary{background:#4a90e2;color:#fff;border-color:transparent}
 .btn-primary:hover{background:#357abd}
@@ -84,7 +84,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f
 .btn-danger{color:#e53935;border-color:#f5c6c6}
 .btn-danger:hover{background:#fde8e8}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
-.stat-card{background:#fff;border-radius:8px;padding:14px 16px;border:1px solid #e0e0e0}
+.stat-card{background:#fff;border-radius:8px;padding:16px 20px;border:1px solid #e0e0e0}
 .stat-label{font-size:11px;color:#888;margin-bottom:4px}
 .stat-value{font-size:22px;font-weight:600}
 .stat-sub{font-size:10px;color:#aaa;margin-top:2px}
@@ -112,7 +112,7 @@ body.modal-open{overflow:hidden}
 .modal.modal-wide{max-width:1500px;transition:max-width .2s}
 .modal-sm{max-width:400px}
 .modal-header{padding:14px 18px;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.modal-title{font-size:14px;font-weight:600}
+.modal-title{font-size:16px;font-weight:600}
 .modal-close{width:28px;height:28px;border-radius:6px;border:none;background:transparent;cursor:pointer;color:#888;font-size:16px;display:flex;align-items:center;justify-content:center}
 .modal-close:hover{background:#f5f5f5}
 .modal-body{padding:18px;overflow-y:auto;flex:1}
@@ -122,8 +122,8 @@ body.modal-open{overflow:hidden}
 .form-grid .form-group{min-width:0;overflow:hidden}
 .modal-body{overflow-x:auto;overflow-y:auto}
 .form-group{display:flex;flex-direction:column;gap:4px}
-.form-group label{font-size:11px;color:#666;font-weight:500}
-.form-group input,.form-group select{padding:7px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#1a1a1a;font-family:inherit}
+.form-group label{font-size:12px;color:#666;font-weight:500}
+.form-group input,.form-group select{padding:8px 12px;font-size:13px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#1a1a1a;font-family:inherit}
 .form-group input:focus,.form-group select:focus{outline:none;border-color:#4a90e2}
 .section-title{font-size:11px;font-weight:600;color:#888;padding:8px 0 6px;border-bottom:1px solid #e0e0e0;margin-bottom:10px;grid-column:1/-1}
 .doc-section{border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;grid-column:1/-1}
