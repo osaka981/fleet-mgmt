@@ -117,7 +117,10 @@ body.modal-open{overflow:hidden}
 .modal-close:hover{background:#f5f5f5}
 .modal-body{padding:18px;overflow-y:auto;flex:1}
 .modal-footer{padding:12px 18px;border-top:1px solid #e0e0e0;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;overflow:hidden}
+.form-grid input,.form-grid select,.form-grid textarea{max-width:100%;min-width:0;box-sizing:border-box}
+.form-grid .form-group{min-width:0;overflow:hidden}
+.modal-body{overflow-x:auto;overflow-y:auto}
 .form-group{display:flex;flex-direction:column;gap:4px}
 .form-group label{font-size:11px;color:#666;font-weight:500}
 .form-group input,.form-group select{padding:7px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#1a1a1a;font-family:inherit}
@@ -6796,16 +6799,28 @@ function openFilePreviewFromAttached(url, name, dataUrl){
 // ★ ファイルプレビュー用インデックス参照ヘルパー
 function openAttachedFilePreview(kind, entityId, fileIdx, companyName){
   let target = null;
+  let isCompany = false;
   if(kind==='driver'){
     target = drivers.find(x=>String(x.id)===String(entityId));
-    if(!target) companies.forEach(c=>{if(!target) target=(c.drivers||[]).find(x=>String(x.id)===String(entityId));});
+    if(!target){ companies.forEach(c=>{if(!target){var d=(c.drivers||[]).find(x=>String(x.id)===String(entityId));if(d){target=d;isCompany=true;}}});}
   } else {
     target = vehicles.find(x=>String(x.id)===String(entityId));
-    if(!target) companies.forEach(c=>{if(!target) target=(c.vehicles||[]).find(x=>String(x.id)===String(entityId));});
+    if(!target){ companies.forEach(c=>{if(!target){var v=(c.vehicles||[]).find(x=>String(x.id)===String(entityId));if(v){target=v;isCompany=true;}}});}
   }
   if(!target || !target.attachedFiles || !target.attachedFiles[fileIdx]) return;
   const f = target.attachedFiles[fileIdx];
-  openFilePreview(f.url||'', f.name, f.dataUrl||'', f.fileId||'');
+  var fid=f.fileId||(f.url&&f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)?f.url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1]:'');
+  // 編集モーダルを開いて2カラムプレビュー
+  if(kind==='driver'&&!isCompany){
+    openDriverModal(parseInt(entityId));
+    setTimeout(function(){openDmPreview(fid,f.name||'',f.dataUrl||'');},300);
+  } else if(kind==='vehicle'&&!isCompany){
+    openVehicleModal(parseInt(entityId));
+    setTimeout(function(){openVmPreview(fid,f.name||'',f.dataUrl||'');},300);
+  } else {
+    // 委託会社の場合はフルスクリーンプレビュー
+    openFilePreview(f.url||'', f.name, f.dataUrl||'', fid);
+  }
 }
 
 function openUnassignedPreview(fileIdx){
