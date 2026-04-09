@@ -126,6 +126,8 @@ body.modal-open{overflow:hidden}
 .split-card{transition:box-shadow .15s,opacity .15s}
 .split-card.drag-over{box-shadow:0 0 0 2px #4a90e2!important;background:#f0f6ff!important}
 .split-card[draggable]:active{opacity:.6}
+.vsc-item{transition:box-shadow .15s,opacity .15s}
+.vsc-item[draggable]:active{opacity:.5}
 @media(max-width:768px){.split-grid-3{grid-template-columns:1fr!important}}
 .form-group input,.form-group select{padding:8px 12px;font-size:13px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#1a1a1a;font-family:inherit}
 .form-group input:focus,.form-group select:focus{outline:none;border-color:#4a90e2}
@@ -7762,6 +7764,7 @@ function splitDrop(e){
 // ドキュメント全体でドラッグオーバーのスタイルをリセット
 document.addEventListener('dragend',function(){
   document.querySelectorAll('.split-card').forEach(function(el){el.style.boxShadow='';el.style.opacity='1';});
+  document.querySelectorAll('.vsc-item').forEach(function(el){el.style.boxShadow='';el.style.opacity='1';});
 });
 
 // ====== 統合確認モーダル ======
@@ -7894,6 +7897,57 @@ function detachVehicle(vehicleId){
   saveLocal();isDirty=true;scheduleAutoSave();
   addLog('割当','搭乗解除: '+String(v.plate));
   renderStorage();renderDashboard();
+}
+
+// ====== 車両サブカード順序入替（↕ドラッグ） ======
+var _vscDrag=null;
+function vscDragStart(e){
+  var el=e.target.closest('.vsc-item');
+  if(!el) return;
+  _vscDrag={driverId:parseInt(el.dataset.driverId),vehicleId:parseInt(el.dataset.vehicleId)};
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain','');
+  el.style.opacity='0.4';
+}
+function vscDragOver(e){
+  e.preventDefault();
+  var el=e.target.closest('.vsc-item');
+  if(el) el.style.boxShadow='0 -3px 0 0 #4a90e2';
+}
+function vscDragLeave(e){
+  var el=e.target.closest('.vsc-item');
+  if(el) el.style.boxShadow='';
+}
+function vscDrop(e){
+  e.preventDefault();
+  e.stopPropagation();
+  var targetEl=e.target.closest('.vsc-item');
+  if(targetEl) targetEl.style.boxShadow='';
+  if(!_vscDrag||!targetEl) return;
+  var dragVid=_vscDrag.vehicleId;
+  var dropVid=parseInt(targetEl.dataset.vehicleId);
+  var driverId=_vscDrag.driverId;
+  _vscDrag=null;
+  if(dragVid===dropVid) return;
+  // ドライバーのvehicleOrderを更新
+  var driver=drivers.find(d=>d.id==driverId);
+  if(!driver) return;
+  // 現在の車両順序を取得
+  var cvs=vehicles.filter(v=>(v.driverId&&String(v.driverId)===String(driverId))||v.driver===driver.name);
+  var order=cvs.map(v=>v.id);
+  // vehicleOrderがあればそれを使用
+  if(driver.vehicleOrder&&driver.vehicleOrder.length) order=driver.vehicleOrder.slice();
+  // ドラッグ元を削除して、ドロップ先の前に挿入
+  var fromIdx=order.indexOf(dragVid);
+  if(fromIdx<0) return;
+  order.splice(fromIdx,1);
+  var toIdx=order.indexOf(dropVid);
+  if(toIdx<0) toIdx=order.length;
+  order.splice(toIdx,0,dragVid);
+  driver.vehicleOrder=order;
+  saveLocal();isDirty=true;scheduleAutoSave();
+  addLog('割当','車両順序変更: '+driver.name+' ['+order.map(id=>{var v=vehicles.find(x=>x.id==id);return v?String(v.plate):id;}).join('→')+']');
+  renderStorage();
 }
 
 function storageToggleExpand(key){
@@ -8121,6 +8175,10 @@ function renderStorage(){
       const typeIcon=d.type==='社員'?'社':d.type==='外注'||d.type==='外注（個人）'?'外':'個';
       const typeColor=d.type==='社員'?'background:#1565C0;color:#fff':d.type==='外注'||d.type==='外注（個人）'?'background:#E65100;color:#fff':'background:#6A1B9A;color:#fff';
       const cvs=allVehiclesUnfiltered.filter(v=>(v.driverId&&String(v.driverId)===String(d.id))||v.driver===d.name);
+      // vehicleOrderがあれば順序に従ってソート
+      if(d.vehicleOrder&&d.vehicleOrder.length){
+        cvs.sort(function(a,b){var ia=d.vehicleOrder.indexOf(a.id);var ib=d.vehicleOrder.indexOf(b.id);if(ia<0)ia=999;if(ib<0)ib=999;return ia-ib;});
+      }
       const cv=cvs[0]||null;
       const plateStr=cvs.length?cvs.map(v=>v.plate).join(', '):'車両未割当';
       const vaf=cv?(cv.attachedFiles||[]):[];
@@ -8233,14 +8291,17 @@ function renderStorage(){
 
       // 搭乗車両（複数対応）
       if(cvs.length){
-        cvs.forEach(function(cv){
+        cardHtml+='<div id="vsc-wrap-'+d.id+'">';
+        cvs.forEach(function(cv,cvIdx){
         var vaf2=cv.attachedFiles||[];
         var hasS2=vaf2.some(function(f){return (f.category||'').includes('車検');});
         var hasJ2=vaf2.some(function(f){return (f.category||'').includes('自賠');});
         var hasN2=vaf2.some(function(f){return (f.category||'').includes('任意');});
-        cardHtml+='<div style="padding:10px 12px;background:#b8bfc9;color:#333;border-radius:8px;font-size:11px;margin-top:6px">';
+        var posLabel=cvIdx===0?'<span style="font-size:8px;padding:1px 6px;border-radius:3px;background:#1565C0;color:#fff;margin-right:4px">メイン</span>':'<span style="font-size:8px;padding:1px 6px;border-radius:3px;background:#888;color:#fff;margin-right:4px">予備</span>';
+        cardHtml+='<div class="vsc-item" data-driver-id="'+d.id+'" data-vehicle-id="'+cv.id+'" draggable="true" ondragstart="vscDragStart(event)" ondragover="vscDragOver(event)" ondragleave="vscDragLeave(event)" ondrop="vscDrop(event)" style="padding:10px 12px;background:#b8bfc9;color:#333;border-radius:8px;font-size:11px;margin-top:6px;transition:box-shadow .15s">';
         cardHtml+='<div style="display:flex;align-items:center;margin-bottom:4px;gap:8px">';
-        cardHtml+='<div style="flex:1;min-width:0"><span style="font-size:10px;color:#555">搭乗車両</span> <strong style="cursor:pointer;color:#4a90e2" onclick="event.stopPropagation();navigateToVehicle(\''+esc(cv.plate)+'\')">'+cv.plate+'</strong> <span style="color:#666">'+(cv.model||'')+'</span></div>';
+        cardHtml+='<span style="cursor:grab;color:#666;font-size:14px;user-select:none;flex-shrink:0" title="ドラッグで順序入替">↕</span>';
+        cardHtml+='<div style="flex:1;min-width:0">'+posLabel+'<span style="font-size:10px;color:#555">搭乗車両</span> <strong style="cursor:pointer;color:#4a90e2" onclick="event.stopPropagation();navigateToVehicle(\''+esc(cv.plate)+'\')">'+cv.plate+'</strong> <span style="color:#666">'+(cv.model||'')+'</span></div>';
         cardHtml+='<button class="btn btn-sm" style="font-size:10px;padding:2px 10px;flex-shrink:0" onclick="event.stopPropagation();openVehicleModal('+cv.id+')">編集</button>';
         cardHtml+='<span style="font-size:10px;padding:3px 10px;border-radius:20px;cursor:pointer;background:#4a90e2;color:#fff;flex-shrink:0" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'\')">+ 追加</span>';
         cardHtml+='<span style="font-size:14px;color:#888;cursor:pointer;flex-shrink:0;padding:0 4px" onclick="event.stopPropagation();detachVehicle('+cv.id+')" title="搭乗解除">×</span>';
@@ -8275,6 +8336,7 @@ function renderStorage(){
         }
         cardHtml+='</div>';
         });
+        cardHtml+='</div>'; // close vsc-wrap
       } else {
         cardHtml+='<div style="font-size:11px;color:#e53935;margin-top:4px">車両未割当</div>';
       }
