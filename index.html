@@ -1727,38 +1727,35 @@ function isSafeToSave(silent){
   // 初回保存（前回データなし）は常に許可
   if(!prev.drivers&&!prev.vehicles) return updateSaveCounts(curF);
 
-  // === 複数カテゴリ同時急減チェック ===
-  // 1カテゴリだけの減少 = 正常な退職/廃車の可能性が高い → 許可
-  // 2カテゴリ以上の同時急減 = データ破損の疑い → ブロック
-  var drasticCount=0;
+  // === 単一カテゴリ30%以上減少チェック ===
   var warn=[];
-  // ドライバー急減チェック
-  if(prevD>0 && drivers.length===0){drasticCount++;warn.push('ドライバー: '+prevD+'→0名');}
-  else if(prevD>5 && drivers.length<prevD*0.3){drasticCount++;warn.push('ドライバー: '+prevD+'→'+drivers.length+'名(70%以上減)');}
-  // 車両急減チェック
-  if(prevV>0 && vehicles.length===0){drasticCount++;warn.push('車両: '+prevV+'→0台');}
-  else if(prevV>5 && vehicles.length<prevV*0.3){drasticCount++;warn.push('車両: '+prevV+'→'+vehicles.length+'台(70%以上減)');}
-  // 添付ファイル急減チェック
-  if(prevF>5 && curF===0){drasticCount++;warn.push('添付ファイル: '+prevF+'→0件');}
-  else if(prevF>10 && curF<prevF*0.3){drasticCount++;warn.push('添付ファイル: '+prevF+'→'+curF+'件(70%以上減)');}
-
-  // 2カテゴリ以上が同時に急減 → 危険（データ破損の疑い）
-  if(drasticCount>=2){
-    if(silent){
-      console.warn('複数カテゴリ同時急減検知（自動保存ブロック）:',warn.join(', '));
-      addLog('同期','複数カテゴリ同時急減で自動保存ブロック: '+warn.join(', '));
-      return false;
-    }
-    var ok=confirm('⚠ 複数カテゴリのデータが同時に大幅減少しています:\n\n'+warn.join('\n')+'\n\nデータ破損の可能性があります。\n正当な変更であれば「OK」、不明な場合は「キャンセル」を押してください。');
-    if(!ok){
-      addLog('同期','ユーザーが同時急減保存をキャンセル');
-      return false;
-    }
-    addLog('同期','ユーザーが同時急減保存を承認: '+warn.join(', '));
+  // ドライバー減少チェック
+  if(prevD>=3 && drivers.length<prevD*0.7){
+    warn.push('ドライバー: '+prevD+'→'+drivers.length+'名('+Math.round((1-drivers.length/prevD)*100)+'%減)');
   }
-  // 1カテゴリだけの減少はログのみ（退職/廃車として許可）
-  else if(drasticCount===1){
-    addLog('同期','1カテゴリ減少（許可）: '+warn.join(', '));
+  // 車両減少チェック
+  if(prevV>=3 && vehicles.length<prevV*0.7){
+    warn.push('車両: '+prevV+'→'+vehicles.length+'台('+Math.round((1-vehicles.length/prevV)*100)+'%減)');
+  }
+  // 添付ファイル減少チェック
+  if(prevF>=5 && curF<prevF*0.5){
+    warn.push('添付ファイル: '+prevF+'→'+curF+'件('+Math.round((1-curF/prevF)*100)+'%減)');
+  }
+
+  if(warn.length){
+    if(silent){
+      // 自動保存はブロック
+      console.warn('データ急減検知（自動保存ブロック）:',warn.join(', '));
+      addLog('同期','データ急減で自動保存ブロック: '+warn.join(', '));
+      return false;
+    }
+    // 手動保存は確認ダイアログ
+    var ok=confirm('⚠ データが大幅に減少しています:\n\n'+warn.join('\n')+'\n\n正当な変更（退職・廃車等）であれば「OK」、\n心当たりがなければ「キャンセル」を押してリロードしてください。');
+    if(!ok){
+      addLog('同期','ユーザーが急減保存をキャンセル');
+      return false;
+    }
+    addLog('同期','ユーザーが急減保存を承認: '+warn.join(', '));
   }
   return updateSaveCounts(curF);
 }
