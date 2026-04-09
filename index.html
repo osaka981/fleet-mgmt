@@ -126,6 +126,7 @@ body.modal-open{overflow:hidden}
 .split-card{transition:box-shadow .15s,opacity .15s}
 .split-card.drag-over{box-shadow:0 0 0 2px #4a90e2!important;background:#f0f6ff!important}
 .split-card[draggable]:active{opacity:.6}
+@media(max-width:768px){.split-grid-3{grid-template-columns:1fr!important}}
 .form-group input,.form-group select{padding:8px 12px;font-size:13px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#1a1a1a;font-family:inherit}
 .form-group input:focus,.form-group select:focus{outline:none;border-color:#4a90e2}
 .section-title{font-size:11px;font-weight:600;color:#888;padding:8px 0 6px;border-bottom:1px solid #e0e0e0;margin-bottom:10px;grid-column:1/-1}
@@ -8064,17 +8065,21 @@ function renderStorage(){
       var plateLabel=cvs2.length?cvs2.map(v=>'<span style="background:#546E7A;color:#fff;padding:1px 6px;border-radius:3px;font-size:9px">'+esc(String(v.plate))+'</span>').join(' '):'<span style="color:#ccc;font-size:10px">未搭乗</span>';
       var licExp=d.license?.exp||'';
       var licColor=licExp?(daysUntil(licExp)<0?'#c62828':daysUntil(licExp)<=30?'#e65100':'#2e7d32'):'#888';
-      return '<div class="split-card split-driver" draggable="true" data-kind="driver" data-id="'+d.id+'" data-name="'+esc(d.name)+'" ondragstart="splitDragStart(event)" ondragover="splitDragOver(event)" ondragleave="splitDragLeave(event)" ondrop="splitDrop(event)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff;border:1px solid #e0e0e0;border-radius:8px;cursor:grab;transition:box-shadow .15s">'+
-        '<span style="color:#bbb;font-size:14px;cursor:grab;flex-shrink:0;user-select:none" title="ドラッグで車両に割当">≡</span>'+
-        '<div style="width:28px;height:28px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;flex-shrink:0">'+typeIcon+'</div>'+
-        '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(d.name)+'</div>'+
-        '<div style="font-size:10px;color:#888">'+offLabel+'</div></div>'+
-        '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+plateLabel+'</div>'+
-        (licExp?'<div style="font-size:10px;font-weight:600;color:'+licColor+';flex-shrink:0;min-width:60px;text-align:right">免許 '+licExp.slice(5)+'</div>':'<div style="font-size:10px;color:#ccc;flex-shrink:0;min-width:60px;text-align:right">免許 —</div>')+
-        '<button class="btn btn-sm" style="font-size:9px;padding:2px 8px;flex-shrink:0" onclick="event.stopPropagation();openDriverModal('+d.id+')">編集</button>'+
+      return '<div class="split-card split-driver" draggable="true" data-kind="driver" data-id="'+d.id+'" data-name="'+esc(d.name)+'" ondragstart="splitDragStart(event)" ondragover="splitDragOver(event)" ondragleave="splitDragLeave(event)" ondrop="splitDrop(event)" style="padding:10px;background:#fff;border:1px solid #e0e0e0;border-radius:8px;cursor:grab;transition:box-shadow .15s">'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+          '<span style="color:#bbb;font-size:12px;cursor:grab;user-select:none">≡</span>'+
+          '<div style="width:26px;height:26px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:600;font-size:9px;flex-shrink:0">'+typeIcon+'</div>'+
+          '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(d.name)+'</div></div>'+
+          '<button class="btn btn-sm" style="font-size:9px;padding:1px 6px" onclick="event.stopPropagation();openDriverModal('+d.id+')">編集</button>'+
+        '</div>'+
+        '<div style="font-size:10px;color:#888;margin-bottom:4px">'+offLabel+'</div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px">'+
+          '<div style="display:flex;gap:3px;flex-wrap:wrap">'+plateLabel+'</div>'+
+          (licExp?'<span style="font-size:9px;font-weight:600;color:'+licColor+'">免許 '+licExp.slice(5)+'</span>':'<span style="font-size:9px;color:#ccc">免許 —</span>')+
+        '</div>'+
       '</div>';
     });
-    html+='<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:20px">'+driverCardsSplit.join('')+'</div>';
+    html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:20px" class="split-grid-3">'+driverCardsSplit.join('')+'</div>';
     }
     // --- 車両一覧 ---
     if(allVehicles.length){
@@ -8087,17 +8092,21 @@ function renderStorage(){
       var shakenColor=shakenExp?(daysUntil(shakenExp)<0?'#c62828':daysUntil(shakenExp)<=30?'#e65100':'#2e7d32'):'#888';
       var companyBadge=v._src&&v._src!=='自社'?'<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#f3e5f5;color:#6A1B9A;margin-left:4px">'+esc(v._src)+'</span>':'';
       var driverBadge=driverName?'<span style="background:#1565C0;color:#fff;padding:1px 6px;border-radius:3px;font-size:9px">'+esc(driverName)+'</span>':'<span style="color:#ccc;font-size:10px">未割当</span>';
-      return '<div class="split-card split-vehicle" draggable="true" data-kind="vehicle" data-id="'+v.id+'" data-plate="'+esc(String(v.plate))+'" ondragstart="splitDragStart(event)" ondragover="splitDragOver(event)" ondragleave="splitDragLeave(event)" ondrop="splitDrop(event)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff;border:1px solid #e0e0e0;border-radius:8px;cursor:grab;transition:box-shadow .15s">'+
-        '<span style="color:#bbb;font-size:14px;cursor:grab;flex-shrink:0;user-select:none" title="ドラッグでドライバーに割当">≡</span>'+
-        '<div style="width:28px;height:28px;border-radius:50%;background:#546E7A;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:9px;flex-shrink:0">車</div>'+
-        '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(v.plate))+(v.model?' <span style="font-weight:400;color:#888;font-size:11px">'+esc(v.model)+'</span>':'')+companyBadge+'</div>'+
-        '<div style="font-size:10px;color:#888">'+offLabel+'</div></div>'+
-        '<div style="flex-shrink:0">'+driverBadge+'</div>'+
-        (shakenExp?'<div style="font-size:10px;font-weight:600;color:'+shakenColor+';flex-shrink:0;min-width:60px;text-align:right">車検 '+shakenExp.slice(5)+'</div>':'<div style="font-size:10px;color:#ccc;flex-shrink:0;min-width:60px;text-align:right">車検 —</div>')+
-        '<button class="btn btn-sm" style="font-size:9px;padding:2px 8px;flex-shrink:0" onclick="event.stopPropagation();openVehicleModal('+v.id+')">編集</button>'+
+      return '<div class="split-card split-vehicle" draggable="true" data-kind="vehicle" data-id="'+v.id+'" data-plate="'+esc(String(v.plate))+'" ondragstart="splitDragStart(event)" ondragover="splitDragOver(event)" ondragleave="splitDragLeave(event)" ondrop="splitDrop(event)" style="padding:10px;background:#fff;border:1px solid #e0e0e0;border-radius:8px;cursor:grab;transition:box-shadow .15s">'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+          '<span style="color:#bbb;font-size:12px;cursor:grab;user-select:none">≡</span>'+
+          '<div style="width:26px;height:26px;border-radius:50%;background:#546E7A;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:9px;flex-shrink:0">車</div>'+
+          '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(v.plate))+(v.model?' <span style="font-weight:400;color:#888;font-size:10px">'+esc(v.model)+'</span>':'')+companyBadge+'</div></div>'+
+          '<button class="btn btn-sm" style="font-size:9px;padding:1px 6px" onclick="event.stopPropagation();openVehicleModal('+v.id+')">編集</button>'+
+        '</div>'+
+        '<div style="font-size:10px;color:#888;margin-bottom:4px">'+offLabel+'</div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px">'+
+          '<div>'+driverBadge+'</div>'+
+          (shakenExp?'<span style="font-size:9px;font-weight:600;color:'+shakenColor+'">車検 '+shakenExp.slice(5)+'</span>':'<span style="font-size:9px;color:#ccc">車検 —</span>')+
+        '</div>'+
       '</div>';
     });
-    html+='<div style="display:flex;flex-direction:column;gap:4px">'+vehicleCardsSplit.join('')+'</div>';
+    html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px" class="split-grid-3">'+vehicleCardsSplit.join('')+'</div>';
     }
     el.innerHTML=html;return;
   }
