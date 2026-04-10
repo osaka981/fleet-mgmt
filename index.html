@@ -696,7 +696,7 @@ body.modal-open{overflow:hidden}
             </select>
           </div>
           <div style="margin:10px 0;display:flex;justify-content:flex-end;gap:8px">
-            <button class="btn btn-sm" onclick="downloadAllZip()" style="font-size:12px" id="zip-all-btn">📦 全営業所ZIP</button>
+            <button class="btn btn-sm" onclick="openZipModal()" style="font-size:12px" id="zip-all-btn">全営業所ZIP</button>
             <button class="btn btn-primary" onclick="sendMailAllOffices()" style="font-size:12px">全営業所に一括送信</button>
           </div>
           <div class="doc-gen-grid" id="doc-office-cards"></div>
@@ -2663,8 +2663,8 @@ function renderDocPage(){
       subCheckHtml+='</div>';
     }
     return `<div class="doc-card">
-      <div class="doc-card-name" style="cursor:pointer" onclick="var b=this.parentElement.querySelector('.doc-card-body');b.style.display=b.style.display==='none'?'block':'none';this.querySelector('.doc-fold').textContent=b.style.display==='none'?'▶':'▼'">${office}営業所 <span class="badge badge-info" style="font-size:10px">${POST_OFFICE(office)}宛</span> <span class="doc-fold" style="font-size:10px;color:#aaa;margin-left:auto">▼</span></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:4px"><div class="doc-card-info" style="margin-bottom:0">社員 ${employees.length}名 / 外注 ${subcons.length+coCompanies.length}件 / 車両 ${offV.length}台</div><div style="display:flex;gap:4px"><button class="btn btn-sm" onclick="event.stopPropagation();docSelectAll('${office}')" style="font-size:9px;padding:3px 8px;background:#E8F5E9;border-color:#A5D6A7;color:#2E7D32">全選択</button><button class="btn btn-sm btn-primary" id="doc-dl-${office}" onclick="event.stopPropagation();docDownloadAll('${office}')" style="font-size:9px;padding:3px 8px;display:none">DL</button><button class="mail-btn" onclick="event.stopPropagation();openMailModal('${office}')" style="font-size:10px;padding:4px 10px">メール送信</button></div></div>
+      <div class="doc-card-name">${office}営業所 <span class="badge badge-info" style="font-size:10px">${POST_OFFICE(office)}宛</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:4px"><div class="doc-card-info" style="margin-bottom:0">社員 ${employees.length}名 / 外注 ${subcons.length+coCompanies.length}件 / 車両 ${offV.length}台</div><div style="display:flex;gap:4px"><button class="mail-btn" onclick="event.stopPropagation();openMailModal('${office}')" style="font-size:10px;padding:4px 10px">メール送信</button></div></div>
       <div class="doc-card-body" style="display:block">
       <div style="display:flex;gap:0;border-bottom:2px solid #e0e0e0;margin:6px 0 8px">
         <button class="doc-tab active" data-tab="${tabId}" data-idx="0" onclick="switchDocTab('${tabId}',0)">現況届</button>
@@ -3544,9 +3544,11 @@ function openMailSendModal(taskId){
   if(msSub.length) attachHtml+='<span class="mail-badge active" style="padding:2px 8px;border-radius:10px;font-size:10px;cursor:pointer;background:#FFF3E0;color:#E65100">外注('+msSub.length+')</span>';
   attachHtml+='<span style="font-size:9px;color:#4a90e2;cursor:pointer;margin-left:auto" onclick="document.querySelectorAll(\'[id^=mms-fold-]\').forEach(function(e){e.style.display=\'block\';})">全展開</span>';
   attachHtml+='<span style="font-size:9px;color:#4a90e2;cursor:pointer" onclick="document.querySelectorAll(\'[id^=mms-fold-]\').forEach(function(e){e.style.display=\'none\';})">全折畳</span>';
+  attachHtml+='<span style="font-size:9px;color:#4a90e2;cursor:pointer" onclick="if(confirm(\'契約書が含まれている可能性があります。全選択しますか？\'))document.querySelectorAll(\'.mail-attach-check[data-group=driver],.mail-attach-check[data-group=vehicle]\').forEach(function(c){c.checked=true;})">全選択</span>';
+  attachHtml+='<span style="font-size:9px;color:#888;cursor:pointer" onclick="document.querySelectorAll(\'.mail-attach-check[data-group=driver],.mail-attach-check[data-group=vehicle]\').forEach(function(c){c.checked=false;})">全解除</span>';
   attachHtml+='</div>';
-  // ドライバーリスト（書類生成メール送信と同一構造）
-  var isDefaultCatMs=function(cat){return['免許','車検','自賠責','任意保険'].some(function(k){return(cat||'').includes(k);});};
+  // ドライバーリスト
+  var isDefaultCatMs=function(cat){var c=(cat||'').toLowerCase();if(c.includes('その他')||c.includes('健康診断'))return false;return true;};
   taskDrivers.forEach(function(dr,di){
     var dFiles=dr.driverFiles||[];
     var vFiles=dr.vehicleFiles||[];
@@ -3566,7 +3568,13 @@ function openMailSendModal(taskId){
       attachHtml+='<div style="padding:2px 0 0 12px">';
       dFiles.forEach(function(f,fi){
         var chk=isDefaultCatMs(f.name)?'checked':'';
-        attachHtml+='<label style="display:flex;align-items:center;gap:4px;font-size:10px;padding:1px 0;cursor:pointer"><input type="checkbox" '+chk+' class="mail-attach-check" data-file-id="'+(f.fileId||'')+'" data-group="driver" data-driver-idx="'+di+'" data-cat="'+esc(f.name)+'" onchange="mailCheckSensitiveFile(this)"> '+esc(f.name)+'</label>';
+        var expWarn='';
+        // 免許証の期限切れチェック
+        if((f.name||'').includes('免許')){
+          var drObj=drivers.find(function(x){return x.id==dr.driverId;});
+          if(drObj&&drObj.license&&drObj.license.exp&&daysUntil(drObj.license.exp)<0) expWarn=' <span style="color:#c62828;font-weight:600;font-size:9px">期限切れ</span>';
+        }
+        attachHtml+='<label style="display:flex;align-items:center;gap:4px;font-size:10px;padding:1px 0;cursor:pointer"><input type="checkbox" '+chk+' class="mail-attach-check" data-file-id="'+(f.fileId||'')+'" data-group="driver" data-driver-idx="'+di+'" data-cat="'+esc(f.name)+'" onchange="mailCheckSensitiveFile(this)"> '+esc(f.name)+expWarn+'</label>';
       });
       attachHtml+='</div></div>';
     }
@@ -3576,9 +3584,17 @@ function openMailSendModal(taskId){
       attachHtml+='<div style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:3px 6px;background:#E8F5E9;border-radius:4px;font-size:10px;font-weight:500;color:#2E7D32" onclick="var t=this.nextElementSibling;t.style.display=t.style.display===\'none\'?\'block\':\'none\'">車両: '+esc(dr.vehiclePlate)+' '+vFiles.length+'件 <span style="margin-left:auto;font-size:9px">▼</span></div>';
       attachHtml+='<div style="padding:2px 0 0 12px">';
       if(vFiles.length){
+        var vObj=vehicles.find(function(x){return x.id==dr.vehicleId;});
         vFiles.forEach(function(f,fi){
           var chk=isDefaultCatMs(f.name)?'checked':'';
-          attachHtml+='<label style="display:flex;align-items:center;gap:4px;font-size:10px;padding:1px 0;cursor:pointer"><input type="checkbox" '+chk+' class="mail-attach-check" data-file-id="'+(f.fileId||'')+'" data-group="vehicle" data-driver-idx="'+di+'" data-cat="'+esc(f.name)+'" onchange="mailCheckSensitiveFile(this)"> '+esc(f.name)+'</label>';
+          var expWarn='';
+          if(vObj){
+            var fn=(f.name||'').toLowerCase();
+            if(fn.includes('車検')&&vObj.shaken&&vObj.shaken.exp&&daysUntil(vObj.shaken.exp)<0) expWarn=' <span style="color:#c62828;font-weight:600;font-size:9px">期限切れ</span>';
+            if(fn.includes('自賠')&&vObj.jibai&&vObj.jibai.exp&&daysUntil(vObj.jibai.exp)<0) expWarn=' <span style="color:#c62828;font-weight:600;font-size:9px">期限切れ</span>';
+            if(fn.includes('任意')&&vObj.nin&&vObj.nin.exp&&daysUntil(vObj.nin.exp)<0) expWarn=' <span style="color:#c62828;font-weight:600;font-size:9px">期限切れ</span>';
+          }
+          attachHtml+='<label style="display:flex;align-items:center;gap:4px;font-size:10px;padding:1px 0;cursor:pointer"><input type="checkbox" '+chk+' class="mail-attach-check" data-file-id="'+(f.fileId||'')+'" data-group="vehicle" data-driver-idx="'+di+'" data-cat="'+esc(f.name)+'" onchange="mailCheckSensitiveFile(this)"> '+esc(f.name)+expWarn+'</label>';
         });
       } else {
         attachHtml+='<span style="color:#aaa;font-size:10px">車両書類なし</span>';
@@ -4147,6 +4163,10 @@ async function generatePdfViaApps(office, docType, dateStr){
 }
 
 async function generateDoc(office,type){
+  // 二重クリック防止
+  if(window._docGenerating){return;}
+  window._docGenerating=true;
+  document.querySelectorAll('.doc-tab-content button').forEach(b=>{b.disabled=true;b.style.opacity='0.5';});
   const dateStr=getDocDate();
   const tag=document.getElementById('doc-tag')?.value||'定期（3ヶ月）';
   const prog=document.getElementById(`prog-${office}`);
@@ -4270,6 +4290,7 @@ async function generateDoc(office,type){
     if(generatedFiles.length){recordHistory(office,generatedFiles,tag);}
     prog.textContent=`${generatedFiles.length}件ダウンロードしました`;
   }catch(e){prog.textContent='生成エラー: '+e.message;console.error(e);}
+  finally{window._docGenerating=false;document.querySelectorAll('.doc-tab-content button').forEach(b=>{b.disabled=false;b.style.opacity='1';});}
 }
 
 // テンプレートdocxから差し込み生成
@@ -5955,6 +5976,264 @@ async function handleSidebarDrop(event){
   setTimeout(function(){statusEl.style.display='none';},8000);
 }
 
+// ====== ZIP生成モーダル ======
+function openZipModal(){
+  var targetOffices=getDocOffices();
+  // 全ドライバー（営業所別）
+  var allDriversByOffice={};
+  targetOffices.forEach(function(o){
+    var offD=drivers.filter(d=>belongsToOffice(d,o)&&(!d.status||d.status==='在籍'));
+    var coD=[];
+    companies.forEach(c=>{(c.drivers||[]).forEach(d=>{if((d.offices||[]).includes(o))coD.push({...d,_co:c.name});});});
+    allDriversByOffice[o]=[...offD,...coD];
+  });
+
+  // 前回生成情報
+  var prevInfo=JSON.parse(localStorage.getItem('fleet_zip_history')||'{}');
+  var prevHtml='';
+  if(prevInfo.time){
+    var dataHash=simpleHash(JSON.stringify(drivers)+JSON.stringify(vehicles));
+    var changed=prevInfo.dataHash&&prevInfo.dataHash!==dataHash;
+    prevHtml='<div style="padding:8px 12px;background:'+(changed?'#fff3e0':'#f1f8e9')+';border-radius:6px;margin-bottom:12px;font-size:11px">'+
+      '<div>前回: <strong>'+prevInfo.time+'</strong>'+(prevInfo.device?' ('+prevInfo.device+')':'')+'</div>'+
+      (changed?'<div style="color:#e65100;font-weight:600;margin-top:4px">⚠ 前回生成後にデータ変更があります</div>':'')+
+      '<div style="margin-top:6px"><label style="cursor:pointer"><input type="radio" name="zip-reuse" value="new" '+(changed?'checked':'')+'>新規生成（最新データで全書類を生成）</label></div>'+
+      '<div><label style="cursor:pointer"><input type="radio" name="zip-reuse" value="reuse" '+(!changed?'checked':'')+'>前回のファイルを再利用</label></div>'+
+    '</div>';
+  }
+
+  var html='<div class="modal-bg" id="zip-modal" style="display:flex" onclick="if(event.target===this)this.remove()">'+
+    '<div class="modal" style="max-width:600px" onclick="event.stopPropagation()">'+
+    '<div class="modal-header"><span class="modal-title">ZIP生成</span><button class="modal-close" onclick="document.getElementById(\'zip-modal\').remove()">✕</button></div>'+
+    '<div class="modal-body" style="padding:16px;font-size:13px;max-height:70vh;overflow-y:auto">';
+
+  // 営業所選択
+  html+='<div style="margin-bottom:12px"><div style="font-weight:600;margin-bottom:6px">対象営業所:</div><div style="display:flex;gap:8px;flex-wrap:wrap">';
+  targetOffices.forEach(function(o){
+    html+='<label style="cursor:pointer;display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" class="zip-office" value="'+o+'" checked>'+o+'</label>';
+  });
+  html+='</div></div>';
+
+  // 書類選択
+  html+='<div style="margin-bottom:12px"><div style="font-weight:600;margin-bottom:6px">対象書類:</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">';
+  var docTypes=[
+    {id:'genkyo',label:'現況届'},
+    {id:'koyou',label:'雇用証明書'},
+    {id:'houkoku',label:'報告書'},
+    {id:'saitaku',label:'再委託承認願'},
+    {id:'seiyaku_osaka',label:'誓約書（大阪急配）'},
+    {id:'seiyaku_sub',label:'誓約書（再委託先）'},
+    {id:'tekigo_osaka',label:'適合証明書（大阪急配）'},
+    {id:'tekigo_sub',label:'適合証明書（再委託先）'},
+  ];
+  docTypes.forEach(function(dt){
+    html+='<label style="cursor:pointer;display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" class="zip-doctype" value="'+dt.id+'" checked>'+dt.label+'</label>';
+  });
+  html+='</div></div>';
+
+  // ドライバー/車両書類
+  html+='<div style="margin-bottom:12px"><div style="display:flex;gap:12px">';
+  html+='<label style="cursor:pointer;display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" class="zip-extra" value="driver_files" checked>ドライバー書類（免許証等）</label>';
+  html+='<label style="cursor:pointer;display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" class="zip-extra" value="vehicle_files" checked>車両書類（車検証等）</label>';
+  html+='</div></div>';
+
+  // ドライバー選択（再委託先書類用）
+  html+='<div style="margin-bottom:12px;padding:10px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0">';
+  html+='<div style="font-weight:600;margin-bottom:6px">対象ドライバー選択 <span style="font-size:10px;color:#888;font-weight:400">（再委託承認願・誓約書(再)・適合証明書(再)に適用）</span></div>';
+  html+='<div style="margin-bottom:6px;display:flex;gap:8px"><button class="btn btn-sm" style="font-size:10px;padding:2px 8px" onclick="document.querySelectorAll(\'.zip-driver\').forEach(c=>c.checked=true)">全選択</button><button class="btn btn-sm" style="font-size:10px;padding:2px 8px" onclick="document.querySelectorAll(\'.zip-driver\').forEach(c=>c.checked=false)">全解除</button></div>';
+  targetOffices.forEach(function(o){
+    var drvs=allDriversByOffice[o]||[];
+    if(!drvs.length) return;
+    html+='<div style="margin-bottom:4px"><span style="font-size:10px;color:#888;font-weight:600">'+o+':</span></div>';
+    html+='<div style="display:flex;flex-wrap:wrap;gap:4px 12px;margin-bottom:8px">';
+    drvs.forEach(function(d){
+      var typeLabel=d.type==='社員'?'社員':d._co?d._co:'外注';
+      html+='<label style="cursor:pointer;display:flex;align-items:center;gap:3px;font-size:11px"><input type="checkbox" class="zip-driver" data-office="'+o+'" value="'+d.id+'" data-name="'+(d.name||'')+'" checked>'+d.name+'<span style="font-size:9px;color:#888">('+typeLabel+')</span></label>';
+    });
+    html+='</div>';
+  });
+  html+='</div>';
+
+  // 前回生成情報
+  html+=prevHtml;
+
+  html+='</div>';
+  html+='<div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">';
+  html+='<button class="btn" onclick="document.getElementById(\'zip-modal\').remove()">キャンセル</button>';
+  html+='<button class="btn btn-primary" id="zip-gen-btn" onclick="execZipGeneration()">生成＆ZIPダウンロード</button>';
+  html+='</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+function simpleHash(str){
+  var h=0;for(var i=0;i<str.length;i++){h=((h<<5)-h)+str.charCodeAt(i);h|=0;}
+  return String(Math.abs(h));
+}
+
+async function execZipGeneration(){
+  var btn=document.getElementById('zip-gen-btn');
+  if(!btn) return;
+  btn.disabled=true;btn.textContent='生成中...';
+
+  try{
+    var JSZipLib=await loadJSZip();
+    var zip=new JSZipLib();
+    var dateStr=getDocDate();
+    var tag=document.getElementById('doc-tag')?.value||'定期（3ヶ月）';
+
+    // 選択された営業所
+    var selOffices=[];
+    document.querySelectorAll('.zip-office:checked').forEach(c=>selOffices.push(c.value));
+    if(!selOffices.length){alert('営業所を選択してください');btn.disabled=false;btn.textContent='生成＆ZIPダウンロード';return;}
+
+    // 選択された書類
+    var selDocs=[];
+    document.querySelectorAll('.zip-doctype:checked').forEach(c=>selDocs.push(c.value));
+
+    // ドライバー/車両書類
+    var inclDriverFiles=document.querySelector('.zip-extra[value="driver_files"]:checked');
+    var inclVehicleFiles=document.querySelector('.zip-extra[value="vehicle_files"]:checked');
+
+    // 選択されたドライバー（IDリスト）
+    var selDriverIds=[];
+    document.querySelectorAll('.zip-driver:checked').forEach(c=>selDriverIds.push(c.value));
+
+    var totalFiles=0;
+
+    for(var oi=0;oi<selOffices.length;oi++){
+      var office=selOffices[oi];
+      var offFolder=zip.folder(office);
+      btn.textContent=office+' 生成中...';
+
+      var offD=drivers.filter(d=>belongsToOffice(d,office)&&(!d.status||d.status==='在籍'));
+      var offV=vehicles.filter(v=>belongsToOffice(v,office));
+      var offSubcons=[];
+      // ドライバー選択に基づくsubconsリスト構築
+      offD.forEach(d=>{if(selDriverIds.includes(String(d.id)))offSubcons.push(d);});
+      companies.forEach(c=>{(c.drivers||[]).forEach(d=>{
+        if((d.offices||[]).includes(office)&&selDriverIds.includes(String(d.id)))
+          offSubcons.push({...d,type:'外注',sub:{company:d.name},addr:d.addr||'',tel:d.tel||'',kana:d.kana||'',_co:c.name});
+      });});
+
+      // 生成書類ごとにフォルダ分け
+      for(var di=0;di<selDocs.length;di++){
+        var docType=selDocs[di];
+        btn.textContent=office+' / '+docType+' 生成中...';
+        try{
+          if(docType==='genkyo'||docType==='koyou'||docType==='houkoku'){
+            var pdfType=docType==='genkyo'?'genkyo':docType;
+            var resp=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'generatePdf',docType:pdfType,office:office,dateStr:dateStr,drivers:offD,vehicles:offV})});
+            var json=await resp.json();
+            if(json.ok&&json.base64){
+              var folderName=docType==='genkyo'?'現況届':docType==='koyou'?'雇用証明書':'報告書';
+              offFolder.folder(folderName).file(json.fileName,json.base64,{base64:true});
+              totalFiles++;
+            }
+          } else if(docType==='saitaku'){
+            var f2=offFolder.folder('再委託承認願');
+            for(var si=0;si<offSubcons.length;si++){
+              var d=offSubcons[si];
+              var xml=genSaitakuXml(office,dateStr,d);
+              var blob=await buildDocx(xml,d);
+              var ab=await blob.arrayBuffer();
+              f2.file(office+'_再委託承認願_'+d.name+'_'+dateStr+'.docx',ab);
+              totalFiles++;
+            }
+          } else if(docType==='seiyaku_osaka'){
+            var xml2=genSeiyakuOsakaXml(office,dateStr);
+            var blob2=await buildDocx(xml2,null);
+            var ab2=await blob2.arrayBuffer();
+            offFolder.folder('誓約書').file(office+'_誓約書_大阪急配_'+dateStr+'.docx',ab2);
+            totalFiles++;
+          } else if(docType==='seiyaku_sub'){
+            var f3=offFolder.folder('誓約書');
+            for(var si2=0;si2<offSubcons.length;si2++){
+              var d2=offSubcons[si2];
+              var xml3=genSeiyakuSubXml(dateStr,d2);
+              var blob3=await buildDocx(xml3,d2);
+              var ab3=await blob3.arrayBuffer();
+              f3.file(office+'_誓約書_'+d2.name+'_'+dateStr+'.docx',ab3);
+              totalFiles++;
+            }
+          } else if(docType==='tekigo_osaka'){
+            var xml4=genTekigoOsakaXml?genTekigoOsakaXml(dateStr,office):null;
+            if(xml4){var blob4=await buildDocx(xml4,null);var ab4=await blob4.arrayBuffer();offFolder.folder('適合証明書').file(office+'_適合証明書_大阪急配_'+dateStr+'.docx',ab4);totalFiles++;}
+          } else if(docType==='tekigo_sub'){
+            var f4=offFolder.folder('適合証明書');
+            for(var si3=0;si3<offSubcons.length;si3++){
+              var d3=offSubcons[si3];
+              var xml5=typeof genTekigoSubXml==='function'?genTekigoSubXml(dateStr,d3):null;
+              if(xml5){var blob5=await buildDocx(xml5,d3);var ab5=await blob5.arrayBuffer();f4.file(office+'_適合証明書_'+d3.name+'_'+dateStr+'.docx',ab5);totalFiles++;}
+            }
+          }
+        }catch(e){console.error('ZIP生成エラー:',office,docType,e);}
+        await new Promise(r=>setTimeout(r,100));
+      }
+
+      // ドライバー書類（免許証等）
+      if(inclDriverFiles){
+        var df=offFolder.folder('ドライバー書類');
+        offD.forEach(function(d){
+          (d.attachedFiles||[]).forEach(function(f){
+            if(f.fileId&&f.name){df.file(d.name+'_'+f.name,fetchFileAsBase64(f.fileId),{base64:true});totalFiles++;}
+          });
+        });
+      }
+
+      // 車両書類（車検証等）
+      if(inclVehicleFiles){
+        var vf=offFolder.folder('車両書類');
+        offV.forEach(function(v){
+          (v.attachedFiles||[]).forEach(function(f){
+            if(f.fileId&&f.name){vf.file(String(v.plate)+'_'+f.name,fetchFileAsBase64(f.fileId),{base64:true});totalFiles++;}
+          });
+        });
+      }
+    }
+
+    if(totalFiles===0){
+      alert('生成するファイルがありません。営業所と書類を選択してください。');
+      btn.disabled=false;btn.textContent='生成＆ZIPダウンロード';return;
+    }
+
+    btn.textContent='ZIP圧縮中...';
+    var content=await zip.generateAsync({type:'blob'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(content);
+    a.download='全営業所_'+dateStr+'.zip';
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    // 生成履歴保存
+    localStorage.setItem('fleet_zip_history',JSON.stringify({
+      time:new Date().toLocaleString('ja-JP'),
+      device:navigator.userAgent.includes('Mobile')?'スマホ':'PC',
+      offices:selOffices,
+      dataHash:simpleHash(JSON.stringify(drivers)+JSON.stringify(vehicles))
+    }));
+
+    btn.textContent=totalFiles+'件 ダウンロード完了';
+    setTimeout(function(){document.getElementById('zip-modal')?.remove();},2000);
+  }catch(e){
+    alert('ZIP生成エラー: '+e.message);
+    console.error(e);
+    btn.disabled=false;btn.textContent='生成＆ZIPダウンロード';
+  }
+}
+
+function fetchFileAsBase64(fileId){
+  // Note: this returns a promise but JSZip handles it
+  return fetch(API_URL+'?action=getFileBlob&fileId='+fileId)
+    .then(r=>r.json())
+    .then(j=>{
+      if(j.ok&&j.dataUrl){
+        return j.dataUrl.split(',')[1]||'';
+      }
+      return '';
+    }).catch(()=>'');
+}
+
 // ====== 全営業所ZIP一括生成 ======
 async function downloadAllZip(){
   const btn=document.getElementById('zip-all-btn');
@@ -6023,7 +6302,7 @@ async function downloadAllZip(){
     downloadBlob(blob,'大阪急配_全営業所_'+dateStr+'.zip');
     alert('ZIP生成完了（'+totalFiles+'ファイル）');
   }catch(e){alert('ZIPエラー: '+e.message);}
-  finally{if(btn){btn.disabled=false;btn.textContent='📦 全営業所ZIP';}}
+  finally{if(btn){btn.disabled=false;btn.textContent='全営業所ZIP';}}
 }
 
 // ====== メール送信履歴CSVエクスポート ======
