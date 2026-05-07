@@ -1462,6 +1462,53 @@ let contractors=JSON.parse(localStorage.getItem('fleet_companies')||localStorage
 let currentOfficeFilter=null,vSortCol=null,vSortDir=1,dSortCol=null,dSortDir=1;
 let editingVehicleId=null,editingDriverId=null;
 
+// ── 起動時データ正規化(防衛的) ──
+// localStorage または GAS/Sheets から読み込んだデータで、本来配列であるべきフィールドが
+// JSON文字列やオブジェクト({0:..., 1:...})になっている場合、配列に正規化する
+// (旧データ・GAS同期エラー・Firebase配列化問題への保険)
+function _normalizeArrayField(v){
+  if(Array.isArray(v)) return v;
+  if(typeof v === 'string'){
+    try{ const p = JSON.parse(v); return Array.isArray(p) ? p : (p && typeof p==='object' ? Object.values(p) : []); }catch(_){ return []; }
+  }
+  if(v && typeof v === 'object') return Object.values(v);
+  return [];
+}
+function _normalizeDriver(d){
+  if(!d || typeof d !== 'object') return d;
+  d.attachedFiles = _normalizeArrayField(d.attachedFiles);
+  d.archivedFiles = _normalizeArrayField(d.archivedFiles);
+  d.offices       = _normalizeArrayField(d.offices);
+  d.otherDocs     = _normalizeArrayField(d.otherDocs);
+  // ネスト object フィールド
+  ['license','other','sub','leave'].forEach(k=>{
+    if(typeof d[k]==='string'){ try{ d[k]=JSON.parse(d[k]); }catch(_){ d[k]={}; } }
+    if(!d[k] || typeof d[k]!=='object' || Array.isArray(d[k])) d[k]={};
+  });
+  return d;
+}
+function _normalizeVehicle(v){
+  if(!v || typeof v !== 'object') return v;
+  v.attachedFiles = _normalizeArrayField(v.attachedFiles);
+  v.archivedFiles = _normalizeArrayField(v.archivedFiles);
+  ['shaken','jibai','nin'].forEach(k=>{
+    if(typeof v[k]==='string'){ try{ v[k]=JSON.parse(v[k]); }catch(_){ v[k]={}; } }
+    if(!v[k] || typeof v[k]!=='object' || Array.isArray(v[k])) v[k]={};
+  });
+  return v;
+}
+try{
+  drivers  = drivers.map(_normalizeDriver);
+  vehicles = vehicles.map(_normalizeVehicle);
+  contractors = contractors.map(c=>{
+    if(c && typeof c==='object'){
+      c.drivers  = _normalizeArrayField(c.drivers).map(_normalizeDriver);
+      c.vehicles = _normalizeArrayField(c.vehicles).map(_normalizeVehicle);
+    }
+    return c;
+  });
+}catch(e){ console.warn('Initial normalization warning:', e); }
+
 function isDocTarget(office){return !docExclude.includes(office);}
 function getDocOffices(){return offices.filter(o=>isDocTarget(o));}
 function toggleDocExclude(office){
@@ -1545,11 +1592,11 @@ async function syncFromSheet(){
     // drivers/vehicles/companies取得
     const res=await fetch(API_URL+'?action=getAll');const json=await res.json();
     if(json.ok){
-      if(json.data.drivers?.length){drivers=json.data.drivers.map(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles'].includes(k)?[]:{};} });if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];if(!Array.isArray(d.offices))d.offices=typeof d.offices==='string'?[d.offices]:[];if(!d.license)d.license={};if(!d.other)d.other={};if(!d.sub)d.sub={};return d;});}
+      if(json.data.drivers?.length){drivers=json.data.drivers.map(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles','archivedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles','archivedFiles'].includes(k)?[]:{};} });if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];if(!Array.isArray(d.archivedFiles))d.archivedFiles=Array.isArray(d.archivedFiles)?d.archivedFiles:(d.archivedFiles&&typeof d.archivedFiles==='object'?Object.values(d.archivedFiles):[]);if(!Array.isArray(d.offices))d.offices=typeof d.offices==='string'?[d.offices]:[];if(!d.license)d.license={};if(!d.other)d.other={};if(!d.sub)d.sub={};return d;});}
         // attachedFiles保護: Sheet解析でファイルが消えた場合、ローカルを保持
         var _oldDrvs=JSON.parse(localStorage.getItem("fleet_drivers")||"[]");
         drivers.forEach(function(d){if(!d.attachedFiles||!d.attachedFiles.length){var od=_oldDrvs.find(function(o){return o.id==d.id;});if(od&&od.attachedFiles&&od.attachedFiles.length)d.attachedFiles=od.attachedFiles;}});
-      if(json.data.vehicles?.length){vehicles=json.data.vehicles.map(v=>{['shaken','jibai','nin','attachedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=k==='attachedFiles'?[]:{};} });if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];v.plate=String(v.plate||"");if(!v.shaken)v.shaken={};if(!v.jibai)v.jibai={};if(!v.nin)v.nin={};return v;});}
+      if(json.data.vehicles?.length){vehicles=json.data.vehicles.map(v=>{['shaken','jibai','nin','attachedFiles','archivedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=['attachedFiles','archivedFiles'].includes(k)?[]:{};} });if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];if(!Array.isArray(v.archivedFiles))v.archivedFiles=(v.archivedFiles&&typeof v.archivedFiles==='object'?Object.values(v.archivedFiles):[]);v.plate=String(v.plate||"");if(!v.shaken)v.shaken={};if(!v.jibai)v.jibai={};if(!v.nin)v.nin={};return v;});}
         var _oldVehs=JSON.parse(localStorage.getItem("fleet_vehicles")||"[]");
         vehicles.forEach(function(v){if(!v.attachedFiles||!v.attachedFiles.length){var ov=_oldVehs.find(function(o){return o.id==v.id;});if(ov&&ov.attachedFiles&&ov.attachedFiles.length)v.attachedFiles=ov.attachedFiles;}});
       if(json.data.companies?.length){
@@ -1557,6 +1604,21 @@ async function syncFromSheet(){
           ['drivers','vehicles'].forEach(k=>{
             if(typeof c[k]==='string')try{c[k]=JSON.parse(c[k]);}catch(e){c[k]=[];}
             if(!Array.isArray(c[k]))c[k]=[];
+          });
+          // ネストされたdrivers/vehiclesの正規化(archivedFiles等のJSON文字列を配列に変換)
+          (c.drivers||[]).forEach(d=>{
+            ['license','other','sub','offices','otherDocs','leave','attachedFiles','archivedFiles'].forEach(k=>{
+              if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles','archivedFiles'].includes(k)?[]:{};}
+            });
+            if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];
+            if(!Array.isArray(d.archivedFiles))d.archivedFiles=(d.archivedFiles&&typeof d.archivedFiles==='object'?Object.values(d.archivedFiles):[]);
+          });
+          (c.vehicles||[]).forEach(v=>{
+            ['attachedFiles','archivedFiles'].forEach(k=>{
+              if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=[];}
+            });
+            if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];
+            if(!Array.isArray(v.archivedFiles))v.archivedFiles=(v.archivedFiles&&typeof v.archivedFiles==='object'?Object.values(v.archivedFiles):[]);
           });
           return c;
         });
@@ -1655,16 +1717,31 @@ async function syncAll(saveFirst){
     const res=await fetch(API_URL+'?action=getAll');
     const json=await res.json();
     if(json.ok){
-      if(json.data.drivers?.length){drivers=json.data.drivers.map(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles'].includes(k)?[]:{};} });if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];if(!Array.isArray(d.offices))d.offices=typeof d.offices==='string'?[d.offices]:[];if(!d.license)d.license={};if(!d.other)d.other={};if(!d.sub)d.sub={};return d;});}
+      if(json.data.drivers?.length){drivers=json.data.drivers.map(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles','archivedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles','archivedFiles'].includes(k)?[]:{};} });if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];if(!Array.isArray(d.archivedFiles))d.archivedFiles=Array.isArray(d.archivedFiles)?d.archivedFiles:(d.archivedFiles&&typeof d.archivedFiles==='object'?Object.values(d.archivedFiles):[]);if(!Array.isArray(d.offices))d.offices=typeof d.offices==='string'?[d.offices]:[];if(!d.license)d.license={};if(!d.other)d.other={};if(!d.sub)d.sub={};return d;});}
         // attachedFiles保護: Sheet解析でファイルが消えた場合、ローカルを保持
         var _oldDrvs=JSON.parse(localStorage.getItem("fleet_drivers")||"[]");
         drivers.forEach(function(d){if(!d.attachedFiles||!d.attachedFiles.length){var od=_oldDrvs.find(function(o){return o.id==d.id;});if(od&&od.attachedFiles&&od.attachedFiles.length)d.attachedFiles=od.attachedFiles;}});
-      if(json.data.vehicles?.length){vehicles=json.data.vehicles.map(v=>{['shaken','jibai','nin','attachedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=k==='attachedFiles'?[]:{};} });if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];v.plate=String(v.plate||"");if(!v.shaken)v.shaken={};if(!v.jibai)v.jibai={};if(!v.nin)v.nin={};return v;});}
+      if(json.data.vehicles?.length){vehicles=json.data.vehicles.map(v=>{['shaken','jibai','nin','attachedFiles','archivedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=['attachedFiles','archivedFiles'].includes(k)?[]:{};} });if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];if(!Array.isArray(v.archivedFiles))v.archivedFiles=(v.archivedFiles&&typeof v.archivedFiles==='object'?Object.values(v.archivedFiles):[]);v.plate=String(v.plate||"");if(!v.shaken)v.shaken={};if(!v.jibai)v.jibai={};if(!v.nin)v.nin={};return v;});}
         var _oldVehs=JSON.parse(localStorage.getItem("fleet_vehicles")||"[]");
         vehicles.forEach(function(v){if(!v.attachedFiles||!v.attachedFiles.length){var ov=_oldVehs.find(function(o){return o.id==v.id;});if(ov&&ov.attachedFiles&&ov.attachedFiles.length)v.attachedFiles=ov.attachedFiles;}});
       if(json.data.companies?.length){
         companies=json.data.companies.map(c=>{
           ['drivers','vehicles'].forEach(k=>{if(typeof c[k]==='string')try{c[k]=JSON.parse(c[k]);}catch(e){c[k]=[];}if(!Array.isArray(c[k]))c[k]=[];});
+          // ネストされたdrivers/vehiclesの正規化(archivedFiles等のJSON文字列を配列に変換)
+          (c.drivers||[]).forEach(d=>{
+            ['license','other','sub','offices','otherDocs','leave','attachedFiles','archivedFiles'].forEach(k=>{
+              if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles','archivedFiles'].includes(k)?[]:{};}
+            });
+            if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];
+            if(!Array.isArray(d.archivedFiles))d.archivedFiles=(d.archivedFiles&&typeof d.archivedFiles==='object'?Object.values(d.archivedFiles):[]);
+          });
+          (c.vehicles||[]).forEach(v=>{
+            ['attachedFiles','archivedFiles'].forEach(k=>{
+              if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=[];}
+            });
+            if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];
+            if(!Array.isArray(v.archivedFiles))v.archivedFiles=(v.archivedFiles&&typeof v.archivedFiles==='object'?Object.values(v.archivedFiles):[]);
+          });
           return c;
         });
         contractors=companies;
@@ -4830,14 +4907,16 @@ function renderArchive(){
       else archDrivers=archDrivers.filter(d=>belongsToOffice(d,filterOffice));
     }
     archDrivers.forEach(d=>{
-      (d.archivedFiles||[]).forEach((f,i)=>{
+      const arc = Array.isArray(d.archivedFiles) ? d.archivedFiles : (d.archivedFiles && typeof d.archivedFiles==='object' ? Object.values(d.archivedFiles) : []);
+      arc.forEach((f,i)=>{
         allArchivedFiles.push({...f, ownerName:f.ownerName||d.name, driverId:d.id, idx:i});
       });
     });
     companies.forEach(c=>{
       (c.drivers||[]).forEach(d=>{
         if(filterOffice!=='全て'&&filterOffice!=='未分類'&&!(d.offices||[]).includes(filterOffice)) return;
-        (d.archivedFiles||[]).forEach((f,i)=>{
+        const arc = Array.isArray(d.archivedFiles) ? d.archivedFiles : (d.archivedFiles && typeof d.archivedFiles==='object' ? Object.values(d.archivedFiles) : []);
+        arc.forEach((f,i)=>{
           allArchivedFiles.push({...f, ownerName:f.ownerName||d.name+' ['+c.name+']', driverId:d.id, idx:i, isCompany:true, companyId:c.id});
         });
       });
@@ -12775,14 +12854,14 @@ setInterval(function(){
         }catch(e){}
       }
       if(!updated) return;
-      if(json.data.drivers?.length){drivers=json.data.drivers.map(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles'].includes(k)?[]:{};} });if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];if(!Array.isArray(d.offices))d.offices=typeof d.offices==='string'?[d.offices]:[];if(!d.license)d.license={};if(!d.other)d.other={};if(!d.sub)d.sub={};return d;});}
+      if(json.data.drivers?.length){drivers=json.data.drivers.map(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles','archivedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles','archivedFiles'].includes(k)?[]:{};} });if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];if(!Array.isArray(d.archivedFiles))d.archivedFiles=Array.isArray(d.archivedFiles)?d.archivedFiles:(d.archivedFiles&&typeof d.archivedFiles==='object'?Object.values(d.archivedFiles):[]);if(!Array.isArray(d.offices))d.offices=typeof d.offices==='string'?[d.offices]:[];if(!d.license)d.license={};if(!d.other)d.other={};if(!d.sub)d.sub={};return d;});}
         // attachedFiles保護: Sheet解析でファイルが消えた場合、ローカルを保持
         var _oldDrvs=JSON.parse(localStorage.getItem("fleet_drivers")||"[]");
         drivers.forEach(function(d){if(!d.attachedFiles||!d.attachedFiles.length){var od=_oldDrvs.find(function(o){return o.id==d.id;});if(od&&od.attachedFiles&&od.attachedFiles.length)d.attachedFiles=od.attachedFiles;}});
-      if(json.data.vehicles?.length){vehicles=json.data.vehicles.map(v=>{['shaken','jibai','nin','attachedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=k==='attachedFiles'?[]:{};} });if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];v.plate=String(v.plate||"");if(!v.shaken)v.shaken={};if(!v.jibai)v.jibai={};if(!v.nin)v.nin={};return v;});}
+      if(json.data.vehicles?.length){vehicles=json.data.vehicles.map(v=>{['shaken','jibai','nin','attachedFiles','archivedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=['attachedFiles','archivedFiles'].includes(k)?[]:{};} });if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];if(!Array.isArray(v.archivedFiles))v.archivedFiles=(v.archivedFiles&&typeof v.archivedFiles==='object'?Object.values(v.archivedFiles):[]);v.plate=String(v.plate||"");if(!v.shaken)v.shaken={};if(!v.jibai)v.jibai={};if(!v.nin)v.nin={};return v;});}
         var _oldVehs=JSON.parse(localStorage.getItem("fleet_vehicles")||"[]");
         vehicles.forEach(function(v){if(!v.attachedFiles||!v.attachedFiles.length){var ov=_oldVehs.find(function(o){return o.id==v.id;});if(ov&&ov.attachedFiles&&ov.attachedFiles.length)v.attachedFiles=ov.attachedFiles;}});
-      if(json.data.companies?.length){companies=json.data.companies.map(c=>{['drivers','vehicles'].forEach(k=>{if(typeof c[k]==='string')try{c[k]=JSON.parse(c[k]);}catch(e){c[k]=[];}if(!Array.isArray(c[k]))c[k]=[];});return c;});contractors=companies;}
+      if(json.data.companies?.length){companies=json.data.companies.map(c=>{['drivers','vehicles'].forEach(k=>{if(typeof c[k]==='string')try{c[k]=JSON.parse(c[k]);}catch(e){c[k]=[];}if(!Array.isArray(c[k]))c[k]=[];});(c.drivers||[]).forEach(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles','archivedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles','archivedFiles'].includes(k)?[]:{};} });if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];if(!Array.isArray(d.archivedFiles))d.archivedFiles=(d.archivedFiles&&typeof d.archivedFiles==='object'?Object.values(d.archivedFiles):[]);});(c.vehicles||[]).forEach(v=>{['attachedFiles','archivedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=[];} });if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];if(!Array.isArray(v.archivedFiles))v.archivedFiles=(v.archivedFiles&&typeof v.archivedFiles==='object'?Object.values(v.archivedFiles):[]);});return c;});contractors=companies;}
       drivers=dedup(drivers);vehicles=dedup(vehicles);
       companies.forEach(c=>{c.drivers=dedup(c.drivers||[]);c.vehicles=dedup(c.vehicles||[]);});
       saveLocal();isDirty=false;
