@@ -12806,7 +12806,7 @@ function scheduleAutoSave(){
     _autoSaveTimer=null;
     if(!isDirty) return;
     if(sessionStorage.getItem('fleet_session')!=='ok') return;
-    if(!isSafeToSave()) return;
+    if(!isSafeToSave(true)) return;
     fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())})
       .then(r=>r.json())
       .then(j=>{
@@ -12877,7 +12877,7 @@ setInterval(function(){
 window.addEventListener('beforeunload', function(){
   if(!isDirty) return;
   if(sessionStorage.getItem('fleet_session')!=='ok') return;
-  if(!isSafeToSave()) return;
+  if(!isSafeToSave(true)) return;
   const payload=JSON.stringify(buildSavePayload());
   navigator.sendBeacon(API_URL, payload);
   isDirty=false;
@@ -12889,7 +12889,7 @@ document.addEventListener('visibilitychange', function(){
     // 非表示時: 変更があれば保存
     if(!isDirty) return;
     if(sessionStorage.getItem('fleet_session')!=='ok') return;
-    if(!isSafeToSave()) return;
+    if(!isSafeToSave(true)) return;
     const payload=JSON.stringify(buildSavePayload());
     navigator.sendBeacon(API_URL, payload);
     isDirty=false;
