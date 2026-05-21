@@ -6692,7 +6692,7 @@ function performUndo(){
   saveLocal();renderAll();
   try{localStorage.setItem('fleet_undo',JSON.stringify(undoStack));}catch(e){}
   updateUndoBadge();
-  setSyncStatus('↩ 元に戻しました: '+entry.label,'sync-ok');
+  setSyncStatus('元に戻しました: '+entry.label,'sync-ok');
   addLog('Undo','操作取消: '+entry.label);
 }
 function updateUndoBadge(){
