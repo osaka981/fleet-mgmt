@@ -1761,7 +1761,15 @@ async function syncAll(saveFirst){
             if(parsed.mailTasks&&Array.isArray(parsed.mailTasks)){mailTasks=parsed.mailTasks;localStorage.setItem('fleet_mail_tasks',JSON.stringify(mailTasks));}
             if(parsed.officeAreas&&typeof parsed.officeAreas==='object'){officeAreas=parsed.officeAreas;}
             if(parsed.officePostMap&&typeof parsed.officePostMap==='object'){officePostMap=parsed.officePostMap;}
-            if(parsed.unassignedFiles&&Array.isArray(parsed.unassignedFiles)){unassignedFiles=parsed.unassignedFiles;}
+            if(parsed.unassignedFiles&&Array.isArray(parsed.unassignedFiles)){
+              var _merged=unassignedFiles.slice();
+              var _localIds={};
+              _merged.forEach(function(f){if(f.fileId)_localIds[f.fileId]=true;});
+              parsed.unassignedFiles.forEach(function(f){
+                if(f.fileId&&!_localIds[f.fileId]){_merged.push(f);_localIds[f.fileId]=true;}
+              });
+              unassignedFiles=_merged;
+            }
             if(parsed.docExclude&&Array.isArray(parsed.docExclude)){docExclude=parsed.docExclude;}
             if(parsed.mailSettings&&typeof parsed.mailSettings==='object'){localStorage.setItem('fleet_mail_settings',JSON.stringify(parsed.mailSettings));}
             if(parsed.stampSettings&&typeof parsed.stampSettings==="object"){localStorage.setItem("fleet_stamp_settings",JSON.stringify(parsed.stampSettings));}
@@ -12844,7 +12852,15 @@ setInterval(function(){
             }
             if(parsed.officeAreas&&typeof parsed.officeAreas==='object'){officeAreas=parsed.officeAreas;}
             if(parsed.officePostMap&&typeof parsed.officePostMap==='object'){officePostMap=parsed.officePostMap;}
-            if(parsed.unassignedFiles&&Array.isArray(parsed.unassignedFiles)){unassignedFiles=parsed.unassignedFiles;}
+            if(parsed.unassignedFiles&&Array.isArray(parsed.unassignedFiles)){
+              var _m2=unassignedFiles.slice();
+              var _ids2={};
+              _m2.forEach(function(f){if(f.fileId)_ids2[f.fileId]=true;});
+              parsed.unassignedFiles.forEach(function(f){
+                if(f.fileId&&!_ids2[f.fileId]){_m2.push(f);_ids2[f.fileId]=true;}
+              });
+              unassignedFiles=_m2;
+            }
             if(parsed.docExclude&&Array.isArray(parsed.docExclude)){docExclude=parsed.docExclude;}
             if(parsed.mailSettings&&typeof parsed.mailSettings==='object'){localStorage.setItem('fleet_mail_settings',JSON.stringify(parsed.mailSettings));}
             if(parsed.stampSettings&&typeof parsed.stampSettings==="object"){localStorage.setItem("fleet_stamp_settings",JSON.stringify(parsed.stampSettings));}
