@@ -1583,7 +1583,32 @@ function cleanUnassignedFiles(){
   if(unassignedFiles.length!==before) console.log('[cleanUnassigned] removed '+(before-unassignedFiles.length)+' registered/duplicate files');
 }
 const LOGO_THUMB='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAEIElEQVR4nO3ab0zUdRzA8ffvd78DTjj+icSAcWBp9ihttQhcRkmz8UA32LQ/D3pAPTAXyyW1BK1dVNoqzWYITC1XbawtN9RRNJg18JZzbeWslU6osFBE/gRjHHfXo37ZSvnB53dk2+f16A4+97n7vrndbncYaS/kxlBzZv7XD+D/TgMKaUAhDSikAYU0oJAGFNKAQhpQSAMKaUAhDSikAYU0oJAGFNKAQhpQSAMKaUAhDSikAYU0oJAGFNKAQhpQSAMKaUAhy+2Fww39R93e6bb0rXkVbu3SZ6CQBhTSgEKG/n+gjD4DhTSgkAYU0oBCGlBIAwppQCENKKQBhTSgkGsfZ2UlL+SVihe5t6iU1CQ/R75r58NTrTxbVgNAdetT/DY64Nbd3TBcC/j+I02UFBbb10cnx8hOWcTKonsA8FlJbt3VnNWVP0dygo9dX+xlYOyiKztdCZifnmfHa+xpIdixE49psubWcjfWu8IyLTav2oRpmLx38qMbK2Buao59ue1MO+NT426sddVN/mxMw/2XfHHALWU1bCl7xr5+tPpjAAqCy657O3+in7ryWlYvLSNzQQbfXDhNw+c7+eqnU7Oem2nmzbWv8egd6+35UE0nAG8df4eXPntVdH5xwCQrCc9Vf9lINEKM63/EmLkgg66NxwhkFAAQjUVZdfNKSouKWbt/A93nTzieczLjT0zB6/nrqH8+xmgsKj2+/G1MsGMHFS2V9vWKlkqy6gOMTo5d8zYND20nkFHAucvnWf5GCTnbF/NuTzOWabHtwednNedk5onWTTz2QbW9t3RPOVn1AYIdO6THn//3gV6PReXt6wB4vWsXvUN9TEXC7DtxAIA781fg9ViO5nxen6Nd8RTf7f9iSdYtJHi8ADRW7aaxavfffu8xPeT4c/Anpsw4V1J4t6NdPw//Eq/jzH/Aq/X0hrgyMfyPnw9NXMGfmDLj3MjkiKNd8TTvAc8OnmM6Oo1lWnzybRvNoYNznkvweB3tApiOhu3LqUkp15ybrbi+Bo6HJ+zLixcWATAVCXP49BEAtq6u5YEl9+ExPfi8PjasqCItKdXxnNNdAP0jv9qX1y+vIjkhGX+iX3xGV77WLA7cRfuThwFY07SOUN9JAAozA3y9uRvDMAAIBG9jZHKURclZdG08Rn56HgDhyDSW6cEwDPZ82Uh9exDA0ZzTXYZhcOLpTpZlL7Ufd1PoALVtdaKzx/UZ2DvUx7ZPX+bi75cYHL9MblouAJfGByl++372djdzZuB7pqNhfhg8S3PoIPtC++3bO5lzuisWi/Hwocfp/PE4o5Nj9I9cIBqNiM+oX6wL6eeBQhpQSAMKaUAhDSikAYU0oJAGFNKAQhpQSAMKaUAhDSikAYU0oJAGFNKAQhpQSAMKaUAhDSikAYX+AJ8vsi9kYWTLAAAAAElFTkSuQmCC';
-function saveLocal(){localStorage.setItem('fleet_vehicles',JSON.stringify(vehicles));localStorage.setItem('fleet_drivers',JSON.stringify(drivers));localStorage.setItem('fleet_offices',JSON.stringify(offices));localStorage.setItem('fleet_office_areas',JSON.stringify(officeAreas));localStorage.setItem('fleet_office_post',JSON.stringify(officePostMap));localStorage.setItem('fleet_companies',JSON.stringify(companies));localStorage.setItem('fleet_unassigned',JSON.stringify(unassignedFiles.filter(function(f){return !f._inbox;})));localStorage.setItem('fleet_doc_exclude',JSON.stringify(docExclude));isDirty=true;scheduleAutoSave();}
+function saveLocal(){
+  // ★ localStorage 5MB超過対策: Drive保存済み(fileIdあり)のdataUrlを除去
+  function stripDataUrls(files){
+    if(!Array.isArray(files)) return files;
+    files.forEach(function(f){if(f.fileId && f.dataUrl){f.dataUrl='';}});
+    return files;
+  }
+  drivers.forEach(function(d){stripDataUrls(d.attachedFiles);stripDataUrls(d.archivedFiles);});
+  vehicles.forEach(function(v){stripDataUrls(v.attachedFiles);stripDataUrls(v.archivedFiles);});
+  companies.forEach(function(c){(c.drivers||[]).forEach(function(d){stripDataUrls(d.attachedFiles);stripDataUrls(d.archivedFiles);});(c.vehicles||[]).forEach(function(v){stripDataUrls(v.attachedFiles);stripDataUrls(v.archivedFiles);});});
+  stripDataUrls(unassignedFiles);
+  try{
+    localStorage.setItem('fleet_vehicles',JSON.stringify(vehicles));
+    localStorage.setItem('fleet_drivers',JSON.stringify(drivers));
+    localStorage.setItem('fleet_offices',JSON.stringify(offices));
+    localStorage.setItem('fleet_office_areas',JSON.stringify(officeAreas));
+    localStorage.setItem('fleet_office_post',JSON.stringify(officePostMap));
+    localStorage.setItem('fleet_companies',JSON.stringify(companies));
+    localStorage.setItem('fleet_unassigned',JSON.stringify(unassignedFiles.filter(function(f){return !f._inbox;})));
+    localStorage.setItem('fleet_doc_exclude',JSON.stringify(docExclude));
+  }catch(e){
+    console.error('localStorage保存エラー（容量超過の可能性）:',e);
+    setSyncStatus('保存エラー: 容量不足','sync-err');
+  }
+  isDirty=true;scheduleAutoSave();
+}
 function parsePlate(plate){plate=String(plate||'');if(!plate)return{chiiki:'',bunrui:'',kana:'',num:''};const p=plate.trim().replace(/\s+/g,' ').split(' ');if(p.length>=4)return{chiiki:p[0],bunrui:p[1],kana:p[2],num:p[3]};const m=plate.match(/^([^\d]+?)(\d{3})\s*([あ-ん])\s*(\d+)/);if(m)return{chiiki:m[1].trim(),bunrui:m[2],kana:m[3],num:m[4]};return{chiiki:plate,bunrui:'',kana:'',num:''};}
 
 // ====== 同期 ======
