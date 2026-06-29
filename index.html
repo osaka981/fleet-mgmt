@@ -2797,7 +2797,7 @@ function renderDocPage(){
   const targetOffices=getDocOffices();
   document.getElementById('doc-office-cards').innerHTML=targetOffices.map(office=>{
     const offD=drivers.filter(d=>belongsToOffice(d,office)&&(!d.status||d.status==='在籍'));
-    const offV=vehicles.filter(v=>belongsToOffice(v,office));
+    const offV=vehicles.filter(v=>belongsToOffice(v,office)&&(!v.status||v.status==='稼働'));
     const employees=offD.filter(d=>d.type==='社員');
     const subcons=offD.filter(d=>d.type==='外注').sort((a,b)=>b.id-a.id);
     // 委託会社情報を構築
@@ -3183,7 +3183,7 @@ function genGenkyoPersonXml(office,dateStr){
 function genGenkyoVehicleXml(office,dateStr){
   const postOffice=POST_OFFICE_MAP[office]||office+'郵便局';
   const dy=fmtDateY(dateStr);
-  const offV=vehicles.filter(v=>belongsToOffice(v,office));
+  const offV=vehicles.filter(v=>belongsToOffice(v,office)&&(!v.status||v.status==='稼働'));
   // 委託会社の車両も含める
   let companyVehicles=[];
   companies.forEach(c=>{
@@ -3225,7 +3225,7 @@ function genHoukokuXml(office,dateStr){
   const postOffice=POST_OFFICE_MAP[office]||office+'郵便局';
   const dateJp=fmtDate(dateStr);
   const offD=drivers.filter(d=>belongsToOffice(d,office));
-  const offV=vehicles.filter(v=>belongsToOffice(v,office));
+  const offV=vehicles.filter(v=>belongsToOffice(v,office)&&(!v.status||v.status==='稼働'));
   const licRows=offD.map(d=>wr(wc(d.name,2500),wc(d.license?.exp?d.license.exp.replace(/-/g,'/'):'' ,1500,{center:true}),wc(d.license?.type||'普通自動車',1500,{center:true}),wc(d.license?.cond||'○',1500,{center:true}),wc('○',1956,{center:true}))).join('');
   const tbl1=wtbl([2500,1500,1500,1500,1956],[wr(wc('社員等氏名',2500,{shade:'E8E8E8'}),wc('運転免許証の記載内容',6956,{span:'4',shade:'E8E8E8',center:true})),wr(wc('',2500,{shade:'E8E8E8'}),wc('有効期間',1500,{shade:'E8E8E8',center:true}),wc('種類',1500,{shade:'E8E8E8',center:true}),wc('免許の条件等',1500,{shade:'E8E8E8',center:true}),wc('裏面記載事項',1956,{shade:'E8E8E8',center:true})),wr(wc('(例) 郵便　太郎',2500,{shade:'F8F8F8'}),wc('○',1500,{shade:'F8F8F8',center:true}),wc('○',1500,{shade:'F8F8F8',center:true}),wc('○',1500,{shade:'F8F8F8',center:true}),wc('○',1956,{shade:'F8F8F8',center:true})),licRows],9456);
   const vRows=offV.map(v=>wr(wc(v.plate,2200),wc(v.shaken?.exp?v.shaken.exp.replace(/-/g,'/'):'' ,905,{center:true}),wc('事業用',905,{center:true}),wc(v.vehicleUser||COMPANY.name,906,{center:true}),wc('○',906,{center:true}),wc('○',906,{center:true}),wc(v.jibai?.exp?v.jibai.exp.replace(/-/g,'/'):'' ,906,{center:true}),wc(v.nin?.exp?v.nin.exp.replace(/-/g,'/'):'' ,903,{center:true}))).join('');
@@ -4138,7 +4138,7 @@ async function execBulkSendByOffice(){
     const subject='【大阪急配】'+office+'営業所 書類提出 '+dateStr.replace(/-/g,'/');
 
     const offD=drivers.filter(d=>belongsToOffice(d,office)&&(!d.status||d.status==='在籍'));
-    const offV=vehicles.filter(v=>belongsToOffice(v,office));
+    const offV=vehicles.filter(v=>belongsToOffice(v,office)&&(!v.status||v.status==='稼働'));
     const coD=[],coV=[];
     companies.forEach(c=>{
       (c.drivers||[]).forEach(d=>{if((d.offices||[]).includes(office))coD.push({...d,type:'外注',subCompany:c.name});});
@@ -4288,7 +4288,7 @@ function clearAllHistory(){
 async function generatePdfViaApps(office, docType, dateStr){
   const judgeDate = document.getElementById('doc-judge-date')?.value || dateStr;
   const offD = drivers.filter(d=>belongsToOffice(d,office)&&(!d.status||d.status==='在籍'));
-  const offV = vehicles.filter(v=>belongsToOffice(v,office));
+  const offV = vehicles.filter(v=>belongsToOffice(v,office)&&(!v.status||v.status==='稼働'));
 
   // 委託会社ドライバー・車両をofficeに紐付けて追加
   const companyDrivers = [];
@@ -4550,7 +4550,7 @@ async function generateFromTemplate(tplId,office,driver,dateStr){
       }
     }
     // 車両データ（最大15台）
-    var offV=vehicles.filter(v=>belongsToOffice(v,office));
+    var offV=vehicles.filter(v=>belongsToOffice(v,office)&&(!v.status||v.status==='稼働'));
     for(var j=1;j<=15;j++){
       var v=offV[j-1];
       if(v){
@@ -6521,7 +6521,7 @@ async function execZipGeneration(){
       btn.textContent=office+' 生成中...';
 
       var offD=drivers.filter(d=>belongsToOffice(d,office)&&(!d.status||d.status==='在籍'));
-      var offV=vehicles.filter(v=>belongsToOffice(v,office));
+      var offV=vehicles.filter(v=>belongsToOffice(v,office)&&(!v.status||v.status==='稼働'));
       var offSubcons=[];
       // ドライバー選択に基づくsubconsリスト構築
       offD.forEach(d=>{if(selDriverIds.includes(String(d.id)))offSubcons.push(d);});
@@ -6661,7 +6661,7 @@ async function downloadAllZip(){
     for(const office of targetOffices){
       if(btn) btn.textContent='生成中: '+office+'...';
       const offD=drivers.filter(d=>belongsToOffice(d,office)&&(!d.status||d.status==='在籍'));
-      const offV=vehicles.filter(v=>belongsToOffice(v,office));
+      const offV=vehicles.filter(v=>belongsToOffice(v,office)&&(!v.status||v.status==='稼働'));
       const coD=[],coV=[];
       companies.forEach(c=>{
         (c.drivers||[]).forEach(d=>{if((d.offices||[]).includes(office))coD.push({...d,type:'外注',subCompany:c.name});});
@@ -11550,7 +11550,7 @@ function openMailModal(office){
 
   // 本文テンプレート
   const offD = drivers.filter(d=>belongsToOffice(d,office)&&(!d.status||d.status==='在籍'));
-  const offV = vehicles.filter(v=>belongsToOffice(v,office));
+  const offV = vehicles.filter(v=>belongsToOffice(v,office)&&(!v.status||v.status==='稼働'));
   // 委託会社のドライバー・車両も含める
   let companyDriverCount = 0;
   companies.forEach(c=>{
@@ -11864,7 +11864,7 @@ async function sendMail(){
     for(const docType of pdfTypes){
       try{
         const offD = drivers.filter(d=>belongsToOffice(d,office)&&(!d.status||d.status==='在籍'));
-        const offV = vehicles.filter(v=>belongsToOffice(v,office));
+        const offV = vehicles.filter(v=>belongsToOffice(v,office)&&(!v.status||v.status==='稼働'));
         const coD=[],coV=[];
         companies.forEach(c=>{
           (c.drivers||[]).forEach(d=>{if((d.offices||[]).includes(office))coD.push({...d,type:'外注',subCompany:c.name});});
@@ -12051,7 +12051,7 @@ async function sendMailAllOffices(){
     const subject = '【大阪急配】'+office+'営業所 書類提出 '+dateStr.replace(/-/g,'/');
 
     const offD = drivers.filter(d=>belongsToOffice(d,office)&&(!d.status||d.status==='在籍'));
-    const offV = vehicles.filter(v=>belongsToOffice(v,office));
+    const offV = vehicles.filter(v=>belongsToOffice(v,office)&&(!v.status||v.status==='稼働'));
     const coD=[],coV=[];
     companies.forEach(c=>{
       (c.drivers||[]).forEach(d=>{if((d.offices||[]).includes(office))coD.push({...d,type:'外注',subCompany:c.name});});
