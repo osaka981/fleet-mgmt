@@ -3752,7 +3752,7 @@ function openMailSendModal(taskId){
       attachHtml+='<div style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:3px 6px;background:#E3F2FD;border-radius:4px;font-size:10px;font-weight:500;color:#1565C0" onclick="var t=this.nextElementSibling;t.style.display=t.style.display===\'none\'?\'block\':\'none\'">ドライバー書類 '+dFiles.length+'件 <span style="margin-left:auto;font-size:9px">▼</span></div>';
       attachHtml+='<div style="padding:2px 0 0 12px">';
       dFiles.forEach(function(f,fi){
-        var chk=isDefaultCatMs(f.name)?'checked':'';
+        var chk=''; // ★ 2026/06/30: 初期チェックを外す。選んだものだけ送信する(誤添付防止)
         var expWarn='';
         // 免許証の期限切れチェック
         if((f.name||'').includes('免許')){
@@ -3771,7 +3771,7 @@ function openMailSendModal(taskId){
       if(vFiles.length){
         var vObj=vehicles.find(function(x){return x.id==dr.vehicleId;});
         vFiles.forEach(function(f,fi){
-          var chk=isDefaultCatMs(f.name)?'checked':'';
+          var chk=''; // ★ 2026/06/30: 初期チェックを外す(誤添付防止)
           var expWarn='';
           if(vObj){
             var fn=(f.name||'').toLowerCase();
@@ -11955,13 +11955,29 @@ async function sendMail(){
   // 添付ファイル収集
   const fileIds = [];
   const pdfTypes = [];
+  const attachNames = []; // ★ 確認表示用のファイル名
   document.querySelectorAll('.mail-attach-check:checked').forEach(cb => {
     if(cb.dataset.group==='pdf' && cb.dataset.pdfType){
       pdfTypes.push(cb.dataset.pdfType);
+      attachNames.push(cb.parentElement?.textContent?.trim() || cb.dataset.pdfType);
     } else if(cb.dataset.fileId){
       fileIds.push(cb.dataset.fileId);
+      attachNames.push(cb.dataset.cat || cb.parentElement?.textContent?.trim() || 'ファイル');
     }
   });
+
+  // ★ 2026/06/30: 送信前に添付内容を確認(誤添付防止)
+  {
+    const pdfList = pdfTypes.map(t=>({genkyo:'現況届',koyou:'雇用証明書',houkoku:'報告書'}[t]||t));
+    let subTargetCount = document.querySelectorAll('.mail-sub-target:checked').length;
+    const lines = [];
+    if(pdfList.length) lines.push('【自動生成PDF】\n　' + pdfList.join('、'));
+    const fileList = attachNames.filter((n,i)=> i>=pdfTypes.length); // ファイル分
+    if(fileList.length) lines.push('【添付ファイル '+fileList.length+'件】\n　' + fileList.slice(0,30).join('\n　') + (fileList.length>30?'\n　ほか':''));
+    if(subTargetCount) lines.push('【再委託先書類】\n　対象 '+subTargetCount+'件');
+    const confirmMsg = '以下の内容でメールを送信します。\n\n宛先: '+to+'\n\n'+(lines.length?lines.join('\n\n'):'(添付ファイルなし)')+'\n\nこの内容で送信してよろしいですか?';
+    if(!confirm(confirmMsg)){ btn.disabled=false; btn.textContent='送信する'; return; }
+  }
 
   // Step1: PDF生成（現況届・雇用証明書等）
   if(pdfTypes.length){
@@ -12128,9 +12144,14 @@ async function sendMail(){
     alert(totalParts > 1
       ? `メールを${totalParts}通に分割して送信しました（合計添付${fileIds.length}件）`
       : `メールを送信しました（添付${fileIds.length}件）`);
+    // ★ 2026/06/30: メール送信履歴(内容含む)に記録
+    try{ recordMailHistory({office, to, subject, body, attachments:[`PDF/添付 ${fileIds.length}件`], result:'sent'}); }catch(e){}
     closeModal('mail-modal');
     const tag = document.getElementById('doc-tag')?.value||'定期（3ヶ月）';
     recordHistory(office, [{name:'メール送信_'+subject, fileIds:fileIds}], tag);
+  } else {
+    // ★ 一部でも失敗した場合も履歴に残す(失敗として)
+    try{ recordMailHistory({office, to, subject, body, attachments:[`PDF/添付 ${fileIds.length}件`], result:'error'}); }catch(e){}
   }
 
   btn.disabled = false; btn.textContent = '送信する';
