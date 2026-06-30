@@ -11086,8 +11086,8 @@ function openCompanyModal(id){
 
 // 登録番号の正規化（全角→半角、小文字→大文字、ハイフン・スペース除去）
 function normalizeRegCode(code){
-  if(!code) return '';
-  return code.replace(/[\uff01-\uff5e]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+  if(code===null||code===undefined||code==='') return '';
+  return String(code).replace(/[\uff01-\uff5e]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
     .replace(/[\s\-\u2010\u2011\u2012\u2013\u2014\u2015\u30FC\uFF0D]/g,'')
     .toUpperCase().trim();
 }
