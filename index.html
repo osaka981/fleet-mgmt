@@ -11743,11 +11743,11 @@ function renderMailAttachments(office){
   html+='<div id="mm-files" class="mm-tab-panel" style="display:none">';
   // 2. 絞り込みバッジ＋委託会社チェックリスト
   html+='<div style="margin-bottom:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">';
-  html+='<span style="font-size:10px;font-weight:600;color:#555">絞込：</span>';
-  if(employees.length) html+='<span class="mail-badge active" data-type="emp" onclick="mailToggleBadge(this,\''+office+'\')">社員('+employees.length+')</span>';
-  if(subPersons.length) html+='<span class="mail-badge active" data-type="sub" onclick="mailToggleBadge(this,\''+office+'\')">外注('+subPersons.length+')</span>';
+  html+='<span style="font-size:10px;font-weight:600;color:#555">絞込：<span style="font-weight:400;color:#999">(タップでそのグループを全選択/全解除)</span></span>';
+  if(employees.length) html+='<span class="mail-badge" data-type="emp" onclick="mailToggleBadge(this,\''+office+'\')">社員('+employees.length+')</span>';
+  if(subPersons.length) html+='<span class="mail-badge" data-type="sub" onclick="mailToggleBadge(this,\''+office+'\')">外注('+subPersons.length+')</span>';
   companyEntries.forEach(co=>{
-    html+='<span class="mail-badge active" data-type="co" data-co="'+co.name+'" onclick="mailToggleBadge(this,\''+office+'\')">'+co.name+'('+co.drivers.length+')</span>';
+    html+='<span class="mail-badge" data-type="co" data-co="'+co.name+'" onclick="mailToggleBadge(this,\''+office+'\')">'+co.name+'('+co.drivers.length+')</span>';
   });
   html+='<span style="font-size:9px;color:#4a90e2;cursor:pointer;margin-left:auto" onclick="mailExpandAll(true)">全展開</span>';
   html+='<span style="font-size:9px;color:#4a90e2;cursor:pointer" onclick="mailExpandAll(false)">全折畳</span>';
@@ -11870,13 +11870,19 @@ function mailToggleBadge(badge,office){
   var dtype=badge.dataset.type;
   var active=badge.classList.contains('active');
   var coName=badge.dataset.co||'';
-  // 絞り込み: 表示/非表示のみ（チェック状態は変えない）
-  document.querySelectorAll('.mail-driver-row').forEach(row=>{
-    if(dtype==='co'){
-      if(row.dataset.co===coName) row.style.display=active?'':'none';
-    } else {
-      if(row.dataset.dtype===dtype) row.style.display=active?'':'none';
-    }
+  // ★ 2026/06/30: バッジを押すと、そのグループ全員の書類チェックを一括オン/オフ
+  //   active(青く点灯)=全選択、非active=全解除。表示/非表示も連動。
+  document.querySelectorAll('.mail-driver-row').forEach(function(row){
+    var match = (dtype==='co') ? (row.dataset.co===coName) : (row.dataset.dtype===dtype);
+    if(!match) return;
+    // 折り畳みを開いて中身を見せる
+    var fold = row.querySelector('[id^="mm-fold-"],[id^="mms-fold-"]');
+    if(fold) fold.style.display = active ? 'block' : fold.style.display;
+    // 行内の全添付チェックを一括設定
+    row.querySelectorAll('.mail-attach-check').forEach(function(c){ c.checked = active; });
+    // ドライバー行のチェック(送付対象)も連動
+    var dchk = row.querySelector('.mail-driver-check');
+    if(dchk) dchk.checked = active;
   });
 }
 
@@ -11970,11 +11976,17 @@ async function sendMail(){
   {
     const pdfList = pdfTypes.map(t=>({genkyo:'現況届',koyou:'雇用証明書',houkoku:'報告書'}[t]||t));
     let subTargetCount = document.querySelectorAll('.mail-sub-target:checked').length;
+    const subDocList = Array.from(document.querySelectorAll('.mail-sub-doc-check:checked')).map(cb=>cb.dataset.doc||'').filter(Boolean);
     const lines = [];
     if(pdfList.length) lines.push('【自動生成PDF】\n　' + pdfList.join('、'));
     const fileList = attachNames.filter((n,i)=> i>=pdfTypes.length); // ファイル分
     if(fileList.length) lines.push('【添付ファイル '+fileList.length+'件】\n　' + fileList.slice(0,30).join('\n　') + (fileList.length>30?'\n　ほか':''));
-    if(subTargetCount) lines.push('【再委託先書類】\n　対象 '+subTargetCount+'件');
+    if(subTargetCount){
+      const totalSubDocs = subTargetCount * (subDocList.length||0);
+      let subLine = '【再委託先書類】\n　対象者 '+subTargetCount+'名';
+      if(subDocList.length) subLine += ' × 書類'+subDocList.length+'種（'+subDocList.join('、')+'）\n　= 合計 '+totalSubDocs+'通を生成';
+      lines.push(subLine);
+    }
     const confirmMsg = '以下の内容でメールを送信します。\n\n宛先: '+to+'\n\n'+(lines.length?lines.join('\n\n'):'(添付ファイルなし)')+'\n\nこの内容で送信してよろしいですか?';
     if(!confirm(confirmMsg)){ btn.disabled=false; btn.textContent='送信する'; return; }
   }
