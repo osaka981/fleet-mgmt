@@ -743,6 +743,7 @@ body.modal-open{overflow:hidden}
           <div style="display:flex;border-bottom:2px solid #e0e0e0;margin-bottom:12px" id="mail-main-tabs">
             <div onclick="mailMainTab('send')" class="filter-chip active" data-mtab="send" style="cursor:pointer;padding:8px 16px;font-size:13px;font-weight:600;position:relative">メール送信<span id="mail-pending-count" style="position:absolute;top:2px;right:2px;min-width:16px;height:16px;border-radius:50%;background:#EF9F27;color:#fff;font-size:9px;display:none;align-items:center;justify-content:center"></span></div>
             <div onclick="mailMainTab('inbox')" class="filter-chip" data-mtab="inbox" style="cursor:pointer;padding:8px 16px;font-size:13px;font-weight:600;position:relative">受信ボックス<span id="inbox-badge" style="position:absolute;top:2px;right:2px;min-width:16px;height:16px;border-radius:50%;background:#e53935;color:#fff;font-size:9px;display:none;align-items:center;justify-content:center"></span></div>
+            <div onclick="mailMainTab('history')" class="filter-chip" data-mtab="history" style="cursor:pointer;padding:8px 16px;font-size:13px;font-weight:600;position:relative">送信履歴</div>
           </div>
 
           <!-- データ送信 セクション -->
@@ -765,6 +766,14 @@ body.modal-open{overflow:hidden}
               <button class="btn btn-sm" onclick="syncInboxFromSheet().then(()=>{renderInbox();alert('受信ボックスを更新しました')})">受信更新</button>
             </div>
             <div id="inbox-list"></div>
+          </div>
+
+          <!-- 送信履歴 セクション 2026/06/29 -->
+          <div id="mail-history-section" style="display:none">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div style="font-size:12px;color:#888">書類メールの送信履歴（内容を確認できます）</div>
+            </div>
+            <div id="mail-history-list"></div>
           </div>
         </div>
       </div>
@@ -3304,10 +3313,13 @@ function mailMainTab(section){
   document.querySelector('#mail-main-tabs [data-mtab="'+section+'"]')?.classList.add('active');
   document.getElementById('mail-send-section').style.display=section==='send'?'block':'none';
   document.getElementById('mail-inbox-section').style.display=section==='inbox'?'block':'none';
+  const histSec=document.getElementById('mail-history-section');
+  if(histSec) histSec.style.display=section==='history'?'block':'none';
   // タスク追加ボタンは送信タブのみ
   document.getElementById('mail-topbar-actions').style.display=section==='send'?'flex':'none';
   if(section==='inbox') renderInbox();
   if(section==='send') renderMailTasks();
+  if(section==='history') renderMailHistory();
 }
 
 function mailSetTab(tab){
@@ -4022,6 +4034,7 @@ async function execMailSend(taskId){
     const json=await res.json();
     if(json.ok){
       t.status='sent';t.sentAt=new Date().toISOString();
+      recordMailHistory({office:t.office,to,subject,body:mailBody,attachments:(t.driverName?[t.driverName]:[]),result:'sent'});
       saveMailTasks();renderMailTasks();
       document.querySelectorAll('.modal-bg:not([id])').forEach(m=>m.remove());
 
@@ -4173,7 +4186,7 @@ async function execBulkSendByOffice(){
     try{
       const r=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'sendMail',to,subject,body,attachments:fileIds,office})});
       const j=await r.json();
-      if(j.ok) successCount++; else errorCount++;
+      if(j.ok){ successCount++; recordMailHistory({office,to,subject,body,attachments:(allD||[]).map(d=>d.name||'').filter(Boolean),result:'sent'}); } else { errorCount++; recordMailHistory({office,to,subject,body,attachments:[],result:'error'}); }
     }catch(e){errorCount++;}
   }
 
@@ -4184,7 +4197,99 @@ async function execBulkSendByOffice(){
 // ====== 提出履歴 ======
 let submitHistory = JSON.parse(localStorage.getItem('fleet_history')||'[]');
 
+// ====== メール送信履歴(内容含む) 2026/06/29 ======
+let mailSentHistory = JSON.parse(localStorage.getItem('fleet_mail_history')||'[]');
+function saveMailHistory(){ try{ localStorage.setItem('fleet_mail_history', JSON.stringify(mailSentHistory)); }catch(e){} }
+/** メール送信履歴を記録。to/subject/body/添付名/営業所/結果を保存 */
+function recordMailHistory(info){
+  try{
+    const now = new Date();
+    mailSentHistory.unshift({
+      id: Date.now() + Math.random(),
+      datetime: now.toISOString(),
+      office: info.office || '',
+      to: info.to || '',
+      subject: info.subject || '',
+      body: info.body || '',
+      attachments: Array.isArray(info.attachments) ? info.attachments : [],
+      result: info.result || 'sent', // sent / error
+    });
+    // 1年以上前は自動削除
+    const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear()-1);
+    mailSentHistory = mailSentHistory.filter(h=>new Date(h.datetime) >= cutoff);
+    saveMailHistory();
+    // GASにも保存(任意・失敗しても無視)
+    try{
+      if(typeof API_URL!=='undefined') fetch(API_URL,{method:'POST',body:JSON.stringify({action:'logMailHistory',entry:mailSentHistory[0]})}).catch(()=>{});
+    }catch(e){}
+  }catch(e){ console.warn('recordMailHistory failed', e); }
+}
+
 function saveHistory(){localStorage.setItem('fleet_history',JSON.stringify(submitHistory));}
+
+// メール送信履歴を一覧表示(内容クリックで全文表示)
+function renderMailHistory(){
+  const el = document.getElementById('mail-history-list');
+  if(!el) return;
+  if(!mailSentHistory.length){
+    el.innerHTML = '<div style="padding:24px;text-align:center;color:#888;font-size:12px">メール送信履歴はありません。書類をメール送信すると自動で記録されます。</div>';
+    return;
+  }
+  el.innerHTML = mailSentHistory.map(h=>{
+    const dt = new Date(h.datetime);
+    const dstr = dt.toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const resBadge = h.result==='error'
+      ? '<span style="font-size:9px;background:#fde8e8;color:#c0392b;padding:1px 7px;border-radius:8px;font-weight:600">送信失敗</span>'
+      : '<span style="font-size:9px;background:#e6f7f0;color:#1a8a5f;padding:1px 7px;border-radius:8px;font-weight:600">送信済</span>';
+    const attCount = (h.attachments||[]).length;
+    return `<div style="border:1px solid #e5e3df;border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fff;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
+            ${resBadge}
+            <span style="font-size:11px;font-weight:700;color:#333;">${esc_f(h.office||'')}</span>
+            <span style="font-size:10px;color:#999;">${dstr}</span>
+          </div>
+          <div style="font-size:12px;font-weight:600;color:#222;margin-bottom:2px;">${esc_f(h.subject||'(件名なし)')}</div>
+          <div style="font-size:10.5px;color:#666;">宛先: ${esc_f(h.to||'-')}${attCount?` ／ 添付対象: ${attCount}名`:''}</div>
+        </div>
+        <button onclick="_showMailHistoryDetail('${h.id}')" style="font-size:10px;padding:4px 10px;border:1px solid #ccc;border-radius:6px;background:#f7f7f5;cursor:pointer;white-space:nowrap;">内容を見る</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _showMailHistoryDetail(id){
+  const h = mailSentHistory.find(x=>String(x.id)===String(id));
+  if(!h) return;
+  const dt = new Date(h.datetime).toLocaleString('ja-JP');
+  const att = (h.attachments||[]).length ? (h.attachments||[]).map(a=>esc_f(a)).join('、') : '(なし)';
+  const modal = document.createElement('div');
+  modal.className = 'modal-bg';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
+  modal.onclick = (e)=>{ if(e.target===modal) modal.remove(); };
+  modal.innerHTML = `<div style="background:#fff;border-radius:12px;max-width:560px;width:100%;max-height:85vh;overflow:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #eee;position:sticky;top:0;background:#fff;">
+      <span style="font-size:14px;font-weight:700;">送信メールの内容</span>
+      <button onclick="this.closest('.modal-bg').remove()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:#888;">✕</button>
+    </div>
+    <div style="padding:16px 18px;font-size:12.5px;color:#333;line-height:1.7;">
+      <div style="margin-bottom:8px;"><span style="color:#888;">送信日時：</span>${dt}</div>
+      <div style="margin-bottom:8px;"><span style="color:#888;">営業所：</span>${esc_f(h.office||'-')}</div>
+      <div style="margin-bottom:8px;"><span style="color:#888;">宛先：</span>${esc_f(h.to||'-')}</div>
+      <div style="margin-bottom:8px;"><span style="color:#888;">件名：</span>${esc_f(h.subject||'-')}</div>
+      <div style="margin-bottom:8px;"><span style="color:#888;">添付対象：</span>${att}</div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eee;">
+        <div style="color:#888;margin-bottom:6px;">本文：</div>
+        <div style="white-space:pre-wrap;background:#f9f8f6;border:1px solid #eee;border-radius:8px;padding:12px;font-size:12px;">${esc_f(h.body||'(本文なし)')}</div>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+// HTMLエスケープ(履歴表示用)
+function esc_f(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 function recordHistory(office, files, tag){
   const now = new Date();
@@ -12092,8 +12197,8 @@ async function sendMailAllOffices(){
     try{
       const res = await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'sendMail',to,subject,body,attachments:fileIds,office})});
       const json = await res.json();
-      if(json.ok) successCount++;
-      else errorCount++;
+      if(json.ok){ successCount++; recordMailHistory({office,to,subject,body,attachments:(allD||[]).map(d=>d.name||'').filter(Boolean),result:'sent'}); }
+      else { errorCount++; recordMailHistory({office,to,subject,body,attachments:[],result:'error'}); }
     }catch(e){ errorCount++; }
   }
 
