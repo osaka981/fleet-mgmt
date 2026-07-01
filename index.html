@@ -11252,7 +11252,7 @@ function renderCompanyPage(companyId, pageId){
   var html = '';
   html += '<div class="topbar" style="position:sticky;top:0;z-index:5;background:#fff;flex-wrap:wrap;gap:4px;align-items:center">';
   html += '<button class="btn btn-sm" onclick="backFromCompanyPage()" style="flex-shrink:0;display:flex;align-items:center;gap:4px;padding:6px 12px"><svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2L4 7l5 5"/></svg>戻る</button>';
-  html += '<h1 style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + c.name + '</h1>';
+  html += '<h1 style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center">' + c.name + '</h1>';
   html += '<div style="display:flex;gap:6px;flex-shrink:0">';
   html += '<button class="btn btn-sm" onclick="openCompanyModal(' + c.id + ')">編集</button>';
   html += '<button class="btn btn-sm btn-danger" onclick="deleteCompany(' + c.id + ')">削除</button>';
