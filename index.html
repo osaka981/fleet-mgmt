@@ -9437,32 +9437,37 @@ function _stExpiryInfo(item, kind){
 
 // ★ 一覧ビュー(1行ずつコンパクト)
 function renderStorageListView(el, allDrivers, allVehicles){
+  // ★ 2026/07/01: ドライバー/車両で列位置を揃えるため固定幅に統一
   function row(item, kind){
     var name = kind==='vehicle' ? (item.plate||'(番号なし)') : (item.name||'(名前なし)');
     var office = (item._offices&&item._offices[0]) || (kind==='vehicle'?(item.type==='持込'?'持込':'未設定'):(item.type&&item.type.includes('外注')?'外注':'未設定'));
+    var src=(item._src&&item._src!=='自社')?item._src:'';
     var ex=_stExpiryInfo(item,kind);
     var openFn = kind==='vehicle' ? "openVehicleModal('"+item.id+"')" : "openDriverModal('"+item.id+"')";
-    return '<div onclick="'+openFn+'" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #eee;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'#f7f9fc\'" onmouseout="this.style.background=\'\'">'+
-      _stBadge(item._src, item.type)+
+    return '<div onclick="'+openFn+'" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #eee;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'#f7f9fc\'" onmouseout="this.style.background=\'\'">'+
+      '<span style="width:24px;flex:none">'+_stBadge(item._src, item.type)+'</span>'+
       '<span style="flex:1;min-width:0;font-weight:600;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(name)+'</span>'+
-      '<span style="width:90px;color:#666;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(office))+'</span>'+
-      (item._src&&item._src!=='自社'?'<span style="width:90px;color:#7B1FA2;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(item._src)+'</span>':'<span style="width:90px"></span>')+
-      '<span style="width:110px;text-align:right;color:'+ex.color+';font-size:11px;font-weight:600">'+ex.text+'</span>'+
+      '<span style="width:80px;flex:none;color:#666;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(office))+'</span>'+
+      '<span style="width:100px;flex:none;color:#7B1FA2;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(src)+'</span>'+
+      '<span style="width:120px;flex:none;text-align:right;color:'+ex.color+';font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+ex.text+'</span>'+
     '</div>';
   }
-  var html='';
+  var html='<div style="overflow-x:auto">';
   html+='<div style="font-size:12px;font-weight:700;color:#555;margin:4px 0 6px">ドライバー（'+allDrivers.length+'名）</div>';
-  html+='<div style="border:1px solid #eee;border-radius:8px;overflow:hidden;margin-bottom:16px">'+(allDrivers.length?allDrivers.map(function(d){return row(d,'driver');}).join(''):'<div style="padding:16px;text-align:center;color:#aaa;font-size:11px">該当なし</div>')+'</div>';
+  html+='<div style="border:1px solid #eee;border-radius:8px;overflow:hidden;margin-bottom:16px;min-width:440px">'+(allDrivers.length?allDrivers.map(function(d){return row(d,'driver');}).join(''):'<div style="padding:16px;text-align:center;color:#aaa;font-size:11px">該当なし</div>')+'</div>';
   html+='<div style="font-size:12px;font-weight:700;color:#555;margin:4px 0 6px">車両（'+allVehicles.length+'台）</div>';
-  html+='<div style="border:1px solid #eee;border-radius:8px;overflow:hidden">'+(allVehicles.length?allVehicles.map(function(v){return row(v,'vehicle');}).join(''):'<div style="padding:16px;text-align:center;color:#aaa;font-size:11px">該当なし</div>')+'</div>';
+  html+='<div style="border:1px solid #eee;border-radius:8px;overflow:hidden;min-width:440px">'+(allVehicles.length?allVehicles.map(function(v){return row(v,'vehicle');}).join(''):'<div style="padding:16px;text-align:center;color:#aaa;font-size:11px">該当なし</div>')+'</div>';
+  html+='</div>';
   el.innerHTML=html;
 }
 
 // ★ 詳細ビュー(表形式)
 function renderStorageTableView(el, allDrivers, allVehicles){
-  function th(label){ return '<th style="text-align:left;padding:7px 10px;font-size:11px;color:#666;border-bottom:2px solid #ddd;white-space:nowrap">'+label+'</th>'; }
+  // ★ 2026/07/01: 2つの表(ドライバー/車両)で列幅を固定し、縦位置を揃える
+  var COLGROUP='<colgroup><col style="width:52px"><col><col style="width:110px"><col style="width:120px"><col style="width:150px"></colgroup>';
+  function th(label){ return '<th style="text-align:left;padding:7px 10px;font-size:11px;color:#666;border-bottom:2px solid #ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+label+'</th>'; }
   function tableFor(items, kind){
-    if(!items.length) return '<div style="padding:16px;text-align:center;color:#aaa;font-size:11px">該当なし</div>';
+    if(!items.length) return '<table style="width:100%;table-layout:fixed;border-collapse:collapse;background:#fff;border:1px solid #eee;border-radius:8px">'+COLGROUP+'<tbody><tr><td colspan="5" style="padding:16px;text-align:center;color:#aaa;font-size:11px">該当なし</td></tr></tbody></table>';
     var head='<tr>'+th('区分')+th(kind==='vehicle'?'車両番号':'氏名')+th('営業所')+th('所属')+th('次の期限')+'</tr>';
     var rows=items.map(function(item){
       var name = kind==='vehicle' ? (item.plate||'(番号なし)') : (item.name||'(名前なし)');
@@ -9472,17 +9477,18 @@ function renderStorageTableView(el, allDrivers, allVehicles){
       var openFn = kind==='vehicle' ? "openVehicleModal('"+item.id+"')" : "openDriverModal('"+item.id+"')";
       return '<tr onclick="'+openFn+'" style="cursor:pointer;border-bottom:1px solid #f0f0f0" onmouseover="this.style.background=\'#f7f9fc\'" onmouseout="this.style.background=\'\'">'+
         '<td style="padding:7px 10px">'+_stBadge(item._src,item.type)+'</td>'+
-        '<td style="padding:7px 10px;font-size:12px;font-weight:600;color:#222">'+esc(name)+'</td>'+
-        '<td style="padding:7px 10px;font-size:11px;color:#666">'+esc(String(office))+'</td>'+
-        '<td style="padding:7px 10px;font-size:11px;color:'+(src==='自社'?'#999':'#7B1FA2')+'">'+esc(src)+'</td>'+
-        '<td style="padding:7px 10px;font-size:11px;color:'+ex.color+';font-weight:600;white-space:nowrap">'+ex.text+'</td>'+
+        '<td style="padding:7px 10px;font-size:12px;font-weight:600;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(name)+'</td>'+
+        '<td style="padding:7px 10px;font-size:11px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(office))+'</td>'+
+        '<td style="padding:7px 10px;font-size:11px;color:'+(src==='自社'?'#999':'#7B1FA2')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(src)+'</td>'+
+        '<td style="padding:7px 10px;font-size:11px;color:'+ex.color+';font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+ex.text+'</td>'+
       '</tr>';
     }).join('');
-    return '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #eee;border-radius:8px"><thead>'+head+'</thead><tbody>'+rows+'</tbody></table></div>';
+    return '<table style="width:100%;table-layout:fixed;border-collapse:collapse;background:#fff;border:1px solid #eee;border-radius:8px">'+COLGROUP+'<thead>'+head+'</thead><tbody>'+rows+'</tbody></table>';
   }
-  var html='';
+  var html='<div style="overflow-x:auto">';
   html+='<div style="font-size:12px;font-weight:700;color:#555;margin:4px 0 6px">ドライバー（'+allDrivers.length+'名）</div>'+tableFor(allDrivers,'driver');
   html+='<div style="font-size:12px;font-weight:700;color:#555;margin:16px 0 6px">車両（'+allVehicles.length+'台）</div>'+tableFor(allVehicles,'vehicle');
+  html+='</div>';
   el.innerHTML=html;
 }
 
