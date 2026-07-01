@@ -451,10 +451,24 @@ body.modal-open{overflow:hidden}
   <div class="login-card">
     <div class="login-logo" style="display:flex;align-items:center;justify-content:center;gap:10px"><img src="" id="login-logo-img" style="width:36px;height:36px;object-fit:contain">大阪急配 フリート管理</div>
     <div class="login-sub">車両・書類・人員管理システム</div>
-    <label class="login-label">パスワード</label>
-    <input class="login-input" type="password" id="pw-input" inputmode="numeric" pattern="[0-9]*" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
-    <button class="login-btn" onclick="doLogin()">ログイン</button>
-    <div class="login-err" id="login-err"></div>
+    <!-- 管理者ログイン -->
+    <div id="admin-login-box">
+      <label class="login-label">パスワード</label>
+      <input class="login-input" type="password" id="pw-input" inputmode="numeric" pattern="[0-9]*" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="login-btn" onclick="doLogin()">ログイン</button>
+      <div class="login-err" id="login-err"></div>
+      <div style="text-align:center;margin-top:14px"><span onclick="toggleOwnerLogin(true)" style="font-size:12px;color:#4a90e2;cursor:pointer;text-decoration:underline">委託会社の方はこちら</span></div>
+    </div>
+    <!-- 委託会社オーナーログイン -->
+    <div id="owner-login-box" style="display:none">
+      <label class="login-label">会社番号（ID）</label>
+      <input class="login-input" type="text" id="owner-code-input" inputmode="numeric" pattern="[0-9]*" placeholder="例：910001">
+      <label class="login-label" style="margin-top:8px">パスワード</label>
+      <input class="login-input" type="password" id="owner-pw-input" placeholder="••••••••" onkeydown="if(event.key==='Enter')doOwnerLogin()">
+      <button class="login-btn" onclick="doOwnerLogin()">委託会社ログイン</button>
+      <div class="login-err" id="owner-login-err"></div>
+      <div style="text-align:center;margin-top:14px"><span onclick="toggleOwnerLogin(false)" style="font-size:12px;color:#888;cursor:pointer;text-decoration:underline">管理者ログインに戻る</span></div>
+    </div>
   </div>
 </div>
 
@@ -2014,9 +2028,88 @@ function hideTabWarning(){
   if(el) el.remove();
 }
 
+// ★ 2026/07/01: 委託会社オーナーモード
+let ownerMode = false;        // true=委託会社ログイン中
+let ownerCompanyId = null;    // ログイン中の委託会社ID
+
+function toggleOwnerLogin(show){
+  document.getElementById('admin-login-box').style.display = show?'none':'block';
+  document.getElementById('owner-login-box').style.display = show?'block':'none';
+}
+
+async function _sha256hex(str){
+  try{
+    const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }catch(e){ return 'plain:'+str; } // フォールバック
+}
+
+async function doOwnerLogin(){
+  const code=(document.getElementById('owner-code-input').value||'').trim();
+  const pw=document.getElementById('owner-pw-input').value||'';
+  const errEl=document.getElementById('owner-login-err');
+  errEl.style.color='#e53935';
+  if(!code){ errEl.textContent='会社番号を入力してください'; return; }
+  if(!pw){ errEl.textContent='パスワードを入力してください'; return; }
+  // 最新データを取得(委託会社情報を確実にするため)
+  errEl.style.color='#1565C0'; errEl.textContent='確認中...';
+  try{
+    if(typeof syncFromSheet==='function'){ await syncFromSheet(); }
+  }catch(e){}
+  // 会社番号(regCode)で委託会社を特定
+  const co = companies.find(c=>String(c.regCode)===String(code) || String(c.companyCode)===String(code));
+  if(!co){ errEl.style.color='#e53935'; errEl.textContent='会社番号が見つかりません'; return; }
+  const inputHash = await _sha256hex(pw);
+  if(!co.ownerPwHash){
+    // 初回: パスワード未設定 → このパスワードを設定
+    const ok=confirm('この会社番号にはパスワードが未設定です。\n入力したパスワードを、この委託会社のログインパスワードとして設定しますか?');
+    if(!ok){ errEl.style.color='#e53935'; errEl.textContent='キャンセルしました'; return; }
+    co.ownerPwHash = inputHash;
+    try{ saveCompanies(); }catch(e){}
+    try{ if(typeof saveLocal==='function') saveLocal(); }catch(e){}
+    try{ if(typeof syncAll==='function') syncAll(false); }catch(e){}
+  } else if(co.ownerPwHash !== inputHash){
+    errEl.style.color='#e53935'; errEl.textContent='パスワードが違います';
+    return;
+  }
+  // ログイン成功 → 委託会社モードで入る
+  ownerMode = true;
+  ownerCompanyId = co.id;
+  sessionStorage.setItem('fleet_owner_session', String(co.id));
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app-screen').style.display='block';
+  applyOwnerModeUI();
+  renderAll();
+}
+
+// 委託会社モードのUI適用(自社データのみに絞る・不要メニューを隠す)
+function applyOwnerModeUI(){
+  if(!ownerMode) return;
+  const co = companies.find(c=>c.id==ownerCompanyId);
+  // ロゴ/タイトルを会社名に
+  var logo=document.querySelector('.sidebar-logo,.app-logo,#app-logo');
+  try{ document.querySelectorAll('.nav-item').forEach(function(n){
+    var pg=n.dataset.page;
+    // 委託会社モードで見せるページのみ許可(第一段階: ドライバー/車両/データ管理)
+    var allow=['drivers','vehicles','storage'];
+    if(pg && allow.indexOf(pg)<0){ n.style.display='none'; }
+    else { n.style.display=''; }
+  }); }catch(e){}
+  // 管理セクション(委託会社・営業所)は隠す
+  try{ document.querySelectorAll('.nav-section,.nav-group-title').forEach(function(s){ s.style.display='none'; }); }catch(e){}
+  // タイトル表示
+  try{
+    var t=document.querySelector('.app-title,.sidebar-title');
+    if(t && co) t.textContent=co.name+' 専用';
+  }catch(e){}
+  // 最初のページをドライバー管理に
+  try{ if(typeof showPage==='function'){ var el=document.querySelector('.nav-item[data-page="drivers"]'); showPage('drivers', el); } }catch(e){}
+}
+
 async function doLogin(){
   const pw=document.getElementById('pw-input').value;
   const errEl=document.getElementById('login-err');
+  // ★ 委託会社モード用の描画は下部 renderOwnerDrivers/renderOwnerVehicles を参照
   // ログイン試行回数制限チェック
   if(isLoginLocked()){
     var remain=getLoginRemainingTime();
@@ -2078,7 +2171,17 @@ async function doLogout(){
       isDirty=false;
     }catch(e){}
   }
-  sessionStorage.removeItem('fleet_session');document.getElementById('app-screen').style.display='none';document.getElementById('login-screen').style.display='flex';document.getElementById('pw-input').value='';document.getElementById('login-err').textContent='';
+  sessionStorage.removeItem('fleet_session');
+  // ★ 委託会社モードのリセット
+  sessionStorage.removeItem('fleet_owner_session');
+  if(ownerMode){
+    ownerMode=false; ownerCompanyId=null;
+    // メニュー表示を元に戻す
+    try{ document.querySelectorAll('.nav-item').forEach(function(n){ n.style.display=''; }); }catch(e){}
+    try{ document.querySelectorAll('.nav-section,.nav-group-title').forEach(function(s){ s.style.display=''; }); }catch(e){}
+    try{ toggleOwnerLogin(false); }catch(e){}
+  }
+  document.getElementById('app-screen').style.display='none';document.getElementById('login-screen').style.display='flex';document.getElementById('pw-input').value='';document.getElementById('login-err').textContent='';
 }
 function changePw(){const o=document.getElementById('pw-old').value,n=document.getElementById('pw-new').value,n2=document.getElementById('pw-new2').value,msg=document.getElementById('pw-msg');if(o!==PASSWORD){msg.style.color='#e53935';msg.textContent='現在のパスワードが違います';return;}if(!n){msg.style.color='#e53935';msg.textContent='新しいパスワードを入力';return;}if(n!==n2){msg.style.color='#e53935';msg.textContent='確認用が一致しません';return;}PASSWORD=n;localStorage.setItem('fleet_pw',n);isDirty=true;scheduleAutoSave();addLog('設定','パスワード変更');['pw-old','pw-new','pw-new2'].forEach(id=>document.getElementById(id).value='');msg.style.color='#43a047';msg.textContent='変更しました';}
 
@@ -2551,6 +2654,60 @@ function execAssignDriver(vehicleId){
   renderVehicles(currentOfficeFilter);
   alert(''+v.plate+' の担当を '+dName+' に設定しました');
 }
+
+// ★ 2026/07/01: 委託会社モード ドライバー描画
+function renderOwnerDrivers(){
+  var co=companies.find(function(c){return c.id==ownerCompanyId;});
+  var thead=document.getElementById('driver-thead');
+  var tbody=document.getElementById('driver-tbody');
+  var filters=document.getElementById('driver-filters');
+  if(filters) filters.innerHTML='';
+  // 追加ボタンを委託会社用に
+  var addBtn=document.querySelector('#page-drivers .topbar .btn-primary');
+  if(addBtn){ addBtn.textContent='＋ ドライバー追加'; addBtn.setAttribute('onclick','openCompanyDriverModal('+ownerCompanyId+')'); }
+  if(!co){ if(tbody) tbody.innerHTML='<tr><td style="padding:16px;color:#aaa">会社情報が見つかりません</td></tr>'; return; }
+  var list=(co.drivers||[]).filter(function(d){return !d.status||d.status==='在籍';});
+  if(thead) thead.innerHTML='<tr><th style="text-align:left;padding:8px">氏名</th><th style="text-align:left;padding:8px">フリガナ</th><th style="text-align:left;padding:8px">免許期限</th><th style="text-align:left;padding:8px">操作</th></tr>';
+  if(tbody){
+    if(!list.length){ tbody.innerHTML='<tr><td colspan="4" style="padding:16px;text-align:center;color:#aaa">ドライバーが登録されていません。「＋ ドライバー追加」から登録してください。</td></tr>'; return; }
+    tbody.innerHTML=list.map(function(d){
+      var lic=d.license&&d.license.exp?String(d.license.exp).replace(/-/g,'/'):'-';
+      var licColor='#666';
+      if(d.license&&d.license.exp){ var dd=daysUntil(d.license.exp); if(dd<0)licColor='#e53935'; else if(dd<=30)licColor='#fb8c00'; }
+      return '<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:8px;font-weight:600">'+esc(d.name||'')+'</td>'+
+        '<td style="padding:8px;color:#666;font-size:12px">'+esc(d.kana||'')+'</td>'+
+        '<td style="padding:8px;color:'+licColor+';font-size:12px">'+lic+'</td>'+
+        '<td style="padding:8px"><button class="btn btn-sm" onclick="openCompanyDriverModal('+ownerCompanyId+','+d.id+')">編集</button></td></tr>';
+    }).join('');
+  }
+}
+
+// ★ 委託会社モード 車両描画
+function renderOwnerVehicles(){
+  var co=companies.find(function(c){return c.id==ownerCompanyId;});
+  var thead=document.getElementById('vehicle-thead');
+  var tbody=document.getElementById('vehicle-tbody');
+  var filters=document.getElementById('vehicle-filters');
+  if(filters) filters.innerHTML='';
+  var addBtn=document.querySelector('#page-vehicles .topbar .btn-primary');
+  if(addBtn){ addBtn.textContent='＋ 車両追加'; addBtn.setAttribute('onclick','openCompanyVehicleModal('+ownerCompanyId+')'); }
+  if(!co){ if(tbody) tbody.innerHTML='<tr><td style="padding:16px;color:#aaa">会社情報が見つかりません</td></tr>'; return; }
+  var list=(co.vehicles||[]).filter(function(v){return !v.status||v.status==='稼働';});
+  if(thead) thead.innerHTML='<tr><th style="text-align:left;padding:8px">車両番号</th><th style="text-align:left;padding:8px">車種</th><th style="text-align:left;padding:8px">車検期限</th><th style="text-align:left;padding:8px">操作</th></tr>';
+  if(tbody){
+    if(!list.length){ tbody.innerHTML='<tr><td colspan="4" style="padding:16px;text-align:center;color:#aaa">車両が登録されていません。「＋ 車両追加」から登録してください。</td></tr>'; return; }
+    tbody.innerHTML=list.map(function(v){
+      var sh=v.shaken&&v.shaken.exp?String(v.shaken.exp).replace(/-/g,'/'):'-';
+      var shColor='#666';
+      if(v.shaken&&v.shaken.exp){ var dd=daysUntil(v.shaken.exp); if(dd<0)shColor='#e53935'; else if(dd<=30)shColor='#fb8c00'; }
+      return '<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:8px;font-weight:600">'+esc(String(v.plate||''))+'</td>'+
+        '<td style="padding:8px;color:#666;font-size:12px">'+esc(v.model||v.kind||'')+'</td>'+
+        '<td style="padding:8px;color:'+shColor+';font-size:12px">'+sh+'</td>'+
+        '<td style="padding:8px"><button class="btn btn-sm" onclick="openCompanyVehicleModal('+ownerCompanyId+','+v.id+')">編集</button></td></tr>';
+    }).join('');
+  }
+}
+
 
 function renderVehicles(off){
   let data=vehicles.filter(v=>!v.status||v.status==='稼働');
@@ -5291,8 +5448,8 @@ function showPage(name,el){
   closeSidebar();
   window.scrollTo(0,0);
   if(name==='dashboard')renderDashboard();
-  if(name==='vehicles'){document.getElementById('vehicle-office-label').textContent='';renderVehicles(null);}
-  if(name==='drivers')renderDrivers(null);
+  if(name==='vehicles'){document.getElementById('vehicle-office-label').textContent='';(ownerMode?renderOwnerVehicles():renderVehicles(null));}
+  if(name==='drivers')(ownerMode?renderOwnerDrivers():renderDrivers(null));
   if(name==='documents'){setTodayDate();renderDocPage();}
   if(name==='print'){rebuildPrintSelect();renderPrint();}
   if(name==='mail'){renderMailTasks();renderInbox();}
