@@ -2719,6 +2719,7 @@ function renderOwnerVehicles(){
 
 
 function renderVehicles(off){
+  if(typeof ownerMode!=='undefined' && ownerMode){ return renderOwnerVehicles(); } // ★ 委託会社モードは自社のみ
   let data=vehicles.filter(v=>!v.status||v.status==='稼働');
   // 委託会社車両も追加
   companies.forEach(c=>{
@@ -2826,6 +2827,7 @@ function toggleVehicleDetail(id){
   }
 }
 function renderDrivers(off){
+  if(typeof ownerMode!=='undefined' && ownerMode){ return renderOwnerDrivers(); } // ★ 委託会社モードは自社のみ
   let data=drivers.filter(d=>!d.status||d.status==='在籍');
   // 委託会社ドライバーも追加
   companies.forEach(c=>{
