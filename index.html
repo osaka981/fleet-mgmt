@@ -11178,6 +11178,17 @@ function showCompanyPage(companyId, el){
   renderCompanyPage(companyId, pageId);
 }
 
+// ★ 2026/07/01: 会社ページから委託会社管理(一覧)へ戻る
+function backFromCompanyPage(){
+  try{
+    currentCompanyId = null;
+    var el = document.querySelector('.nav-item[data-page="contractors"]');
+    if(typeof showPage==='function') showPage('contractors', el);
+  }catch(e){
+    try{ if(typeof showPage==='function') showPage('dashboard'); }catch(e2){}
+  }
+}
+
 function renderCompanyPage(companyId, pageId){
   pageId = pageId || ('page-company-' + companyId);
   var pageEl = document.getElementById(pageId);
@@ -11239,7 +11250,8 @@ function renderCompanyPage(companyId, pageId){
     : '<div style="padding:16px;text-align:center;color:#888;font-size:12px">車両が登録されていません</div>';
 
   var html = '';
-  html += '<div class="topbar" style="position:sticky;top:0;z-index:5;background:#fff;flex-wrap:wrap;gap:4px">';
+  html += '<div class="topbar" style="position:sticky;top:0;z-index:5;background:#fff;flex-wrap:wrap;gap:4px;align-items:center">';
+  html += '<button class="btn btn-sm" onclick="backFromCompanyPage()" style="flex-shrink:0;display:flex;align-items:center;gap:4px;padding:6px 12px"><svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2L4 7l5 5"/></svg>戻る</button>';
   html += '<h1 style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + c.name + '</h1>';
   html += '<div style="display:flex;gap:6px;flex-shrink:0">';
   html += '<button class="btn btn-sm" onclick="openCompanyModal(' + c.id + ')">編集</button>';
