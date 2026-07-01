@@ -2086,21 +2086,29 @@ async function doOwnerLogin(){
 function applyOwnerModeUI(){
   if(!ownerMode) return;
   const co = companies.find(c=>c.id==ownerCompanyId);
-  // ロゴ/タイトルを会社名に
-  var logo=document.querySelector('.sidebar-logo,.app-logo,#app-logo');
+  // 見せるページ: ドライバー管理・車両管理のみ
   try{ document.querySelectorAll('.nav-item').forEach(function(n){
     var pg=n.dataset.page;
-    // 委託会社モードで見せるページのみ許可(第一段階: ドライバー/車両/データ管理)
-    var allow=['drivers','vehicles','storage'];
+    var allow=['drivers','vehicles'];
     if(pg && allow.indexOf(pg)<0){ n.style.display='none'; }
-    else { n.style.display=''; }
+    else if(pg){ n.style.display=''; }
+    else { n.style.display='none'; } // data-page無しのnav-item(会社名/営業所リスト等)は隠す
   }); }catch(e){}
-  // 管理セクション(委託会社・営業所)は隠す
-  try{ document.querySelectorAll('.nav-section,.nav-group-title').forEach(function(s){ s.style.display='none'; }); }catch(e){}
+  // グループヘッダー(管理)・セクション(委託会社/営業所)を隠す
+  try{ document.querySelectorAll('.nav-group-header,.nav-section,.nav-group-title').forEach(function(s){ s.style.display='none'; }); }catch(e){}
+  // 管理グループの中身(ドライバー/車両)が折り畳まれていたら開く
+  try{
+    var grp=document.getElementById('nav-grp-manage');
+    if(grp) grp.style.display='block';
+  }catch(e){}
+  // 委託会社・営業所グループの中身コンテナを隠す
+  try{
+    ['nav-grp-company','nav-grp-office'].forEach(function(id){ var g=document.getElementById(id); if(g) g.style.display='none'; });
+  }catch(e){}
   // タイトル表示
   try{
-    var t=document.querySelector('.app-title,.sidebar-title');
-    if(t && co) t.textContent=co.name+' 専用';
+    var t=document.querySelector('.app-title,.sidebar-title,.sidebar-logo');
+    if(t && co) t.textContent=co.name;
   }catch(e){}
   // 最初のページをドライバー管理に
   try{ if(typeof showPage==='function'){ var el=document.querySelector('.nav-item[data-page="drivers"]'); showPage('drivers', el); } }catch(e){}
@@ -2178,7 +2186,8 @@ async function doLogout(){
     ownerMode=false; ownerCompanyId=null;
     // メニュー表示を元に戻す
     try{ document.querySelectorAll('.nav-item').forEach(function(n){ n.style.display=''; }); }catch(e){}
-    try{ document.querySelectorAll('.nav-section,.nav-group-title').forEach(function(s){ s.style.display=''; }); }catch(e){}
+    try{ document.querySelectorAll('.nav-section,.nav-group-title,.nav-group-header').forEach(function(s){ s.style.display=''; }); }catch(e){}
+    try{ ['nav-grp-company','nav-grp-office'].forEach(function(id){ var g=document.getElementById(id); if(g) g.style.display=''; }); }catch(e){}
     try{ toggleOwnerLogin(false); }catch(e){}
   }
   document.getElementById('app-screen').style.display='none';document.getElementById('login-screen').style.display='flex';document.getElementById('pw-input').value='';document.getElementById('login-err').textContent='';
