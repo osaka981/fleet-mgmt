@@ -708,12 +708,32 @@ body.modal-open{overflow:hidden}
           <h1>データ管理</h1><div style="flex:1"></div><div class="topbar-sync" onclick="syncAll(true)"><span class="sync-dot"></span><span class="sync-time"></span></div>
         </div>
         <div class="content">
-          <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
             <input type="text" id="storage-search" placeholder="検索..." style="padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:6px;flex:1;min-width:80px;max-width:200px" oninput="renderStorage()">
-            <button class="btn btn-sm" onclick="toggleStorageView()" id="storage-view-btn" style="white-space:nowrap;min-height:34px">一覧</button>
+            <div id="storage-viewtype" style="display:inline-flex;border:1px solid #ddd;border-radius:8px;overflow:hidden">
+              <button class="stview-seg" data-v="card" onclick="setStorageViewType('card')" style="border:none;padding:7px 12px;font-size:11px;cursor:pointer;background:#4a90e2;color:#fff">カード</button>
+              <button class="stview-seg" data-v="list" onclick="setStorageViewType('list')" style="border:none;border-left:1px solid #ddd;padding:7px 12px;font-size:11px;cursor:pointer;background:#f5f5f5;color:#555">一覧</button>
+              <button class="stview-seg" data-v="table" onclick="setStorageViewType('table')" style="border:none;border-left:1px solid #ddd;padding:7px 12px;font-size:11px;cursor:pointer;background:#f5f5f5;color:#555">詳細</button>
+              <button class="stview-seg" data-v="file" onclick="setStorageViewType('file')" style="border:none;border-left:1px solid #ddd;padding:7px 12px;font-size:11px;cursor:pointer;background:#f5f5f5;color:#555">ファイル</button>
+            </div>
+            <select id="storage-sort" onchange="renderStorage()" style="padding:7px 8px;font-size:11px;border:1px solid #ddd;border-radius:8px;cursor:pointer">
+              <option value="default">並び替え：標準</option>
+              <option value="number">番号順</option>
+              <option value="date">登録日順</option>
+              <option value="office">営業所順</option>
+              <option value="expiry">期限が近い順</option>
+            </select>
             <button class="btn btn-primary" onclick="openFileMgrUploadGeneral()" style="white-space:nowrap;min-height:38px;padding:8px 14px;font-size:12px">＋ ファイル追加</button>
           </div>
-          <div id="storage-office-badges" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:6px;margin-bottom:12px"></div>
+          <div id="storage-office-badges" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:6px;margin-bottom:10px"></div>
+          <div id="storage-legend" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px;font-size:10px;color:#888;padding:6px 10px;background:#fafafa;border-radius:6px">
+            <span style="font-weight:600;color:#666">凡例：</span>
+            <span><span style="display:inline-block;width:16px;height:14px;background:#2e7d32;color:#fff;border-radius:3px;text-align:center;line-height:14px;font-size:8px">社</span> 社員</span>
+            <span><span style="display:inline-block;width:16px;height:14px;background:#e65100;color:#fff;border-radius:3px;text-align:center;line-height:14px;font-size:8px">外</span> 外注</span>
+            <span><span style="display:inline-block;width:16px;height:14px;background:#7B1FA2;color:#fff;border-radius:3px;text-align:center;line-height:14px;font-size:8px">委</span> 委託会社</span>
+            <span><span style="color:#e53935;font-weight:600">■</span> 期限切れ</span>
+            <span><span style="color:#fb8c00;font-weight:600">■</span> 30日以内</span>
+          </div>
           <div id="storage-content"></div>
         </div>
       </div>
@@ -8565,6 +8585,44 @@ function toggleStorageView(){
   renderStorage();
 }
 
+// ★ 2026/07/01: 表示タイプ切替(card/list/table/file)
+function setStorageViewType(v){
+  storageViewMode=v;
+  // セグメントボタンの見た目を更新
+  document.querySelectorAll('#storage-viewtype .stview-seg').forEach(function(b){
+    var on=b.dataset.v===v;
+    b.style.background=on?'#4a90e2':'#f5f5f5';
+    b.style.color=on?'#fff':'#555';
+  });
+  renderStorage();
+}
+
+// ★ 並び替えヘルパー
+function _storageSortItems(arr, kind){
+  var sortEl=document.getElementById('storage-sort');
+  var mode=sortEl?sortEl.value:'default';
+  if(mode==='default') return arr;
+  var a=arr.slice();
+  function nextExpiry(x){
+    // 車両: 車検/自賠/任意、ドライバー: 免許 の最も近い期限
+    var ds=[];
+    if(kind==='vehicle'){ [x.shaken,x.jibai,x.nin].forEach(function(o){ if(o&&o.exp) ds.push(o.exp); }); }
+    else { if(x.license&&x.license.exp) ds.push(x.license.exp); }
+    if(!ds.length) return Infinity;
+    return Math.min.apply(null, ds.map(function(e){ var t=new Date(e).getTime(); return isNaN(t)?Infinity:t; }));
+  }
+  if(mode==='number'){
+    a.sort(function(x,y){ return String(kind==='vehicle'?x.plate:x.name||'').localeCompare(String(kind==='vehicle'?y.plate:y.name||''),'ja',{numeric:true}); });
+  } else if(mode==='date'){
+    a.sort(function(x,y){ return (new Date(y.createdAt||y.regDate||0))-(new Date(x.createdAt||x.regDate||0)); });
+  } else if(mode==='office'){
+    a.sort(function(x,y){ return String((x._offices||[])[0]||'').localeCompare(String((y._offices||[])[0]||''),'ja'); });
+  } else if(mode==='expiry'){
+    a.sort(function(x,y){ return nextExpiry(x)-nextExpiry(y); });
+  }
+  return a;
+}
+
 function storageClickAll(){
   if(!storageOfficeFilter){
     // 既に「すべて」選択中 → スプリットモード切替
@@ -8945,7 +9003,13 @@ function renderStorage(){
     }
   }
 
+  // ★ 2026/07/01: 並び替え適用
+  allDrivers=_storageSortItems(allDrivers,'driver');
+  allVehicles=_storageSortItems(allVehicles,'vehicle');
+
   if(storageViewMode==='file') return renderStorageFileView(el,allDrivers,allVehicles);
+  if(storageViewMode==='list') return renderStorageListView(el,allDrivers,allVehicles);
+  if(storageViewMode==='table') return renderStorageTableView(el,allDrivers,allVehicles);
 
   // ★ 全営業所表示時: 営業所順でソート
   if(!offF){
@@ -9346,6 +9410,82 @@ function expBadgeStyle(exp){
   if(d<=90) return 'background:#fffde7;color:#f57f17';
   return 'background:#e8f5e9;color:#2e7d32';
 }
+
+// ★ 2026/07/01: 共通ヘルパー(区分バッジ・期限色)
+function _stBadge(src, type){
+  if(src && src!=='自社') return '<span style="display:inline-block;padding:1px 5px;border-radius:3px;background:#7B1FA2;color:#fff;font-size:9px;font-weight:600">委</span>';
+  if(type==='外注'||type==='外注（個人）') return '<span style="display:inline-block;padding:1px 5px;border-radius:3px;background:#e65100;color:#fff;font-size:9px;font-weight:600">外</span>';
+  return '<span style="display:inline-block;padding:1px 5px;border-radius:3px;background:#2e7d32;color:#fff;font-size:9px;font-weight:600">社</span>';
+}
+function _stExpiryInfo(item, kind){
+  // 最も近い期限と状態色を返す
+  var ds=[];
+  if(kind==='vehicle'){ [['車検',item.shaken],['自賠',item.jibai],['任意',item.nin]].forEach(function(p){ if(p[1]&&p[1].exp) ds.push({label:p[0],exp:p[1].exp}); }); }
+  else { if(item.license&&item.license.exp) ds.push({label:'免許',exp:item.license.exp}); }
+  if(!ds.length) return {text:'-', color:'#bbb', days:null};
+  ds.sort(function(a,b){ return new Date(a.exp)-new Date(b.exp); });
+  var near=ds[0];
+  var d=(typeof daysUntil==='function')?daysUntil(near.exp):null;
+  var color='#888', text=String(near.exp).replace(/-/g,'/');
+  if(d!==null){
+    if(d<0){ color='#e53935'; text=near.label+' 切れ'; }
+    else if(d<=30){ color='#fb8c00'; text=near.label+' あと'+d+'日'; }
+    else { color='#4a7'; text=near.label+' '+String(near.exp).replace(/-/g,'/'); }
+  }
+  return {text:text, color:color, days:d};
+}
+
+// ★ 一覧ビュー(1行ずつコンパクト)
+function renderStorageListView(el, allDrivers, allVehicles){
+  function row(item, kind){
+    var name = kind==='vehicle' ? (item.plate||'(番号なし)') : (item.name||'(名前なし)');
+    var office = (item._offices&&item._offices[0]) || (kind==='vehicle'?(item.type==='持込'?'持込':'未設定'):(item.type&&item.type.includes('外注')?'外注':'未設定'));
+    var ex=_stExpiryInfo(item,kind);
+    var openFn = kind==='vehicle' ? "openVehicleModal('"+item.id+"')" : "openDriverModal('"+item.id+"')";
+    return '<div onclick="'+openFn+'" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #eee;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'#f7f9fc\'" onmouseout="this.style.background=\'\'">'+
+      _stBadge(item._src, item.type)+
+      '<span style="flex:1;min-width:0;font-weight:600;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(name)+'</span>'+
+      '<span style="width:90px;color:#666;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(office))+'</span>'+
+      (item._src&&item._src!=='自社'?'<span style="width:90px;color:#7B1FA2;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(item._src)+'</span>':'<span style="width:90px"></span>')+
+      '<span style="width:110px;text-align:right;color:'+ex.color+';font-size:11px;font-weight:600">'+ex.text+'</span>'+
+    '</div>';
+  }
+  var html='';
+  html+='<div style="font-size:12px;font-weight:700;color:#555;margin:4px 0 6px">ドライバー（'+allDrivers.length+'名）</div>';
+  html+='<div style="border:1px solid #eee;border-radius:8px;overflow:hidden;margin-bottom:16px">'+(allDrivers.length?allDrivers.map(function(d){return row(d,'driver');}).join(''):'<div style="padding:16px;text-align:center;color:#aaa;font-size:11px">該当なし</div>')+'</div>';
+  html+='<div style="font-size:12px;font-weight:700;color:#555;margin:4px 0 6px">車両（'+allVehicles.length+'台）</div>';
+  html+='<div style="border:1px solid #eee;border-radius:8px;overflow:hidden">'+(allVehicles.length?allVehicles.map(function(v){return row(v,'vehicle');}).join(''):'<div style="padding:16px;text-align:center;color:#aaa;font-size:11px">該当なし</div>')+'</div>';
+  el.innerHTML=html;
+}
+
+// ★ 詳細ビュー(表形式)
+function renderStorageTableView(el, allDrivers, allVehicles){
+  function th(label){ return '<th style="text-align:left;padding:7px 10px;font-size:11px;color:#666;border-bottom:2px solid #ddd;white-space:nowrap">'+label+'</th>'; }
+  function tableFor(items, kind){
+    if(!items.length) return '<div style="padding:16px;text-align:center;color:#aaa;font-size:11px">該当なし</div>';
+    var head='<tr>'+th('区分')+th(kind==='vehicle'?'車両番号':'氏名')+th('営業所')+th('所属')+th('次の期限')+'</tr>';
+    var rows=items.map(function(item){
+      var name = kind==='vehicle' ? (item.plate||'(番号なし)') : (item.name||'(名前なし)');
+      var office=(item._offices&&item._offices[0])||'-';
+      var src=(item._src&&item._src!=='自社')?item._src:'自社';
+      var ex=_stExpiryInfo(item,kind);
+      var openFn = kind==='vehicle' ? "openVehicleModal('"+item.id+"')" : "openDriverModal('"+item.id+"')";
+      return '<tr onclick="'+openFn+'" style="cursor:pointer;border-bottom:1px solid #f0f0f0" onmouseover="this.style.background=\'#f7f9fc\'" onmouseout="this.style.background=\'\'">'+
+        '<td style="padding:7px 10px">'+_stBadge(item._src,item.type)+'</td>'+
+        '<td style="padding:7px 10px;font-size:12px;font-weight:600;color:#222">'+esc(name)+'</td>'+
+        '<td style="padding:7px 10px;font-size:11px;color:#666">'+esc(String(office))+'</td>'+
+        '<td style="padding:7px 10px;font-size:11px;color:'+(src==='自社'?'#999':'#7B1FA2')+'">'+esc(src)+'</td>'+
+        '<td style="padding:7px 10px;font-size:11px;color:'+ex.color+';font-weight:600;white-space:nowrap">'+ex.text+'</td>'+
+      '</tr>';
+    }).join('');
+    return '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #eee;border-radius:8px"><thead>'+head+'</thead><tbody>'+rows+'</tbody></table></div>';
+  }
+  var html='';
+  html+='<div style="font-size:12px;font-weight:700;color:#555;margin:4px 0 6px">ドライバー（'+allDrivers.length+'名）</div>'+tableFor(allDrivers,'driver');
+  html+='<div style="font-size:12px;font-weight:700;color:#555;margin:16px 0 6px">車両（'+allVehicles.length+'台）</div>'+tableFor(allVehicles,'vehicle');
+  el.innerHTML=html;
+}
+
 
 // ファイル一覧ビュー（旧レイアウト互換）
 function renderStorageFileView(el, allDrivers, allVehicles){
