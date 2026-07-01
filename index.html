@@ -5201,7 +5201,13 @@ function deleteArchivedVehicle(id){
   if(!confirmFullDelete('車両', v.plate, extra))return;
   pushUndo('車両削除: '+v.plate);
   vehicles=vehicles.filter(x=>x.id!=id);
+  // ★ 2026/07/01: 委託会社の車両からも同IDを削除(どちらからでも完全に消えるように)
+  if(Array.isArray(companies)){
+    companies.forEach(function(c){ if(Array.isArray(c.vehicles)) c.vehicles=c.vehicles.filter(function(x){return x.id!=id;}); });
+  }
   saveLocal();renderArchive();renderVehicles(currentOfficeFilter);renderDashboard();renderDocPage();
+  try{ if(typeof renderCompanies==='function') renderCompanies(); }catch(e){}
+  try{ if(typeof renderStorage==='function') renderStorage(); }catch(e){}
 }
 
 function deleteArchiveFileFromList(ownerName, driverId, idx, isCompany, companyId){
@@ -11438,9 +11444,22 @@ function deleteCompanyVehicle(companyId, vehicleId){
   const c=companies.find(x=>x.id==companyId);
   if(!c) return;
   const v=c.vehicles?.find(x=>x.id==vehicleId);
-  if(!v||!confirm(`「${v.plate}」を削除しますか？`))return;
+  if(!v||!confirm(`「${v.plate}」を削除しますか？\n\nこの車両をデータから完全に削除します。`))return;
   c.vehicles=c.vehicles.filter(x=>x.id!=vehicleId);
-  saveCompanies();renderCompanyPage(companyId);renderDashboard();
+  // ★ 2026/07/01: 自社車両からも同IDを削除(どちらからでも完全に消えるように)
+  if(Array.isArray(vehicles)){
+    vehicles=vehicles.filter(x=>x.id!=vehicleId);
+  }
+  // 他の委託会社にも同IDがあれば削除(念のため)
+  companies.forEach(function(cc){ if(cc.id!=companyId && Array.isArray(cc.vehicles)) cc.vehicles=cc.vehicles.filter(function(x){return x.id!=vehicleId;}); });
+  saveCompanies();
+  try{ if(typeof saveLocal==='function') saveLocal(); }catch(e){}
+  renderCompanyPage(companyId);renderDashboard();
+  // データ管理・アーカイブ・車両一覧も更新
+  try{ if(typeof renderDocPage==='function') renderDocPage(); }catch(e){}
+  try{ if(typeof renderArchive==='function') renderArchive(); }catch(e){}
+  try{ if(typeof renderVehicles==='function') renderVehicles(currentOfficeFilter); }catch(e){}
+  try{ if(typeof renderStorage==='function') renderStorage(); }catch(e){}
 }
 
 // ====== AI書類読み取り（Claude API連携）======
