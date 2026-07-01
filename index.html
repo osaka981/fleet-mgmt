@@ -1889,13 +1889,37 @@ function isSafeToSave(silent){
       addLog('同期','データ急減で自動保存ブロック: '+warn.join(', '));
       return false;
     }
-    // 手動保存は確認ダイアログ
-    var ok=confirm('⚠ データが大幅に減少しています:\n\n'+warn.join('\n')+'\n\n正当な変更（退職・廃車等）であれば「OK」、\n心当たりがなければ「キャンセル」を押してリロードしてください。');
-    if(!ok){
+    // ★ 2026/07/01: 手動保存時も既定は「保存しない」。
+    //   減ったデータを保存すると、他端末の正しいデータを上書きして消してしまうため、
+    //   まず「サーバーから最新を取り直す」ことを促す。本当に減らした場合のみ二段階で承認。
+    var ok=confirm(
+      '⚠ この端末のデータが大幅に減っています:\n\n'+warn.join('\n')+'\n\n'+
+      'この状態で保存すると、他の端末（PC等）の正しいデータが\nこの少ないデータで上書きされ、消えてしまう恐れがあります。\n\n'+
+      '【OK】=保存せず、サーバーの最新データを取り直す（推奨・安全）\n'+
+      '【キャンセル】=退職・廃車などで本当に減らした場合のみ、次の確認へ進む'
+    );
+    if(ok){
+      // 推奨: 保存を中止してサーバーから取り直す
+      addLog('同期','急減のためサーバー再取得を選択（保存中止）');
+      try{
+        if(typeof syncFromSheet==='function'){
+          syncFromSheet().then(function(){ try{renderAll&&renderAll();}catch(e){} alert('サーバーの最新データを取り直しました。'); }).catch(function(){ location.reload(); });
+        } else { location.reload(); }
+      }catch(e){ location.reload(); }
+      return false;
+    }
+    // キャンセル側 = 本当に減らした場合。二段階目の最終確認。
+    var ok2=confirm(
+      '本当にこの少ないデータで保存しますか？\n\n'+warn.join('\n')+'\n\n'+
+      'これは退職・廃車などで実際に減らした場合の操作です。\n'+
+      '他の端末で編集した内容がある場合、それが失われます。\n\n'+
+      'よろしければ【OK】、やめる場合は【キャンセル】。'
+    );
+    if(!ok2){
       addLog('同期','ユーザーが急減保存をキャンセル');
       return false;
     }
-    addLog('同期','ユーザーが急減保存を承認: '+warn.join(', '));
+    addLog('同期','ユーザーが急減保存を承認（二段階確認）: '+warn.join(', '));
   }
   return updateSaveCounts(curF);
 }
