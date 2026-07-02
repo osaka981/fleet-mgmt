@@ -2086,33 +2086,21 @@ async function doOwnerLogin(){
 function applyOwnerModeUI(){
   if(!ownerMode) return;
   const co = companies.find(c=>c.id==ownerCompanyId);
-  // 見せるページ: ドライバー管理・車両管理のみ
+  // ★ 2026/07/01: 会社ページ直結方式。会社ページ1つに全機能があるので、
+  //   サイドバーのメニューは全て隠し、ログアウトのみ残す。
   try{ document.querySelectorAll('.nav-item').forEach(function(n){
-    var pg=n.dataset.page;
-    var allow=['drivers','vehicles'];
     var isLogout=(n.getAttribute('onclick')||'').indexOf('doLogout')>=0;
-    if(isLogout){ n.style.display=''; }          // ログアウトは常に表示
-    else if(pg && allow.indexOf(pg)>=0){ n.style.display=''; }
-    else { n.style.display='none'; }
+    n.style.display = isLogout ? '' : 'none';
   }); }catch(e){}
-  // グループヘッダー(管理)・セクション(委託会社/営業所)を隠す
   try{ document.querySelectorAll('.nav-group-header,.nav-section,.nav-group-title').forEach(function(s){ s.style.display='none'; }); }catch(e){}
-  // ★ 管理グループ本体は「開いた状態」にして中のドライバー・車両を見せる
-  try{
-    var grp=document.getElementById('nav-grp-manage');
-    if(grp){ grp.classList.remove('collapsed'); grp.style.maxHeight='none'; grp.style.display='block'; }
-  }catch(e){}
-  // 委託会社・営業所グループの中身は隠す
-  try{
-    ['nav-grp-company','nav-grp-office'].forEach(function(id){ var g=document.getElementById(id); if(g) g.style.display='none'; });
-  }catch(e){}
-  // タイトル表示
+  try{ ['nav-grp-company','nav-grp-office'].forEach(function(id){ var g=document.getElementById(id); if(g) g.style.display='none'; }); }catch(e){}
+  // タイトルを会社名に
   try{
     var t=document.querySelector('.app-title,.sidebar-title,.sidebar-logo');
     if(t && co) t.textContent=co.name;
   }catch(e){}
-  // 最初のページをドライバー管理に
-  try{ if(typeof showPage==='function'){ var el=document.querySelector('.nav-item[data-page="drivers"]'); showPage('drivers', el); } }catch(e){}
+  // ★ 自社の会社ページを直接開く
+  try{ if(co && typeof showCompanyPage==='function'){ showCompanyPage(co.id, null); } }catch(e){}
 }
 
 async function doLogin(){
@@ -11251,11 +11239,15 @@ function renderCompanyPage(companyId, pageId){
 
   var html = '';
   html += '<div class="topbar" style="position:sticky;top:0;z-index:5;background:#fff;flex-wrap:wrap;gap:4px;align-items:center">';
-  html += '<button class="btn btn-sm" onclick="backFromCompanyPage()" style="flex-shrink:0;display:flex;align-items:center;gap:4px;padding:6px 12px"><svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2L4 7l5 5"/></svg>戻る</button>';
+  if(!(typeof ownerMode!=='undefined' && ownerMode)){
+    html += '<button class="btn btn-sm" onclick="backFromCompanyPage()" style="flex-shrink:0;display:flex;align-items:center;gap:4px;padding:6px 12px"><svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2L4 7l5 5"/></svg>戻る</button>';
+  }
   html += '<h1 style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center">' + c.name + '</h1>';
   html += '<div style="display:flex;gap:6px;flex-shrink:0">';
   html += '<button class="btn btn-sm" onclick="openCompanyModal(' + c.id + ')">編集</button>';
-  html += '<button class="btn btn-sm btn-danger" onclick="deleteCompany(' + c.id + ')">削除</button>';
+  if(!(typeof ownerMode!=='undefined' && ownerMode)){
+    html += '<button class="btn btn-sm btn-danger" onclick="deleteCompany(' + c.id + ')">削除</button>';
+  }
   html += '</div></div>';
   html += '<div class="content">';
   html += '<div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:12px 16px;margin-bottom:14px">';
