@@ -13529,13 +13529,18 @@ document.addEventListener('click',function(e){
   // ★ 委託会社モードのセッション復元(更新してもログアウトせず委託会社モードに戻る)
   var ownerSession = sessionStorage.getItem('fleet_owner_session');
   if(ownerSession){
+    // ★ 先にownerModeを立てる(renderAll等が全体を描かないように)
+    ownerMode=true; ownerCompanyId=isNaN(ownerSession)?ownerSession:Number(ownerSession);
     document.getElementById('login-screen').style.display='none';
-    document.getElementById('app-screen').style.display='block';
+    var appScr=document.getElementById('app-screen');
+    appScr.style.display='block';
+    appScr.style.visibility='hidden'; // 同期完了まで隠す(全体ページの一瞬の表示を防ぐ)
     (async function(){
       try{ if(typeof syncFromSheet==='function') await syncFromSheet(); }catch(e){}
       ownerMode=true; ownerCompanyId=isNaN(ownerSession)?ownerSession:Number(ownerSession);
       try{ renderAll(); }catch(e){}
       try{ applyOwnerModeUI(); }catch(e){}
+      appScr.style.visibility='visible'; // 委託会社ページ準備後に表示
       try{ resetSessionTimer(); }catch(e){}
     })();
     return; // 管理者セッション処理はスキップ
