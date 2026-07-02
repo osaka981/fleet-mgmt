@@ -2094,10 +2094,16 @@ function applyOwnerModeUI(){
   }); }catch(e){}
   try{ document.querySelectorAll('.nav-group-header,.nav-section,.nav-group-title').forEach(function(s){ s.style.display='none'; }); }catch(e){}
   try{ ['nav-grp-company','nav-grp-office'].forEach(function(id){ var g=document.getElementById(id); if(g) g.style.display='none'; }); }catch(e){}
-  // タイトルを会社名に
+  // ★ ロゴのテキストを「フリート管理」に(大阪急配を外す)。クリックは更新(location.reload)のまま。
   try{
-    var t=document.querySelector('.app-title,.sidebar-title,.sidebar-logo');
-    if(t && co) t.textContent=co.name;
+    var logoTitle=document.querySelector('.logo-title');
+    if(logoTitle){
+      var img=logoTitle.querySelector('img');
+      logoTitle.textContent='フリート管理';
+      if(img) logoTitle.insertBefore(img, logoTitle.firstChild);
+    }
+    var logoDiv=document.querySelector('.logo');
+    if(logoDiv){ logoDiv.setAttribute('onclick','location.reload()'); logoDiv.style.cursor='pointer'; }
   }catch(e){}
   // ★ 自社の会社ページを直接開く
   try{ if(co && typeof showCompanyPage==='function'){ showCompanyPage(co.id, null); } }catch(e){}
@@ -11242,7 +11248,7 @@ function renderCompanyPage(companyId, pageId){
   if(!(typeof ownerMode!=='undefined' && ownerMode)){
     html += '<button class="btn btn-sm" onclick="backFromCompanyPage()" style="flex-shrink:0;display:flex;align-items:center;gap:4px;padding:6px 12px"><svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2L4 7l5 5"/></svg>戻る</button>';
   }
-  html += '<h1 style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center">' + c.name + '</h1>';
+  html += '<h1 style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;pointer-events:none;cursor:default">' + c.name + '</h1>';
   html += '<div style="display:flex;gap:6px;flex-shrink:0">';
   html += '<button class="btn btn-sm" onclick="openCompanyModal(' + c.id + ')">編集</button>';
   if(!(typeof ownerMode!=='undefined' && ownerMode)){
@@ -13520,6 +13526,20 @@ document.addEventListener('click',function(e){
 // ?form=1 のQRフォームアクセス時は自動ログインしない
 (function(){
   if(location.search.includes('form=1') || location.hash === '#form') return; // QRフォームは除外
+  // ★ 委託会社モードのセッション復元(更新してもログアウトせず委託会社モードに戻る)
+  var ownerSession = sessionStorage.getItem('fleet_owner_session');
+  if(ownerSession){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app-screen').style.display='block';
+    (async function(){
+      try{ if(typeof syncFromSheet==='function') await syncFromSheet(); }catch(e){}
+      ownerMode=true; ownerCompanyId=isNaN(ownerSession)?ownerSession:Number(ownerSession);
+      try{ renderAll(); }catch(e){}
+      try{ applyOwnerModeUI(); }catch(e){}
+      try{ resetSessionTimer(); }catch(e){}
+    })();
+    return; // 管理者セッション処理はスキップ
+  }
   const SESSION_KEY = 'fleet_session';
   if(sessionStorage.getItem(SESSION_KEY) === 'ok'){
     document.getElementById('login-screen').style.display='none';
