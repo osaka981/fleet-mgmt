@@ -11259,12 +11259,13 @@ function renderCompanyPage(companyId, pageId){
   html += '</div></div>';
   html += '<div class="content">';
   html += '<div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:12px 16px;margin-bottom:14px">';
-  html += '<div style="font-size:12px;color:#888">' + (c.addr||'') + (c.tel?' &nbsp;&#x260E;'+c.tel:'') + ' &nbsp;代表：' + (c.rep||'—') + '　社員数：' + (c.count||1) + '名</div>';
-  html += '<div style="margin-top:8px;padding:5px 12px;background:#e3f2fd;border-radius:6px;display:inline-flex;align-items:center;gap:8px">';
+  html += '<div style="padding:5px 12px;background:#e3f2fd;border-radius:6px;display:inline-flex;align-items:center;gap:8px">';
   html += '<span style="font-size:11px;color:#1565c0;font-weight:500">登録番号</span>';
   html += '<span style="font-size:16px;font-weight:700;color:#1565c0;letter-spacing:.1em">' + (c.regCode||'—') + '</span>';
   html += '<span style="font-size:10px;color:#888">※ QR新規登録で使用</span>';
-  html += '</div></div>';
+  html += '</div>';
+  html += '<div style="font-size:12px;color:#888;margin-top:8px">' + (c.addr||'') + (c.tel?' &nbsp;&#x260E;'+c.tel:'') + ' &nbsp;代表：' + (c.rep||'—') + '　社員数：' + (c.count||1) + '名</div>';
+  html += '</div>';
   html += '<div class="company-card">';
   html += '<div class="company-tabs">';
   html += '<div class="company-tab active" id="ctab-drivers-' + companyId + '" onclick="switchCompanyTab(\'drivers\',' + companyId + ')">ドライバー（' + dc.length + '名）</div>';
