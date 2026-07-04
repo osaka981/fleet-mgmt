@@ -7252,6 +7252,32 @@ function initSelfForm(){
     document.getElementById('sf-office').innerHTML='<option value="">選択してください</option>'+sfOffices.map(o=>`<option>${o}</option>`).join('');
     document.getElementById('sf-new-office').innerHTML='<option value="">選択してください</option><option value="未定">未定（後で設定）</option>'+sfOffices.map(o=>`<option>${o}</option>`).join('');
     sfSetMode('update');
+    // ★ 2026/07/04: QRに会社番号が埋め込まれていれば登録番号に自動セット
+    try{
+      var qs = location.search || '';
+      var hash = location.hash || '';
+      var m = (qs+'&'+hash).match(/[?&#]company=(\d+)/);
+      if(m && m[1]){
+        var rc = document.getElementById('sf-regcode');
+        if(rc){
+          rc.value = m[1];
+          rc.readOnly = true;                 // 自動入力済みは編集不可に
+          rc.style.background = '#f0f4ff';
+          // 会社名を表示(分かれば)
+          try{
+            var cos = JSON.parse(localStorage.getItem('fleet_companies')||'[]');
+            var co = cos.find(function(c){ return String(c.regCode)===String(m[1]); });
+            var grp = document.getElementById('sf-regcode-group');
+            if(co && grp){
+              var hint = document.createElement('div');
+              hint.style.cssText='font-size:12px;color:#1565c0;margin-top:4px;font-weight:600';
+              hint.textContent='▶ '+co.name+' として登録されます';
+              grp.appendChild(hint);
+            }
+          }catch(e){}
+        }
+      }
+    }catch(e){}
     // 自動ログインが後から app-screen を表示しても self-form-screen を守るため監視
     const observer = new MutationObserver(() => {
       const appEl = document.getElementById('app-screen');
@@ -11240,6 +11266,68 @@ function backFromCompanyPage(){
   }
 }
 
+// ★ 2026/07/04: 委託会社ごとのQRコード発行(会社番号入りフォームURL)
+function showCompanyQR(companyId){
+  var c = companies.find(function(x){return x.id==companyId;});
+  if(!c){ alert('会社が見つかりません'); return; }
+  var regCode = c.regCode || '';
+  if(!regCode){ alert('この会社には登録番号がありません。編集で登録番号を設定してください。'); return; }
+  // フォームURL(会社番号を埋め込む)
+  var base = location.href.split('?')[0].split('#')[0];
+  var formUrl = base + '#form?company=' + encodeURIComponent(regCode);
+
+  // モーダル
+  var modal = document.createElement('div');
+  modal.className='modal-bg';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px';
+  modal.onclick=function(e){ if(e.target===modal) modal.remove(); };
+  modal.innerHTML='<div style="background:#fff;border-radius:14px;max-width:400px;width:100%;padding:22px;text-align:center">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
+      '<span style="font-size:15px;font-weight:700">'+esc(c.name)+' 従業員QR</span>'+
+      '<button onclick="this.closest(\'.modal-bg\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888">✕</button>'+
+    '</div>'+
+    '<div style="font-size:12px;color:#666;margin-bottom:14px;line-height:1.6">このQRを自社の従業員に配布してください。<br>従業員がスマホで読み取ると、<b>'+esc(c.name)+'</b>（登録番号 '+esc(String(regCode))+'）として登録フォームが開きます。</div>'+
+    '<div id="company-qr-box" style="display:flex;justify-content:center;padding:14px;background:#fff;border:1px solid #eee;border-radius:10px;margin-bottom:12px"></div>'+
+    '<div style="font-size:10px;color:#999;word-break:break-all;margin-bottom:14px">'+esc(formUrl)+'</div>'+
+    '<button class="btn btn-primary" onclick="printCompanyQR(\''+esc(c.name)+'\',\''+esc(String(regCode))+'\')">QRコードを印刷</button>'+
+  '</div>';
+  document.body.appendChild(modal);
+
+  // QR描画(ライブラリ動的ロード)
+  function draw(){
+    var box=document.getElementById('company-qr-box');
+    if(!box) return;
+    box.innerHTML='';
+    try{ new QRCode(box,{text:formUrl,width:180,height:180,colorDark:'#1a1a1a',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M}); }
+    catch(e){ box.textContent='QR生成に失敗しました'; }
+  }
+  if(window.QRCode){ draw(); }
+  else{
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload=draw;
+    document.head.appendChild(s);
+  }
+}
+
+function printCompanyQR(name, regCode){
+  var box=document.getElementById('company-qr-box');
+  var img = box ? box.querySelector('img,canvas') : null;
+  var dataUrl='';
+  try{
+    if(img){ dataUrl = img.tagName==='CANVAS' ? img.toDataURL() : img.src; }
+  }catch(e){}
+  var w=window.open('','_blank');
+  if(!w){ alert('印刷ウィンドウを開けませんでした'); return; }
+  w.document.write('<html><head><title>'+name+' 従業員QR</title></head><body style="text-align:center;font-family:sans-serif;padding:40px">'+
+    '<h2>'+name+'</h2><p>従業員セルフ登録用QRコード（登録番号 '+regCode+'）</p>'+
+    (dataUrl?'<img src="'+dataUrl+'" style="width:280px;height:280px">':'<p>QR画像を取得できませんでした</p>')+
+    '<p style="font-size:12px;color:#666;margin-top:20px">スマホのカメラで読み取ってください</p>'+
+    '</body></html>');
+  w.document.close();
+  setTimeout(function(){ w.print(); }, 500);
+}
+
 function renderCompanyPage(companyId, pageId){
   pageId = pageId || ('page-company-' + companyId);
   var pageEl = document.getElementById(pageId);
@@ -11321,6 +11409,7 @@ function renderCompanyPage(companyId, pageId){
   html += '<span style="font-size:16px;font-weight:700;color:#1565c0;letter-spacing:.1em">' + (c.regCode||'—') + '</span>';
   html += '<span style="font-size:10px;color:#888">※ QR新規登録で使用</span>';
   html += '</div>';
+  html += '<button class="btn btn-sm" onclick="showCompanyQR('+c.id+')" style="margin-left:8px;display:inline-flex;align-items:center;gap:4px;vertical-align:middle"><svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="5" height="5"/><rect x="8" y="1" width="5" height="5"/><rect x="1" y="8" width="5" height="5"/><path d="M8 8h2M12 8v2M8 12h5M11 10v3"/></svg>QRコード発行</button>';
   html += '<div style="font-size:12px;color:#888;margin-top:8px">' + (c.addr||'') + (c.tel?' &nbsp;&#x260E;'+c.tel:'') + ' &nbsp;代表：' + (c.rep||'—') + '　社員数：' + (c.count||1) + '名</div>';
   html += '</div>';
   html += '<div class="company-card">';
