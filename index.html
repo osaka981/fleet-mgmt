@@ -2226,17 +2226,14 @@ async function doLogout(){
     }catch(e){}
   }
   sessionStorage.removeItem('fleet_session');
-  // ★ 委託会社モードのリセット
+  // ★ 2026/07/04: 委託会社モードを常に完全リセット(モード混在を防ぐ)
   sessionStorage.removeItem('fleet_owner_session');
-  if(ownerMode){
-    ownerMode=false; ownerCompanyId=null;
-    // メニュー表示を元に戻す
-    try{ document.querySelectorAll('.nav-item').forEach(function(n){ n.style.display=''; }); }catch(e){}
-    try{ document.querySelectorAll('.nav-section,.nav-group-title,.nav-group-header').forEach(function(s){ s.style.display=''; }); }catch(e){}
-    try{ ['nav-grp-company','nav-grp-office'].forEach(function(id){ var g=document.getElementById(id); if(g) g.style.display=''; }); }catch(e){}
-    try{ toggleOwnerLogin(false); }catch(e){}
-  }
+  ownerMode=false; ownerCompanyId=null;
+  try{ if(typeof _resetMenuVisibility==='function') _resetMenuVisibility(); }catch(e){}
+  try{ toggleOwnerLogin(false); }catch(e){}
   document.getElementById('app-screen').style.display='none';document.getElementById('login-screen').style.display='flex';document.getElementById('pw-input').value='';document.getElementById('login-err').textContent='';
+  var oc=document.getElementById('owner-code-input'); if(oc) oc.value='';
+  var op=document.getElementById('owner-pw-input'); if(op) op.value='';
 }
 function changePw(){const o=document.getElementById('pw-old').value,n=document.getElementById('pw-new').value,n2=document.getElementById('pw-new2').value,msg=document.getElementById('pw-msg');if(o!==PASSWORD){msg.style.color='#e53935';msg.textContent='現在のパスワードが違います';return;}if(!n){msg.style.color='#e53935';msg.textContent='新しいパスワードを入力';return;}if(n!==n2){msg.style.color='#e53935';msg.textContent='確認用が一致しません';return;}PASSWORD=n;localStorage.setItem('fleet_pw',n);isDirty=true;scheduleAutoSave();addLog('設定','パスワード変更');['pw-old','pw-new','pw-new2'].forEach(id=>document.getElementById(id).value='');msg.style.color='#43a047';msg.textContent='変更しました';}
 
