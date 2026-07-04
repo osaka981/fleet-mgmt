@@ -2083,6 +2083,19 @@ async function doOwnerLogin(){
 }
 
 // 委託会社モードのUI適用(自社データのみに絞る・不要メニューを隠す)
+// ★ 2026/07/04: メニュー表示を管理者モードの状態に復元
+function _resetMenuVisibility(){
+  ownerMode=false; ownerCompanyId=null;
+  try{ document.querySelectorAll('.nav-item').forEach(function(n){ n.style.display=''; }); }catch(e){}
+  try{ document.querySelectorAll('.nav-group-header,.nav-section,.nav-group-title').forEach(function(s){ s.style.display=''; }); }catch(e){}
+  try{ ['nav-grp-company','nav-grp-office'].forEach(function(id){ var g=document.getElementById(id); if(g) g.style.display=''; }); }catch(e){}
+  // ロゴを元の「フリート管理」表示・更新クリックに(既に大阪急配は外してある)
+  try{
+    var logoDiv=document.querySelector('.logo');
+    if(logoDiv){ logoDiv.setAttribute('onclick','location.reload()'); logoDiv.style.cursor='pointer'; }
+  }catch(e){}
+}
+
 function applyOwnerModeUI(){
   if(!ownerMode) return;
   const co = companies.find(c=>c.id==ownerCompanyId);
@@ -2123,6 +2136,7 @@ async function doLogin(){
   if(pw===PASSWORD){
     recordLoginAttempt(true);
     sessionStorage.setItem('fleet_session','ok');
+    _resetMenuVisibility(); // ★ 管理者モード: メニュー表示を確実に復元
     addLog('ログイン','パスワード認証成功');resetSessionTimer();
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-screen').style.display='block';
@@ -13551,6 +13565,7 @@ document.addEventListener('click',function(e){
   if(sessionStorage.getItem(SESSION_KEY) === 'ok'){
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-screen').style.display='block';
+    try{ _resetMenuVisibility(); }catch(e){} // ★ 管理者モード: メニュー確実表示
     renderAll();
     // 前回表示していたページを復元
     var lastPage=sessionStorage.getItem('fleet_current_page');
