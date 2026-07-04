@@ -2116,10 +2116,47 @@ function applyOwnerModeUI(){
       if(img) logoTitle.insertBefore(img, logoTitle.firstChild);
     }
     var logoDiv=document.querySelector('.logo');
-    if(logoDiv){ logoDiv.setAttribute('onclick','location.reload()'); logoDiv.style.cursor='pointer'; }
+    if(logoDiv){ logoDiv.setAttribute('onclick','ownerRefresh()'); logoDiv.style.cursor='pointer'; }
   }catch(e){}
   // ★ 自社の会社ページを直接開く
   try{ if(co && typeof showCompanyPage==='function'){ showCompanyPage(co.id, null); } }catch(e){}
+}
+
+// ★ 2026/07/04: 委託会社モードの更新(画面を白くせず、データだけ再取得して再描画)
+let _ownerRefreshing=false;
+async function ownerRefresh(){
+  if(_ownerRefreshing) return;
+  _ownerRefreshing=true;
+  // 更新中トースト表示
+  var toast=document.getElementById('owner-refresh-toast');
+  if(!toast){
+    toast=document.createElement('div');
+    toast.id='owner-refresh-toast';
+    toast.style.cssText='position:fixed;top:12px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:8px 18px;border-radius:20px;font-size:13px;z-index:99999;box-shadow:0 2px 10px rgba(0,0,0,.3);display:flex;align-items:center;gap:8px';
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML='<span style="display:inline-block;width:12px;height:12px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:ownerspin .7s linear infinite"></span>更新中...';
+  toast.style.display='flex';
+  // スピナー用CSS(一度だけ)
+  if(!document.getElementById('owner-spin-style')){
+    var st=document.createElement('style'); st.id='owner-spin-style';
+    st.textContent='@keyframes ownerspin{to{transform:rotate(360deg)}}';
+    document.head.appendChild(st);
+  }
+  try{
+    if(typeof syncFromSheet==='function') await syncFromSheet();
+    // 会社ページを再描画(画面はそのまま)
+    if(ownerCompanyId!=null && typeof renderCompanyPage==='function'){
+      var pageId='page-company-'+ownerCompanyId;
+      renderCompanyPage(ownerCompanyId, pageId);
+    }
+    toast.innerHTML='✓ 更新しました';
+    setTimeout(function(){ toast.style.display='none'; }, 1200);
+  }catch(e){
+    toast.innerHTML='更新に失敗しました';
+    setTimeout(function(){ toast.style.display='none'; }, 2000);
+  }
+  _ownerRefreshing=false;
 }
 
 async function doLogin(){
