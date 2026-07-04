@@ -1864,6 +1864,45 @@ async function syncAll(saveFirst){
   }
 }
 
+// ★ 2026/07/04: 委託会社モード専用の安全保存。
+//   サーバーから最新の全データを取得し、自社(companies内の該当会社)の変更だけを
+//   反映して保存する。これにより大阪急配の車両/ドライバーを古いデータで上書きせず、
+//   台数の誤判定・データ消失を防ぐ。
+async function saveOwnerCompanyData(){
+  if(!ownerMode || ownerCompanyId==null) return false;
+  try{
+    // 保存したい自社データ(手元)を退避
+    var myCompany = companies.find(function(c){return c.id==ownerCompanyId;});
+    if(!myCompany) return false;
+    var myCompanyCopy = JSON.parse(JSON.stringify(myCompany));
+    // サーバー最新を取得
+    var res = await fetch(API_URL+'?action=getAll');
+    var json = await res.json();
+    if(!json.ok || !json.data){ return false; }
+    var srvDrivers = json.data.drivers||[];
+    var srvVehicles = json.data.vehicles||[];
+    var srvCompanies = json.data.companies||[];
+    // 委託会社リストの該当社だけ自分の変更で置き換え(他社はサーバーのまま)
+    var idx = srvCompanies.findIndex(function(c){return String(c.id)===String(ownerCompanyId);});
+    if(idx>=0){ srvCompanies[idx] = myCompanyCopy; }
+    else { srvCompanies.push(myCompanyCopy); }
+    // 全体データはサーバーの最新+自社分のみ更新して保存
+    var ts=new Date().toISOString();
+    var payload = {action:'saveAll', drivers:srvDrivers, vehicles:srvVehicles, companies:srvCompanies, clientTimestamp:ts};
+    var saveRes = await fetch(API_URL,{method:'POST',body:JSON.stringify(payload)});
+    var saveJson = await saveRes.json();
+    if(saveJson.ok){
+      // 手元も最新に合わせる(他社データを取り込む)
+      companies = srvCompanies;
+      contractors = companies;
+      localStorage.setItem('fleet_companies', JSON.stringify(companies));
+      isDirty=false;
+      return true;
+    }
+    return false;
+  }catch(e){ console.warn('saveOwnerCompanyData failed', e); return false; }
+}
+
 function buildSavePayload(){
   var ts=new Date().toISOString();
   return {action:'saveAll',drivers,vehicles,companies,clientTimestamp:ts,settings:{
@@ -2227,7 +2266,10 @@ async function doLogin(){
   }
 }
 async function doLogout(){
-  if(isDirty&&isSafeToSave()){
+  // ★ 2026/07/04: 委託会社モードのログアウトでは全体保存をしない。
+  //   委託会社モードは自社データしか触らず、全体保存すると台数の減少誤判定・
+  //   データ消失事故が起きるため、保存はスキップする(データはサーバーが正)。
+  if(!ownerMode && isDirty && isSafeToSave()){
     setSyncStatus('保存中...','');
     try{
       await fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())});
@@ -13585,6 +13627,13 @@ function scheduleAutoSave(){
   _autoSaveTimer=setTimeout(function(){
     _autoSaveTimer=null;
     if(!isDirty) return;
+    // ★ 委託会社モードは専用の安全保存(サーバー最新に自社分だけ反映)
+    if(ownerMode){
+      saveOwnerCompanyData().then(function(ok){
+        if(ok){ var ts=new Date().toLocaleTimeString(); try{setSyncStatus('保存しました '+ts,'');}catch(e){} }
+      });
+      return;
+    }
     if(sessionStorage.getItem('fleet_session')!=='ok') return;
     if(!isSafeToSave(true)) return;
     fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())})
