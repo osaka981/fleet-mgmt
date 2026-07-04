@@ -11417,6 +11417,9 @@ function renderCompanyPage(companyId, pageId){
   html += '<div class="company-tab active" id="ctab-drivers-' + companyId + '" onclick="switchCompanyTab(\'drivers\',' + companyId + ')">ドライバー（' + dc.length + '名）</div>';
   html += '<div class="company-tab" id="ctab-vehicles-' + companyId + '" onclick="switchCompanyTab(\'vehicles\',' + companyId + ')">車両（' + vc.length + '台）</div>';
   html += '<div class="company-tab" id="ctab-files-' + companyId + '" onclick="switchCompanyTab(\'files\',' + companyId + ')">書類・写真</div>';
+  // ★ 2026/07/04: 提出受信箱タブ(自社宛のQR提出)
+  var _inboxCount = _getCompanyInboxItems(c.regCode).length;
+  html += '<div class="company-tab" id="ctab-inbox-' + companyId + '" onclick="switchCompanyTab(\'inbox\',' + companyId + ')" style="position:relative">提出受信箱' + (_inboxCount?'<span style="background:#e53935;color:#fff;font-size:9px;border-radius:9px;padding:1px 6px;margin-left:4px">'+_inboxCount+'</span>':'') + '</div>';
   html += '</div>';
   html += '<div class="company-tab-content active" id="ctabcontent-drivers-' + companyId + '">';
   html += '<div style="margin-bottom:8px"><button class="btn btn-sm btn-primary" onclick="openCompanyDriverModal(' + companyId + ')">＋ ドライバー追加</button></div>';
@@ -11429,8 +11432,50 @@ function renderCompanyPage(companyId, pageId){
   html += '<div class="company-tab-content" id="ctabcontent-files-' + companyId + '">';
   html += renderCompanyFilesTabHTML(dc, vc, companyId);
   html += '</div>';
+  html += '<div class="company-tab-content" id="ctabcontent-inbox-' + companyId + '">';
+  html += _renderCompanyInboxHTML(c.regCode, companyId);
+  html += '</div>';
   html += '</div></div>';
   pageEl.innerHTML = html;
+}
+
+// ★ 2026/07/04: 自社宛(regCode一致)の未登録QR提出を取得
+function _getCompanyInboxItems(regCode){
+  if(!regCode) return [];
+  try{
+    var inbox=JSON.parse(localStorage.getItem('fleet_inbox')||'[]');
+    return inbox.filter(function(it){
+      if(!it) return false;
+      if(it.status==='登録済') return false; // 登録済みは両方から消える
+      return String(normalizeRegCode(it.regcode))===String(normalizeRegCode(regCode));
+    });
+  }catch(e){ return []; }
+}
+
+// ★ 提出受信箱の中身HTML
+function _renderCompanyInboxHTML(regCode, companyId){
+  var items=_getCompanyInboxItems(regCode);
+  var h='<div style="font-size:11px;color:#888;margin-bottom:10px">QRコードから従業員が提出したデータです。「登録」すると台帳に追加され、この一覧から消えます。</div>';
+  if(!items.length){
+    return h+'<div style="padding:20px;text-align:center;color:#aaa;font-size:12px">新しい提出はありません</div>';
+  }
+  h+=items.map(function(it){
+    var dt=it.timestamp?new Date(it.timestamp).toLocaleString('ja-JP'):'';
+    var name=(it.sei||'')+' '+(it.mei||'')||it.name||'(名前なし)';
+    var kind=it.mode==='new'?'新規':'更新';
+    var plate=it.plate?' / 車両: '+esc(String(it.plate)):'';
+    return '<div style="border:1px solid #e5e3df;border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fff">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:9px;background:#eef;color:#4a6;padding:1px 7px;border-radius:8px;display:inline-block;margin-bottom:3px">'+kind+'</div>'+
+          '<div style="font-size:13px;font-weight:600;color:#222">'+esc(name)+'</div>'+
+          '<div style="font-size:10.5px;color:#666;margin-top:2px">'+dt+plate+'</div>'+
+        '</div>'+
+        '<button class="btn btn-sm btn-primary" onclick="registerFromInbox(\''+it.id+'\')" style="white-space:nowrap">登録</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  return h;
 }
 
 function toggleCompanyDriverDetail(companyId,driverId){
@@ -11546,7 +11591,7 @@ function deleteCompanyAttachedFile(companyId, kind, targetId, idx){
 }
 
 function switchCompanyTab(tab, companyId){
-  ['drivers','vehicles','files'].forEach(t=>{
+  ['drivers','vehicles','files','inbox'].forEach(t=>{
     const tabEl = document.getElementById(`ctab-${t}-${companyId}`);
     const contentEl = document.getElementById(`ctabcontent-${t}-${companyId}`);
     if(tabEl) tabEl.classList.toggle('active', t===tab);
