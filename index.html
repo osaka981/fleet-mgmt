@@ -2087,10 +2087,18 @@ function _resetMenuVisibility(){
   try{ document.querySelectorAll('.nav-item').forEach(function(n){ n.style.display=''; }); }catch(e){}
   try{ document.querySelectorAll('.nav-group-header,.nav-section,.nav-group-title').forEach(function(s){ s.style.display=''; }); }catch(e){}
   try{ ['nav-grp-company','nav-grp-office'].forEach(function(id){ var g=document.getElementById(id); if(g) g.style.display=''; }); }catch(e){}
-  // ロゴを元の「フリート管理」表示・更新クリックに(既に大阪急配は外してある)
+  // ロゴを元の更新クリックに
   try{
     var logoDiv=document.querySelector('.logo');
     if(logoDiv){ logoDiv.setAttribute('onclick','location.reload()'); logoDiv.style.cursor='pointer'; }
+  }catch(e){}
+  // ★ 委託会社ページが開いたままなら閉じて、ダッシュボードを開く
+  try{
+    document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+    var dash=document.getElementById('page-dashboard');
+    if(dash){ dash.classList.add('active'); }
+    var navDash=document.querySelector('.nav-item[data-page="dashboard"]');
+    if(typeof showPage==='function'){ showPage('dashboard', navDash); }
   }catch(e){}
 }
 
@@ -2176,6 +2184,7 @@ async function doLogin(){
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-screen').style.display='block';
     renderAll();syncAll(false);
+    try{ showPage('dashboard', document.querySelector('.nav-item[data-page="dashboard"]')); }catch(e){}
     return;
   }
   // ローカル不一致 → Sheetから最新パスワード+設定を取得して再チェック
@@ -2199,10 +2208,12 @@ async function doLogin(){
     if(pw===PASSWORD){
       recordLoginAttempt(true);
       sessionStorage.setItem('fleet_session','ok');
+      _resetMenuVisibility(); // ★ 管理者モード: メニュー復元
       document.getElementById('login-screen').style.display='none';
       addLog('ログイン','Sheet同期後パスワード認証成功');resetSessionTimer();
       document.getElementById('app-screen').style.display='block';
       renderAll();syncAll(false);
+      try{ showPage('dashboard', document.querySelector('.nav-item[data-page="dashboard"]')); }catch(e){}
     } else {
       recordLoginAttempt(false);
       var lock=getLoginLock();
