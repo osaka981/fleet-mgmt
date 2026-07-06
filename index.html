@@ -1903,6 +1903,50 @@ async function saveOwnerCompanyData(){
   }catch(e){ console.warn('saveOwnerCompanyData failed', e); return false; }
 }
 
+// ★ 2026/07/06: 保存前にサーバー最新とマージし、他端末で登録された
+//   ドライバー・車両・委託会社を消さないようにする根本対策。
+//   手元(自分)の変更は優先しつつ、サーバーにあって手元に無いものは取り込む。
+async function mergeAndSaveAll(){
+  try{
+    var res = await fetch(API_URL+'?action=getAll');
+    var json = await res.json();
+    if(!json.ok || !json.data){ 
+      // サーバー取得失敗時は従来保存にフォールバック
+      var r2=await fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())});
+      var j2=await r2.json(); return j2.ok;
+    }
+    var srvD = json.data.drivers||[];
+    var srvV = json.data.vehicles||[];
+    var srvC = json.data.companies||[];
+    // マージ: 手元のデータを基準に、サーバーにしか無いもの(idベース)を追加
+    function mergeById(local, server){
+      var localIds = {};
+      local.forEach(function(x){ if(x && x.id!=='' && x.id!=null) localIds[String(x.id)]=true; });
+      var merged = local.slice();
+      server.forEach(function(s){
+        if(!s || s.id==='' || s.id==null) return;
+        if(!localIds[String(s.id)]){ merged.push(s); } // 手元に無い=他端末で登録された → 取り込む
+      });
+      return merged;
+    }
+    var mD = mergeById(drivers, srvD).filter(function(d){return d && d.name && String(d.name).trim();});
+    var mV = mergeById(vehicles, srvV).filter(function(v){return v && String(v.plate||'').trim();});
+    // 委託会社は id でマージ(会社単位)
+    var mC = mergeById(companies, srvC);
+    // 手元を更新
+    drivers = mD; vehicles = mV; companies = mC; contractors = companies;
+    try{ localStorage.setItem('fleet_drivers',JSON.stringify(drivers)); localStorage.setItem('fleet_vehicles',JSON.stringify(vehicles)); localStorage.setItem('fleet_companies',JSON.stringify(companies)); }catch(e){}
+    // マージ後のデータで保存
+    var ts=new Date().toISOString();
+    var payload = buildSavePayload();
+    payload.drivers = drivers; payload.vehicles = vehicles; payload.companies = companies;
+    var saveRes = await fetch(API_URL,{method:'POST',body:JSON.stringify(payload)});
+    var saveJson = await saveRes.json();
+    if(saveJson.ok){ isDirty=false; try{renderAll&&renderAll();}catch(e){} return true; }
+    return false;
+  }catch(e){ console.warn('mergeAndSaveAll failed',e); return false; }
+}
+
 function buildSavePayload(){
   var ts=new Date().toISOString();
   return {action:'saveAll',drivers,vehicles,companies,clientTimestamp:ts,settings:{
@@ -13636,16 +13680,11 @@ function scheduleAutoSave(){
     }
     if(sessionStorage.getItem('fleet_session')!=='ok') return;
     if(!isSafeToSave(true)) return;
-    fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())})
-      .then(r=>r.json())
-      .then(j=>{
-        if(j.ok){
-          isDirty=false;
-          var ts=new Date().toLocaleTimeString();
-          localStorage.setItem('fleet_last_sync',ts);
-          setSyncStatus('自動保存 '+ts,'sync-ok');
-        }
-      }).catch(()=>{});
+    // ★ 2026/07/06: マージ保存(他端末のデータを消さない)
+    mergeAndSaveAll().then(function(ok){
+      if(ok){ var ts=new Date().toLocaleTimeString(); try{setSyncStatus('保存しました '+ts,'');}catch(e){} }
+    });
+    return;
   }, 10*1000);
 }
 
