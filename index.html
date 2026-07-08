@@ -5768,6 +5768,9 @@ function saveVehicle(keepOpen){
   processPendingFiles(savedVObj,'vehicle');
   if(!keepOpen){closeModal('vehicle-modal');}renderVehicles(currentOfficeFilter);renderDashboard();renderDocPage();
   if(vStatus==='廃車') renderArchive();
+  // ★ 2026/07/07: 登録は重要操作のため即時サーバー保存(10秒タイマー待ちを回避)。
+  //   これにより登録直後にブラウザを閉じてもサーバーに確定する。
+  try{ saveNow(); }catch(e){ /* 失敗時は従来のタイマー保存が働く */ }
 }
 var driverNavList=[];
 var driverNavIndex=-1;
@@ -6589,6 +6592,8 @@ function saveDriver(keepOpen){
       },200);
     }
   }
+  // ★ 2026/07/07: ドライバー登録も即時サーバー保存(10秒タイマー待ちを回避)。
+  try{ saveNow(); }catch(e){ /* 失敗時は従来のタイマー保存が働く */ }
   return true;
 }
 function closeModal(id){var el=document.getElementById(id);if(el)el.style.display='none';}
@@ -13688,6 +13693,39 @@ function scheduleAutoSave(){
   }, 10*1000);
 }
 
+// ★ 2026/07/07: 即時サーバー保存。車両・ドライバー登録など重要操作で使用。
+//   10秒タイマーを待たずにサーバーへ確定保存するため、登録直後にブラウザを
+//   閉じても消えない。保存中は待機予約タイマーをクリアして二重送信を防ぐ。
+//   返り値: 保存成功なら true(Promise)。
+function saveNow(){
+  if(_autoSaveTimer){ clearTimeout(_autoSaveTimer); _autoSaveTimer=null; }
+  if(!isDirty) return Promise.resolve(true);
+  try{ setSyncStatus('保存中…','' ); }catch(e){}
+  // 委託会社モード
+  if(ownerMode){
+    return saveOwnerCompanyData().then(function(ok){
+      var ts=new Date().toLocaleTimeString();
+      try{ setSyncStatus(ok?('保存しました '+ts):'保存に失敗(再試行します)', ok?'sync-ok':'sync-err'); }catch(e){}
+      if(!ok){ isDirty=true; scheduleAutoSave(); } // 失敗時はタイマー保存で再挑戦
+      return ok;
+    }).catch(function(){ isDirty=true; scheduleAutoSave(); return false; });
+  }
+  // 通常モード
+  if(sessionStorage.getItem('fleet_session')!=='ok'){ return Promise.resolve(false); }
+  if(!isSafeToSave(true)){
+    // 安全弁で即時保存を見送った場合も、タイマー保存に委ねる
+    try{ setSyncStatus('保存待機中','' ); }catch(e){}
+    isDirty=true; scheduleAutoSave();
+    return Promise.resolve(false);
+  }
+  return mergeAndSaveAll().then(function(ok){
+    var ts=new Date().toLocaleTimeString();
+    try{ setSyncStatus(ok?('保存しました '+ts):'保存に失敗(再試行します)', ok?'sync-ok':'sync-err'); }catch(e){}
+    if(!ok){ isDirty=true; scheduleAutoSave(); }
+    return ok;
+  }).catch(function(){ isDirty=true; scheduleAutoSave(); return false; });
+}
+
 // 3分ごとに自動読込（他端末の変更を取得 + inbox同期）
 setInterval(function(){
   if(isDirty) return;
@@ -13750,13 +13788,19 @@ setInterval(function(){
 }, 3*60*1000);
 
 // タブ閉じ/ブラウザ閉じ時にsendBeaconで確実送信
-window.addEventListener('beforeunload', function(){
+window.addEventListener('beforeunload', function(e){
   if(!isDirty) return;
   if(sessionStorage.getItem('fleet_session')!=='ok') return;
-  if(!isSafeToSave(true)) return;
-  const payload=JSON.stringify(buildSavePayload());
-  navigator.sendBeacon(API_URL, payload);
-  isDirty=false;
+  if(isSafeToSave(true)){
+    const payload=JSON.stringify(buildSavePayload());
+    var sent=navigator.sendBeacon(API_URL, payload);
+    if(sent){ isDirty=false; return; }
+  }
+  // ★ 2026/07/07: 安全弁でブロック or ビーコン送信失敗 → 未保存のまま。
+  //   離脱前に警告してデータ消失を防ぐ(即時保存を入れたので通常はここに来ない)。
+  e.preventDefault();
+  e.returnValue='保存していない変更があります。このまま閉じると失われる可能性があります。';
+  return e.returnValue;
 });
 
 // タブが再表示になった時に自動読込（スマホでアプリ切替時など）
