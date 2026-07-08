@@ -1532,11 +1532,77 @@ function _normalizeVehicle(v){
   if(!v || typeof v !== 'object') return v;
   v.attachedFiles = _normalizeArrayField(v.attachedFiles);
   v.archivedFiles = _normalizeArrayField(v.archivedFiles);
+  v.offices       = _normalizeArrayField(v.offices);
+  // office(単一)が空で offices があれば補完(表示・集計の一貫性のため)
+  if((!v.office || typeof v.office!=='string') && v.offices.length){ v.office = v.offices[0]; }
   ['shaken','jibai','nin'].forEach(k=>{
     if(typeof v[k]==='string'){ try{ v[k]=JSON.parse(v[k]); }catch(_){ v[k]={}; } }
     if(!v[k] || typeof v[k]!=='object' || Array.isArray(v[k])) v[k]={};
   });
   return v;
+}
+// ★ 2026/07/07: 現在メモリ上の全データを正規化する共通関数。
+//   初回ロードだけでなく、サーバー同期後・マージ後・描画前にも呼び、
+//   壊れた配列フィールド(offices/attachedFiles/archivedFiles等)を常に正常化する。
+//   これにより「vaf.some is not a function」「offices.join is not a function」等を根絶する。
+function normalizeAllData(){
+  try{
+    if(Array.isArray(drivers))  drivers  = drivers.map(_normalizeDriver);
+    if(Array.isArray(vehicles)) vehicles = vehicles.map(_normalizeVehicle);
+    var _norm = function(c){
+      if(c && typeof c==='object'){
+        c.drivers  = _normalizeArrayField(c.drivers).map(_normalizeDriver);
+        c.vehicles = _normalizeArrayField(c.vehicles).map(_normalizeVehicle);
+      }
+      return c;
+    };
+    if(Array.isArray(companies))   companies   = companies.map(_norm);
+    if(Array.isArray(contractors)) contractors = contractors.map(_norm);
+  }catch(e){ console.warn('normalizeAllData warning:', e); }
+}
+// ★ 2026/07/07: 自社車両のナンバー重複を自動除去。
+//   同一ナンバー(廃車を除く)が複数ある場合、情報が最も濃い1件を残す。
+//   残す基準: 添付ファイル数 → 担当ドライバー有無 → 車検情報有無 → id が新しい方。
+//   返り値: 削除した重複件数。
+function _dedupeVehicles(){
+  if(!Array.isArray(vehicles)) return 0;
+  function score(v){
+    var s=0;
+    if(Array.isArray(v.attachedFiles)) s += v.attachedFiles.length*100;
+    if(v.driver && String(v.driver).trim()) s += 50;
+    if(v.shaken && v.shaken.exp) s += 20;
+    if(v.shaken && v.shaken.chassis) s += 10;
+    if((v.offices||[]).length) s += 5;
+    // 同点なら新しいid(=後から登録した方)を優先
+    var idNum = parseInt(v.id)||0;
+    return s + Math.min(idNum/1e15, 0.9);
+  }
+  var groups={}, keep=[];
+  vehicles.forEach(function(v){
+    var plate=String(v&&v.plate||'').trim();
+    // ナンバー無し・廃車は重複判定から除外(そのまま残す)
+    if(!plate || v.status==='廃車'){ keep.push(v); return; }
+    (groups[plate]=groups[plate]||[]).push(v);
+  });
+  var removed=0;
+  Object.keys(groups).forEach(function(plate){
+    var recs=groups[plate];
+    if(recs.length===1){ keep.push(recs[0]); return; }
+    var winner=recs[0];
+    recs.forEach(function(r){ if(score(r)>score(winner)) winner=r; });
+    // 敗者の添付ファイルで、勝者に無いものは取り込む(消失防止)
+    recs.forEach(function(r){
+      if(r===winner) return;
+      (r.attachedFiles||[]).forEach(function(f){
+        var exists=(winner.attachedFiles||[]).some(function(w){return w.fileId&&f.fileId&&w.fileId===f.fileId;});
+        if(!exists){ if(!Array.isArray(winner.attachedFiles)) winner.attachedFiles=[]; winner.attachedFiles.push(f); }
+      });
+    });
+    removed += recs.length-1;
+    keep.push(winner);
+  });
+  if(removed>0){ vehicles=keep; }
+  return removed;
 }
 try{
   drivers  = drivers.map(_normalizeDriver);
@@ -1690,7 +1756,7 @@ async function syncFromSheet(){
         });
         contractors=companies;
       }
-      saveLocal();saveCompanies();renderAll();
+      saveLocal();saveCompanies();normalizeAllData();renderAll();
     }
     // inbox取得（GASから）
     await syncInboxFromSheet();
@@ -1935,6 +2001,7 @@ async function mergeAndSaveAll(){
     var mC = mergeById(companies, srvC);
     // 手元を更新
     drivers = mD; vehicles = mV; companies = mC; contractors = companies;
+    normalizeAllData(); // ★ マージ後に正規化(サーバーの壊れた配列を取り込んでも修復)
     try{ localStorage.setItem('fleet_drivers',JSON.stringify(drivers)); localStorage.setItem('fleet_vehicles',JSON.stringify(vehicles)); localStorage.setItem('fleet_companies',JSON.stringify(companies)); }catch(e){}
     // マージ後のデータで保存
     var ts=new Date().toISOString();
@@ -2021,6 +2088,21 @@ function isSafeToSave(silent){
         } else { location.reload(); }
       }catch(e){ location.reload(); }
       return false;
+    }
+    // ★ 2026/07/07: 「基準値の方が壊れている」ケースの救済。
+    //   過去に誤って多い件数が基準値として保存されると、正しい件数のたびに急減誤検知になる。
+    //   その場合はここで基準値を今の正しい件数に更新して解除できる。
+    var okReset=confirm(
+      '基準値の方が間違っている可能性があります。\n\n'+
+      '前回の基準値: ドライバー'+prevD+'名 / 車両'+prevV+'台 / ファイル'+prevF+'件\n'+
+      '今の件数:     ドライバー'+drivers.length+'名 / 車両'+vehicles.length+'台 / ファイル'+curF+'件\n\n'+
+      '今の件数が正しい（＝前回の基準値が誤って多く記録された）場合は【OK】。\n'+
+      '基準値を今の件数に更新し、以降この警告を出さないようにします。\n\n'+
+      '本当にデータを減らした（退職・廃車など）場合は【キャンセル】。'
+    );
+    if(okReset){
+      addLog('同期','基準値を現在値に更新（急減警告を解除）: D'+drivers.length+'/V'+vehicles.length+'/F'+curF);
+      return updateSaveCounts(curF); // 基準値を今の件数に更新して保存許可
     }
     // キャンセル側 = 本当に減らした場合。二段階目の最終確認。
     var ok2=confirm(
@@ -5768,6 +5850,9 @@ function saveVehicle(keepOpen){
   processPendingFiles(savedVObj,'vehicle');
   if(!keepOpen){closeModal('vehicle-modal');}renderVehicles(currentOfficeFilter);renderDashboard();renderDocPage();
   if(vStatus==='廃車') renderArchive();
+  // ★ 2026/07/07: ナンバー重複を自動除去(同じ車両が二重登録されるのを防ぐ)。
+  var _vdup=_dedupeVehicles();
+  if(_vdup>0){ console.log('[saveVehicle] 車両ナンバー重複を自動除去: '+_vdup+'件'); saveLocal(); }
   // ★ 2026/07/07: 登録は重要操作のため即時サーバー保存(10秒タイマー待ちを回避)。
   //   これにより登録直後にブラウザを閉じてもサーバーに確定する。
   try{ saveNow(); }catch(e){ /* 失敗時は従来のタイマー保存が働く */ }
@@ -9239,6 +9324,7 @@ function storageColumnsHtml(cards){
 }
 
 function renderStorage(){
+  try{ normalizeAllData(); }catch(e){} // ★ タブ切替時の壊れた配列によるエラーを防止
   const search = (document.getElementById('storage-search')?.value || '').toLowerCase();
   const el = document.getElementById('storage-content');
   const badgesEl = document.getElementById('storage-office-badges');
@@ -12894,6 +12980,7 @@ async function sendMailAllOffices(){
 
 // ====== 初期化 ======
 function renderAll(){
+  normalizeAllData(); // ★ 描画前に必ず正規化(壊れた配列でエラーにならないよう保険)
   renderOfficeNav();
   try{renderCompanyNav();}catch(e){console.error('renderCompanyNav error:',e);}
   renderDashboard();renderVehicles(null);renderDrivers(null);renderDocPage();renderArchive();
