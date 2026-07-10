@@ -2392,14 +2392,18 @@ async function doLogin(){
   }
 }
 async function doLogout(){
-  // ★ 2026/07/04: 委託会社モードのログアウトでは全体保存をしない。
-  //   委託会社モードは自社データしか触らず、全体保存すると台数の減少誤判定・
-  //   データ消失事故が起きるため、保存はスキップする(データはサーバーが正)。
-  if(!ownerMode && isDirty && isSafeToSave()){
-    setSyncStatus('保存中...','');
+  // ★ 2026/07/07: ログアウトは即時・確実に。保存でブロックしない。
+  //   以前は isSafeToSave()(確認ダイアログ有り)と await fetch でログアウトが
+  //   固まり、「2〜3回押してやっとログアウト」「大阪急配ログインに戻される」等の
+  //   不具合が出ていた。保存は silent(ダイアログ無し)で投げっぱなしにし、
+  //   画面遷移を待たせない。未保存分は beforeunload / 次回ログイン時に確定する。
+  if(!ownerMode && isDirty){
     try{
-      await fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())});
-      isDirty=false;
+      if(isSafeToSave(true)){ // silent=true: 確認ダイアログを出さない
+        // 投げっぱなし(await しない)。保存完了を待たずにログアウトを続行。
+        fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())})
+          .then(function(){ isDirty=false; }).catch(function(){});
+      }
     }catch(e){}
   }
   sessionStorage.removeItem('fleet_session');
@@ -13875,19 +13879,18 @@ setInterval(function(){
 }, 3*60*1000);
 
 // タブ閉じ/ブラウザ閉じ時にsendBeaconで確実送信
+// ★ 2026/07/07: 警告プロンプト(e.preventDefault)は撤去。
+//   ログアウトや画面遷移のたびに警告が出て「戻される」「反応が悪い」不具合の原因に
+//   なっていたため。登録時の即時保存(saveNow)を入れたので、閉じる瞬間の未保存は
+//   ほぼ発生しない。残った未保存分は下のビーコンで静かに送るだけにする。
 window.addEventListener('beforeunload', function(e){
   if(!isDirty) return;
   if(sessionStorage.getItem('fleet_session')!=='ok') return;
-  if(isSafeToSave(true)){
+  if(!isSafeToSave(true)) return; // 急減時は送らない(誤上書き防止)
+  try{
     const payload=JSON.stringify(buildSavePayload());
-    var sent=navigator.sendBeacon(API_URL, payload);
-    if(sent){ isDirty=false; return; }
-  }
-  // ★ 2026/07/07: 安全弁でブロック or ビーコン送信失敗 → 未保存のまま。
-  //   離脱前に警告してデータ消失を防ぐ(即時保存を入れたので通常はここに来ない)。
-  e.preventDefault();
-  e.returnValue='保存していない変更があります。このまま閉じると失われる可能性があります。';
-  return e.returnValue;
+    if(navigator.sendBeacon(API_URL, payload)){ isDirty=false; }
+  }catch(_){}
 });
 
 // タブが再表示になった時に自動読込（スマホでアプリ切替時など）
