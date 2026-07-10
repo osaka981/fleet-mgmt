@@ -11579,9 +11579,8 @@ function renderCompanyPage(companyId, pageId){
   html += '<button class="btn btn-sm" onclick="openCompanyModal(' + c.id + ')">編集</button>';
   if(!(typeof ownerMode!=='undefined' && ownerMode)){
     html += '<button class="btn btn-sm btn-danger" onclick="deleteCompany(' + c.id + ')">削除</button>';
-  } else {
-    html += '<button class="btn btn-sm" onclick="doLogout()" style="display:flex;align-items:center;gap:4px"><svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 7h7M9 4l3 3-3 3"/><path d="M7 2H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h4"/></svg>ログアウト</button>';
   }
+  // ★ 2026/07/11: 委託会社モードの右上ログアウトは撤去。ログアウトは左サイドバーに一本化。
   html += '</div></div>';
   html += '<div class="content">';
   html += '<div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:12px 16px;margin-bottom:14px">';
