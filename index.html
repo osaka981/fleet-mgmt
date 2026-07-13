@@ -5998,9 +5998,10 @@ function expandVmPreview(){
 
 // PDFドラッグ移動用ラッパー生成
 function buildDraggablePdf(src,prefix){
+  // ★ 2026/07/13: 透明ガードを撤去。PDFはiframe内蔵ビューアで拡大・スクロールできる。
+  //   ガードがあるとCtrl押下中にPDFを操作できず、拡大後にパンできなかった。
   return '<div style="width:100%;height:100%;position:relative">'+
     '<iframe src="'+src+'" style="width:100%;height:100%;border:none" allow="autoplay"></iframe>'+
-    '<div class="ctrl-zoom-guard" style="position:absolute;top:0;left:0;right:0;bottom:0;z-index:10;display:none"></div>'+
   '</div>';
 }
 function initPdfDrag(prefix){}
@@ -6034,6 +6035,12 @@ function initModalWheelZoom(){
       var prefix=modalId==='driver-modal'?'dm':'vm';
       var body=document.getElementById(prefix+'-preview-body');
       if(!body||!body.firstElementChild) return;
+      // ★ 2026/07/13: PDFはiframe内蔵ビューアの拡大に任せる(transform拡大は
+      //   パン不可になるため)。画像は専用のパン&ズーム(initZoomDrag)に任せる。
+      //   どちらでもない場合のみ従来のtransform拡大を行う。
+      var hasIframe=body.querySelector('iframe');
+      var hasZoomImg=body.querySelector('[id$="-img-zoom"]');
+      if(hasIframe || hasZoomImg) return;
       var cur=_modalPreviewZoom[prefix]||1;
       cur=Math.max(0.5,Math.min(3,cur+(e.deltaY<0?0.15:-0.15)));
       _modalPreviewZoom[prefix]=cur;
@@ -8087,6 +8094,83 @@ function handleFiles(files, bufKey){
   });
 }
 
+// ★ 2026/07/13: プレビュー画像のパン&ズーム。
+//   ・クリックでフィット⇔拡大をトグル ・拡大中はドラッグで上下左右に移動
+//   ・Ctrl+ホイールでカーソル位置を中心に拡大縮小
+function _initImgPanZoom(){
+  const pan=document.getElementById('fp-pan');
+  const img=document.getElementById('fp-img');
+  if(!pan||!img) return;
+  let scale=1;          // 1=フィット, >1=拡大
+  let zoomed=false;
+  function fit(){
+    scale=1; zoomed=false;
+    img.style.maxWidth='100%'; img.style.maxHeight='100%';
+    img.style.width=''; img.style.height='';
+    pan.style.cursor='zoom-in';
+  }
+  function enlarge(factor){
+    zoomed=true;
+    scale=factor||2;
+    // フィット状態の実表示サイズを基準に拡大
+    const natW=img.naturalWidth||img.clientWidth;
+    img.style.maxWidth='none'; img.style.maxHeight='none';
+    img.style.width=(natW*scale/ (img.naturalWidth/ (img.clientWidth||natW) ) )+'px';
+    // シンプルに: 自然サイズ×倍率
+    img.style.width=(img.naturalWidth*scale)+'px';
+    img.style.height='auto';
+    pan.style.cursor='grab';
+  }
+  // クリックでトグル(ドラッグと区別)
+  let downX=0,downY=0,moved=false,dragging=false,startL=0,startT=0;
+  img.addEventListener('click',function(e){
+    if(moved) return; // ドラッグ後のクリックは無視
+    if(!zoomed){ enlarge(2); }
+    else { fit(); }
+  });
+  // ドラッグでパン
+  pan.addEventListener('mousedown',function(e){
+    if(!zoomed) return;
+    dragging=true; moved=false;
+    downX=e.clientX; downY=e.clientY;
+    startL=pan.scrollLeft; startT=pan.scrollTop;
+    pan.style.cursor='grabbing';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove',function(e){
+    if(!dragging) return;
+    const dx=e.clientX-downX, dy=e.clientY-downY;
+    if(Math.abs(dx)>3||Math.abs(dy)>3) moved=true;
+    pan.scrollLeft=startL-dx;
+    pan.scrollTop=startT-dy;
+  });
+  window.addEventListener('mouseup',function(){
+    if(dragging){ dragging=false; pan.style.cursor=zoomed?'grab':'zoom-in'; setTimeout(function(){moved=false;},30); }
+  });
+  // Ctrl+ホイールでズーム(カーソル位置中心)
+  pan.addEventListener('wheel',function(e){
+    if(!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    const rect=pan.getBoundingClientRect();
+    const cx=e.clientX-rect.left+pan.scrollLeft;
+    const cy=e.clientY-rect.top+pan.scrollTop;
+    const prev=scale;
+    scale=Math.min(6, Math.max(1, scale*(e.deltaY<0?1.15:0.87)));
+    if(scale<=1){ fit(); return; }
+    zoomed=true;
+    img.style.maxWidth='none'; img.style.maxHeight='none';
+    img.style.width=(img.naturalWidth*scale)+'px';
+    img.style.height='auto';
+    pan.style.cursor='grab';
+    // カーソル位置を保持するようスクロール調整
+    const ratio=scale/prev;
+    pan.scrollLeft=cx*ratio-(e.clientX-rect.left);
+    pan.scrollTop=cy*ratio-(e.clientY-rect.top);
+  },{passive:false});
+  // 初期はフィット
+  if(img.complete){ fit(); } else { img.addEventListener('load',fit); }
+}
+
 function openFilePreview(url, name, dataUrl, fileId){
   const body = document.getElementById('file-preview-body');
   const title = document.getElementById('file-preview-title');
@@ -8140,13 +8224,20 @@ function openFilePreview(url, name, dataUrl, fileId){
       body.innerHTML = '<div style="color:#fff;padding:32px;text-align:center"><div style="font-size:64px;margin-bottom:16px">PDF</div><div style="font-size:14px;margin-bottom:8px">'+name+'</div><div style="font-size:12px;color:#aaa;margin-bottom:20px">PDFプレビューを表示できません</div>'+(url?'<a href="'+url+'" target="_blank" style="color:#4a90e2;padding:10px 20px;border:1px solid #4a90e2;border-radius:6px;text-decoration:none">別タブで開く</a>':'')+'</div>';
     }
   } else if(isImg){
-    const imgSrc = src||'';
+    let imgSrc = src||'';
     if(driveFileId && !imgSrc.startsWith('data:')){
-      const thumbUrl = 'https://drive.google.com/thumbnail?id='+driveFileId+'&sz=w1600';
-      body.innerHTML = '<img src="'+thumbUrl+'" style="max-width:100%;max-height:100%;object-fit:contain;display:block;margin:auto;padding:8px;cursor:zoom-in" onclick="this.style.cursor=this.style.maxWidth===\'none\'?\'zoom-in\':\'zoom-out\';this.style.maxWidth=this.style.maxWidth===\'none\'?\'100%\':\'none\';this.style.maxHeight=this.style.maxHeight===\'none\'?\'100%\':\'none\'" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div style=color:#fff;padding:32px;text-align:center>IMG '+name+'</div>\'"><div id="img-fallback" style="display:none"></div>';
-    } else {
-      body.innerHTML = '<img src="'+imgSrc+'" style="max-width:100%;max-height:100%;object-fit:contain;display:block;margin:auto;padding:8px;cursor:zoom-in" onclick="this.style.cursor=this.style.maxWidth===\'none\'?\'zoom-in\':\'zoom-out\';this.style.maxWidth=this.style.maxWidth===\'none\'?\'100%\':\'none\';this.style.maxHeight=this.style.maxHeight===\'none\'?\'100%\':\'none\'" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div style=color:#fff;padding:32px;text-align:center>IMG '+name+'</div>\'"><div id="img-fallback" style="display:none"></div>';
+      imgSrc = 'https://drive.google.com/thumbnail?id='+driveFileId+'&sz=w1600';
     }
+    // ★ 2026/07/13: 拡大時に上下左右へパン(移動)できるプレビュー。
+    //   スクロール可能なラッパー内に画像を置き、クリックで等倍拡大/縮小、
+    //   拡大中はドラッグで移動できる。flexの中央寄せによる「上・左が見られない」問題を回避。
+    body.innerHTML =
+      '<div id="fp-pan" style="width:100%;height:100%;overflow:auto;-webkit-overflow-scrolling:touch;display:block;text-align:center;background:#1a1a1a;cursor:zoom-in">'+
+        '<img id="fp-img" src="'+imgSrc+'" alt="'+esc(name)+'" '+
+          'style="max-width:100%;max-height:100%;object-fit:contain;display:inline-block;vertical-align:middle" '+
+          'onerror="this.onerror=null;this.parentElement.innerHTML=\'<div style=color:#fff;padding:32px;text-align:center>IMG '+esc(name)+'</div>\'">'+
+      '</div>';
+    try{ _initImgPanZoom(); }catch(e){}
   } else {
     const openUrl = hasDriveUrl ? url : src;
     body.innerHTML = '<div style="color:#fff;padding:32px;text-align:center"><div style="font-size:48px;margin-bottom:12px">FILE</div><div style="margin-bottom:16px">'+name+'</div>'+(openUrl?'<a href="'+openUrl+'" '+(hasDriveUrl?'target="_blank"':'download="'+name+'"')+' style="color:#4a90e2;padding:10px 20px;border:1px solid #4a90e2;border-radius:6px;text-decoration:none">'+(hasDriveUrl?'Driveで開く':'ダウンロード')+'</a>':'')+'</div>';
