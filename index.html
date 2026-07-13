@@ -8924,16 +8924,14 @@ function openCatPicker(kind, ownerId, fileIdx, labelEl){
   document.querySelectorAll('.cat-picker-popup').forEach(e=>e.remove());
 
   const driverCats=['免許証（表）','免許証（裏）','免許証（表裏）','健康診断書','その他'];
-  const vehicleCats=['車検証','自賠責','任意保険','その他'];
+  const vehicleCats=['車検証','自賠責保険（表）','自賠責保険（裏）','自賠責保険（表裏）','任意保険（表）','任意保険（裏）','任意保険（表裏）','その他'];
   const cats=kind==='driver'?driverCats:vehicleCats;
 
   const popup=document.createElement('div');
   popup.className='cat-picker-popup';
-  popup.style.cssText='position:fixed;z-index:9999;background:#fff;border:1px solid #aaa;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.2);padding:4px 0;min-width:140px';
-
-  const rect=labelEl.getBoundingClientRect();
-  popup.style.left=Math.min(rect.left, window.innerWidth-160)+'px';
-  popup.style.top=(rect.bottom+4)+'px';
+  // ★ 2026/07/13: 項目が増えて下にはみ出す問題に対応。
+  //   画面下端に近い場合は上向きに開き、収まらなければスクロールさせる。
+  popup.style.cssText='position:fixed;z-index:9999;background:#fff;border:1px solid #aaa;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.2);padding:4px 0;min-width:140px;max-height:60vh;overflow-y:auto';
 
   cats.forEach(cat=>{
     const btn=document.createElement('div');
@@ -8963,7 +8961,30 @@ function openCatPicker(kind, ownerId, fileIdx, labelEl){
   clearBtn.onclick=()=>{applyCatChange(kind,ownerId,fileIdx,'');popup.remove();};
   popup.appendChild(clearBtn);
 
+  // まず画面外(非表示)に置いて実寸を測り、収まる向きへ配置する
+  popup.style.visibility='hidden';
   document.body.appendChild(popup);
+  const rect=labelEl.getBoundingClientRect();
+  const ph=popup.offsetHeight;
+  const vh=window.innerHeight;
+  const margin=8;
+  // 左右: 画面内に収める
+  popup.style.left=Math.max(margin, Math.min(rect.left, window.innerWidth-popup.offsetWidth-margin))+'px';
+  // 上下: 下に十分な余白があれば下向き、無ければ上向き。どちらも入らなければ余白の広い側へ。
+  const spaceBelow=vh-rect.bottom-margin;
+  const spaceAbove=rect.top-margin;
+  if(spaceBelow>=ph){
+    popup.style.top=(rect.bottom+4)+'px';
+  } else if(spaceAbove>=ph){
+    popup.style.top=(rect.top-ph-4)+'px';
+  } else if(spaceBelow>=spaceAbove){
+    popup.style.top=(rect.bottom+4)+'px';
+    popup.style.maxHeight=(spaceBelow-4)+'px';
+  } else {
+    popup.style.top=margin+'px';
+    popup.style.maxHeight=(spaceAbove-4)+'px';
+  }
+  popup.style.visibility='visible';
 
   // クリック外で閉じる
   setTimeout(()=>{
