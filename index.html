@@ -6221,7 +6221,7 @@ function renderPendingCategoryUI(kind){
   var idxs=pending.idxs||[pending.idx];
   if(!idxs.length) return;
   var isVehicle=kind==='vehicle';
-  var cats=isVehicle?['車検証','自賠責','任意保険','その他']:['免許証（表）','免許証（裏）','免許証（表裏）','健康診断書','その他'];
+  var cats=isVehicle?['車検証','自賠責保険（表）','自賠責保険（裏）','自賠責保険（表裏）','任意保険（表）','任意保険（裏）','任意保険（表裏）','その他']:['免許証（表）','免許証（裏）','免許証（表裏）','健康診断書','その他'];
   var containerId=isVehicle?'v-pending-cat':'d-pending-cat';
   var old=document.getElementById(containerId);if(old)old.remove();
   var dropZone=document.getElementById(isVehicle?'v-files-zone':'d-files-zone');
@@ -7507,7 +7507,7 @@ function sfAddFiles(files){
   }
 }
 function renderSfPreviews(){
-  var catOptions='<option value="">選択</option><option value="免許証（表）">免許証（表）</option><option value="免許証（裏）">免許証（裏）</option><option value="免許証（表裏）">免許証（表裏1枚）</option><option value="車検証">車検証</option><option value="自賠責保険">自賠責保険</option><option value="任意保険">任意保険</option><option value="健康診断書">健康診断書</option><option value="その他">その他</option>';
+  var catOptions='<option value="">選択</option><option value="免許証（表）">免許証（表）</option><option value="免許証（裏）">免許証（裏）</option><option value="免許証（表裏）">免許証（表裏1枚）</option><option value="車検証">車検証</option><option value="自賠責保険（表）">自賠責保険（表）</option><option value="自賠責保険（裏）">自賠責保険（裏）</option><option value="自賠責保険（表裏）">自賠責保険（表裏1枚）</option><option value="任意保険（表）">任意保険（表）</option><option value="任意保険（裏）">任意保険（裏）</option><option value="任意保険（表裏）">任意保険（表裏1枚）</option><option value="健康診断書">健康診断書</option><option value="その他">その他</option>';
   document.getElementById('sf-previews').innerHTML=sfFiles.map(function(f,i){
     var selVal=f.category||'';
     var opts=catOptions.replace('value="'+selVal+'"','value="'+selVal+'" selected');
@@ -8196,9 +8196,9 @@ function openUnassignedPreview(fileIdx){
 // ファイルカテゴリ定義
 const FILE_CATEGORIES={
   'd-files':['免許証（表）','免許証（裏）','免許証（表裏）','健康診断書','その他'],
-  'v-files':['車検証','自賠責保険','任意保険','その他'],
+  'v-files':['車検証','自賠責保険（表）','自賠責保険（裏）','自賠責保険（表裏）','任意保険（表）','任意保険（裏）','任意保険（表裏）','その他'],
   'cd-files':['免許証（表）','免許証（裏）','免許証（表裏）','健康診断書','その他'],
-  'cv-files':['車検証','自賠責保険','任意保険','その他']
+  'cv-files':['車検証','自賠責保険（表）','自賠責保険（裏）','自賠責保険（表裏）','任意保険（表）','任意保険（裏）','任意保険（表裏）','その他']
 };
 
 function guessFileCategory(fileName, bufKey){
@@ -8208,8 +8208,9 @@ function guessFileCategory(fileName, bufKey){
   if(n.includes('免許')&&n.includes('裏')) return '免許証（裏）';
   if(n.includes('免許')||n.includes('license')) return '免許証（表）';
   if(n.includes('車検')||n.includes('shaken')) return '車検証';
-  if(n.includes('自賠')||n.includes('jibai')) return '自賠責保険';
-  if(n.includes('任意')||n.includes('nin')||n.includes('保険')) return '任意保険';
+  if(n.includes('自賠')||n.includes('jibai')){ if(n.includes('表裏')) return '自賠責保険（表裏）'; if(n.includes('裏')) return '自賠責保険（裏）'; if(n.includes('表')) return '自賠責保険（表）'; return '自賠責保険（表）'; }
+  if(n.includes('任意')||n.includes('nin')){ if(n.includes('表裏')) return '任意保険（表裏）'; if(n.includes('裏')) return '任意保険（裏）'; if(n.includes('表')) return '任意保険（表）'; return '任意保険（表）'; }
+  if(n.includes('保険')){ if(n.includes('表裏')) return '任意保険（表裏）'; if(n.includes('裏')) return '任意保険（裏）'; if(n.includes('表')) return '任意保険（表）'; return '任意保険（表）'; }
   if(n.includes('健康')||n.includes('診断')) return '健康診断書';
   return '';
 }
@@ -8288,7 +8289,7 @@ function renderExistingFiles(elId, kind, ownerId){
   if(!af.length&&!archived.length){el.innerHTML='';return;}
 
   const isVehicle=kind==='vehicle'||kind==='cv';
-  const catList=isVehicle?['車検証','自賠責','任意保険','その他']:['免許証（表）','免許証（裏）','免許証（表裏）','健康診断書','その他'];
+  const catList=isVehicle?['車検証','自賠責保険（表）','自賠責保険（裏）','自賠責保険（表裏）','任意保険（表）','任意保険（裏）','任意保険（表裏）','その他']:['免許証（表）','免許証（裏）','免許証（表裏）','健康診断書','その他'];
 
   let html='<div style="font-size:10px;color:#888;font-weight:500;margin-bottom:4px">登録済みファイル（'+af.length+'件）</div>';
   html+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
