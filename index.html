@@ -937,6 +937,18 @@ body.modal-open{overflow:hidden}
               #page-settings div[style*="display:flex;gap:16px"]{flex-direction:column!important}
             }
           </style>
+          <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:#888">文字サイズ</div>
+          <div style="background:#f8f9fa;border:1px solid #e8e8e8;border-radius:10px;padding:16px;margin-bottom:28px">
+            <div style="font-size:12px;color:#555;margin-bottom:12px">画面全体の文字と表示サイズを変更します。見やすい大きさを選んでください。</div>
+            <div id="font-size-btns" style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn fsz-btn" data-fsz="small"  onclick="setFontSize('small')"  style="flex:1;min-width:64px;justify-content:center;font-size:12px">小</button>
+              <button class="btn fsz-btn" data-fsz="medium" onclick="setFontSize('medium')" style="flex:1;min-width:64px;justify-content:center;font-size:14px">中</button>
+              <button class="btn fsz-btn" data-fsz="large"  onclick="setFontSize('large')"  style="flex:1;min-width:64px;justify-content:center;font-size:16px">大</button>
+              <button class="btn fsz-btn" data-fsz="xlarge" onclick="setFontSize('xlarge')" style="flex:1;min-width:64px;justify-content:center;font-size:18px">特大</button>
+            </div>
+            <div style="font-size:10px;color:#888;margin-top:8px">※ この端末にのみ適用されます（他の端末には影響しません）。</div>
+          </div>
+
           <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:#888">営業所管理</div>
           <div class="office-list" id="settings-office-list"></div>
           <button class="btn btn-primary" style="margin-top:12px;width:100%;justify-content:center" onclick="openOfficeModal()">＋ 営業所を追加</button>
@@ -13525,7 +13537,37 @@ function calendarShowDetail(dateKey){
   detail.style.display='block';
 }
 
-function renderSettingsAll(){renderSettingsOffices();generateQR();loadAiSettings();renderMailSettings();loadAlertSettings();loadStampSettings();renderOperationLogs();loadSessionTimeout();var dt=document.getElementById('dark-mode-toggle');if(dt)dt.checked=document.documentElement.classList.contains('dark-mode');}
+function renderSettingsAll(){renderSettingsOffices();generateQR();loadAiSettings();renderMailSettings();loadAlertSettings();loadStampSettings();renderOperationLogs();loadSessionTimeout();var dt=document.getElementById('dark-mode-toggle');if(dt)dt.checked=document.documentElement.classList.contains('dark-mode');highlightFontSizeBtn();}
+
+// ★ 2026/07/13: 文字サイズ設定(特大/大/中/小)。html要素のzoomで全体を拡縮する。
+//   中=1.15(従来の既定値)を基準に、小/大/特大を用意。端末ごとにlocalStorageへ保存。
+var FONT_SIZE_ZOOM={small:1.0, medium:1.15, large:1.32, xlarge:1.5};
+function applyFontSize(level){
+  // 未設定(既定)のときはCSSに任せる(PC=1.15 / スマホ=1)。
+  // ユーザーが明示的に選んだ場合のみ、inline+importantで全環境に適用する。
+  if(!level){ document.documentElement.style.removeProperty('zoom'); return; }
+  var z=FONT_SIZE_ZOOM[level]||FONT_SIZE_ZOOM.medium;
+  document.documentElement.style.setProperty('zoom', z, 'important');
+}
+function setFontSize(level){
+  if(!FONT_SIZE_ZOOM[level]) level='medium';
+  try{ localStorage.setItem('fleet_font_size', level); }catch(e){}
+  applyFontSize(level);
+  highlightFontSizeBtn();
+}
+function getFontSize(){
+  try{ return localStorage.getItem('fleet_font_size')||''; }catch(e){ return ''; }
+}
+function highlightFontSizeBtn(){
+  var cur=getFontSize()||'medium'; // 未設定表示上は「中」を選択済み扱い
+  document.querySelectorAll('.fsz-btn').forEach(function(b){
+    var on=b.getAttribute('data-fsz')===cur;
+    b.classList.toggle('btn-primary', on);
+    b.style.fontWeight=on?'700':'';
+  });
+}
+// 起動時: 明示設定があるときのみ適用(なければCSS既定のまま)
+(function(){ try{ var f=getFontSize(); if(f) applyFontSize(f); }catch(e){} })();
 
 function updateSessionTimeout(minutes){
   SESSION_TIMEOUT_MS=parseInt(minutes)*60*1000;
