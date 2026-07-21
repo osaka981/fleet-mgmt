@@ -9711,7 +9711,7 @@ function renderStorage(){
       var offLabel=(v._offices||[v.office]).filter(Boolean).join('・')||'未設定';
       var shakenExp=v.shaken?.exp||'';
       var shakenColor=shakenExp?(daysUntil(shakenExp)<0?'#c62828':daysUntil(shakenExp)<=30?'#e65100':'#2e7d32'):'#888';
-      var companyBadge=v._src&&v._src!=='自社'?'<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#f3e5f5;color:#6A1B9A;margin-left:4px">'+esc(v._src)+'</span>':'';
+      var companyBadge=v._src&&v._src!=='自社'?'<span title="'+esc(v._src)+'" style="font-size:9px;padding:1px 5px;border-radius:3px;background:#f3e5f5;color:#6A1B9A;margin-left:4px;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle">'+esc(v._src)+'</span>':'';
       var driverBadge=driverName?'<span style="background:#1565C0;color:#fff;padding:1px 6px;border-radius:3px;font-size:9px">'+esc(driverName)+'</span>':'<span style="color:#ccc;font-size:10px">未割当</span>';
       return '<div class="split-card split-vehicle" draggable="true" data-kind="vehicle" data-id="'+v.id+'" data-plate="'+esc(String(v.plate))+'" ondragstart="splitDragStart(event)" ondragover="splitDragOver(event)" ondragleave="splitDragLeave(event)" ondrop="splitDrop(event)" style="padding:10px;background:#fff;border:1px solid #e0e0e0;border-radius:8px;cursor:grab;transition:box-shadow .15s">'+
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
@@ -9753,7 +9753,7 @@ function renderStorage(){
 
       // 委託会社リンク
       const companyLink=d._src&&d._src!=='自社'?'<span class="company-link" onclick="event.stopPropagation();navigateToCompany(\''+esc(d._src).replace(/'/g,"\\'")+'\')">'+esc(d._src)+'</span>':'';
-      const companyBadge=d._src&&d._src!=='自社'?'<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:#f3e5f5;color:#6A1B9A;white-space:nowrap;font-weight:500;border:1px solid #CE93D8" onclick="event.stopPropagation();navigateToCompany(\''+esc(d._src).replace(/'/g,"\\'")+'\')">'+esc(d._src)+'</span>':'';
+      const companyBadge=d._src&&d._src!=='自社'?'<span title="'+esc(d._src)+'" style="font-size:9px;padding:2px 6px;border-radius:4px;background:#f3e5f5;color:#6A1B9A;white-space:nowrap;font-weight:500;border:1px solid #CE93D8;max-width:96px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:middle" onclick="event.stopPropagation();navigateToCompany(\''+esc(d._src).replace(/'/g,"\\'")+'\')">'+esc(d._src)+'</span>':'';
 
       // 搭乗車両バッジ（折り畳み時のみ表示）
       const plateNum=cv?parsePlate(cv.plate).num:'';
