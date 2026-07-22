@@ -106,10 +106,10 @@ tr.row-warn td{background:rgba(251,140,0,.03)}
 .badge-danger{background:#fde8e8;color:#c62828}
 .badge-info{background:#e3f2fd;color:#1565c0}
 .badge-gray{background:#f5f5f5;color:#757575;border:1px solid #e0e0e0}
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:flex-start;justify-content:center;z-index:100;padding:4px;padding-top:8px;overflow-y:auto}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:flex-start;justify-content:center;z-index:100;padding:4px;padding-top:8px;overflow-y:auto;overflow-x:hidden}
 body.modal-open{overflow:hidden}
 .modal{background:#fff;border-radius:12px;border:1px solid #e0e0e0;width:100%;max-width:700px;max-height:98vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12)}
-.modal.modal-wide{max-width:1500px;transition:max-width .2s}
+.modal.modal-wide{max-width:min(1500px,96vw);transition:max-width .2s}
 .modal-sm{max-width:400px}
 .modal-header{padding:14px 18px;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .modal-title{font-size:16px;font-weight:600}
@@ -1189,7 +1189,7 @@ body.modal-open{overflow:hidden}
         <div id="dm-preview-body" style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;min-height:0"></div>
         <div id="dm-preview-thumbs" style="padding:6px 8px;background:#222;border-top:1px solid #333;overflow-x:auto;white-space:nowrap;display:none"></div>
       </div>
-      <div class="modal-body" style="flex:1;overflow-y:auto"><div class="form-grid">
+      <div class="modal-body" style="flex:1;min-width:0;overflow-y:auto"><div class="form-grid">
       <div class="section-title">写真・PDF添付</div>
       <div style="grid-column:1/-1">
         <div class="file-drop-zone" id="d-files-zone" ondragover="fileDragOver(event,'d-files-zone')" ondragleave="fileDragLeave('d-files-zone')" ondrop="fileDrop(event,'d-files')">
@@ -1312,7 +1312,7 @@ body.modal-open{overflow:hidden}
         </div>
         <div id="cdm-preview-body" style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;min-height:0"></div>
       </div>
-      <div class="modal-body" style="flex:1;overflow-y:auto"><div class="form-grid">
+      <div class="modal-body" style="flex:1;min-width:0;overflow-y:auto"><div class="form-grid">
       <div class="section-title">写真・PDF添付</div>
       <div style="grid-column:1/-1">
         <div class="file-drop-zone" id="cd-files-zone" ondragover="fileDragOver(event,'cd-files-zone')" ondragleave="fileDragLeave('cd-files-zone')" ondrop="fileDrop(event,'cd-files')">
