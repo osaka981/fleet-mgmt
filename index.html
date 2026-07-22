@@ -1303,7 +1303,16 @@ body.modal-open{overflow:hidden}
 <div id="company-driver-modal" style="display:none" class="modal-bg">
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-header"><span class="modal-title" id="cdm-title">委託会社 ドライバー登録</span><button class="modal-close" onclick="closeModal('company-driver-modal')">✕</button></div>
-    <div class="modal-body"><div class="form-grid">
+    <div id="cdm-flex-wrap" style="display:flex;flex:1;overflow:hidden;min-height:0">
+      <div id="cdm-preview-pane" style="width:0;min-width:0;background:#1a1a1a;display:none;flex-direction:column;overflow:hidden;border-right:1px solid #333;transition:width .2s">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#222;border-bottom:1px solid #333">
+          <span id="cdm-preview-title" style="font-size:11px;color:#ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1"></span>
+          <button onclick="expandCdmPreview()" title="全画面で表示" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:14px;padding:0 6px">↗</button>
+          <button onclick="closeCdmPreview()" style="background:none;border:none;color:#888;cursor:pointer;font-size:14px;padding:0 4px">✕</button>
+        </div>
+        <div id="cdm-preview-body" style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;min-height:0"></div>
+      </div>
+      <div class="modal-body" style="flex:1;overflow-y:auto"><div class="form-grid">
       <div class="section-title">写真・PDF添付</div>
       <div style="grid-column:1/-1">
         <div class="file-drop-zone" id="cd-files-zone" ondragover="fileDragOver(event,'cd-files-zone')" ondragleave="fileDragLeave('cd-files-zone')" ondrop="fileDrop(event,'cd-files')">
@@ -1350,6 +1359,7 @@ body.modal-open{overflow:hidden}
         <div id="cd-stamp-preview" style="margin-top:6px;display:none"></div>
       </div>
     </div></div>
+    </div>
     <div class="modal-footer"><button class="btn" onclick="closeModal('company-driver-modal')">キャンセル</button><button class="btn btn-primary" onclick="saveCompanyDriver()">保存する</button></div>
   </div>
 </div>
@@ -6288,6 +6298,59 @@ function initZoomDrag(wrapId,imgId){
   },{passive:true});
 }
 
+// ====== 委託会社ドライバーモーダル内プレビューペイン ======
+// ★ 2026/07/14: 自社ドライバー編集と同じ「左PDF・右入力」を委託会社編集にも提供。
+function openCdmPreview(fileId, name, dataUrl){
+  window._cdmPreviewFile={fileId:fileId,name:name,dataUrl:dataUrl};
+  if(_modalPreviewZoom) _modalPreviewZoom.cdm=1;
+  var pane=document.getElementById('cdm-preview-pane');
+  var body=document.getElementById('cdm-preview-body');
+  var title=document.getElementById('cdm-preview-title');
+  var modal=document.querySelector('#company-driver-modal .modal');
+  if(!pane||!body) return;
+  title.textContent=name||'';
+  var isPdf=(name||'').match(/\.pdf$/i);
+  var isImg=(name||'').match(/\.(jpg|jpeg|png|gif|webp)$/i);
+  if(isPdf&&fileId){
+    body.innerHTML=buildDraggablePdf('https://drive.google.com/file/d/'+fileId+'/preview','cdm');
+    initPdfDrag('cdm');
+  } else if(isPdf&&dataUrl){
+    try{
+      var b64=dataUrl.split(',')[1];var bs=atob(b64);var bytes=new Uint8Array(bs.length);
+      for(var i=0;i<bs.length;i++)bytes[i]=bs.charCodeAt(i);
+      var blob=new Blob([bytes],{type:'application/pdf'});
+      body.innerHTML=buildDraggablePdf(URL.createObjectURL(blob),'cdm');
+      initPdfDrag('cdm');
+    }catch(e){body.innerHTML='<div style="color:#888;padding:24px;text-align:center">PDFを表示できません</div>';}
+  } else if(isImg){
+    var src=dataUrl||(fileId?'https://drive.google.com/thumbnail?id='+fileId+'&sz=w1600':'');
+    body.innerHTML='<div id="cdm-img-wrap" style="width:100%;height:100%;overflow:auto;cursor:grab;position:relative"><img src="'+src+'" id="cdm-img-zoom" style="max-width:100%;max-height:100%;object-fit:contain;display:block;margin:auto;padding:8px;cursor:zoom-in"></div>';
+    initZoomDrag('cdm-img-wrap','cdm-img-zoom');
+  } else {
+    body.innerHTML='<div style="color:#888;padding:24px;text-align:center;font-size:13px"><div style="font-size:36px;margin-bottom:8px">📄</div>'+esc(name)+'<br><br>'+(fileId?'<a href="https://drive.google.com/file/d/'+fileId+'/view" target="_blank" style="color:#4a90e2;text-decoration:none;border:1px solid #4a90e2;padding:6px 16px;border-radius:6px">Driveで開く</a>':'プレビュー不可')+'</div>';
+  }
+  pane.style.display='flex';
+  pane.style.width='50%';
+  pane.style.minWidth='300px';
+  if(modal) modal.classList.add('modal-wide');
+}
+function closeCdmPreview(){
+  var pane=document.getElementById('cdm-preview-pane');
+  var modal=document.querySelector('#company-driver-modal .modal');
+  if(pane){pane.style.display='none';pane.style.width='0';}
+  if(modal) modal.classList.remove('modal-wide');
+}
+function expandCdmPreview(){
+  var f=window._cdmPreviewFile;if(!f) return;
+  openFilePreview('', f.name||'', f.dataUrl||'', f.fileId||'');
+}
+function openCdmPreviewFromAttached(kind, ownerId, idx){
+  var target=null;
+  companies.forEach(function(c){(c.drivers||[]).forEach(function(d){if(String(d.id)===String(ownerId))target=d;});});
+  if(!target||!target.attachedFiles||!target.attachedFiles[idx]) return;
+  var f=target.attachedFiles[idx];
+  openCdmPreview(f.fileId||'', f.name||'', f.dataUrl||'');
+}
 function closeDmPreview(){
   var pane=document.getElementById('dm-preview-pane');
   var modal=document.querySelector('#driver-modal .modal');
@@ -8560,7 +8623,7 @@ function renderExistingFiles(elId, kind, ownerId){
     const catColor=curCat?(isVehicle?'#E65100':'#1565C0'):'#999';
 
     html+='<div style="width:100px;border:1px solid #ccc;border-radius:6px;overflow:hidden;background:#fff;position:relative">';
-    var previewClick=elId==='d-existing-files'?'openDmPreviewFromAttached(\''+kind+'\','+ownerId+','+i+')':elId==='v-existing-files'?'openVmPreviewFromAttached(\''+kind+'\','+ownerId+','+i+')':'openAttachedFilePreview(\''+kind+'\','+ownerId+','+i+',\'\')';
+    var previewClick=elId==='d-existing-files'?'openDmPreviewFromAttached(\''+kind+'\','+ownerId+','+i+')':elId==='v-existing-files'?'openVmPreviewFromAttached(\''+kind+'\','+ownerId+','+i+')':elId==='cd-existing-files'?'openCdmPreviewFromAttached(\''+kind+'\','+ownerId+','+i+')':'openAttachedFilePreview(\''+kind+'\','+ownerId+','+i+',\'\')';
     html+='<div style="cursor:pointer" onclick="'+previewClick+'">'+thumb+'</div>';
     html+='<button style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:99px;background:rgba(0,0,0,.5);color:#fff;border:none;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center" onclick="event.stopPropagation();removeExistingFile(\''+kind+'\','+ownerId+','+i+',\''+elId+'\')">×</button>';
     html+='<select style="width:100%;padding:2px;font-size:9px;border:none;border-top:1px solid #eee;background:'+catColor+';color:#fff;cursor:pointer" onchange="changeExistingFileCat(\''+kind+'\','+ownerId+','+i+',this.value,\''+elId+'\')">';
@@ -12198,6 +12261,13 @@ function openCompanyDriverModal(companyId, driverId){
   initDateFields();
   modalFiles['cd-files']=[];
   renderFilePreview('cd-files');
+  // ★ 2026/07/14: 登録済みファイルを表示(クリックで左PDFプレビュー)＋プレビューを初期化
+  try{ closeCdmPreview(); }catch(e){}
+  var cdExist=document.getElementById('cd-existing-files');
+  if(cdExist){
+    if(driverId){ renderExistingFiles('cd-existing-files','cd',driverId); }
+    else { cdExist.innerHTML=''; }
+  }
   setTimeout(()=>initModalKeyNav('company-driver-modal'),100);
 }
 
