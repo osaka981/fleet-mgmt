@@ -1599,6 +1599,14 @@ function _normalizeVehicle(v){
     if(typeof v[k]==='string'){ try{ v[k]=JSON.parse(v[k]); }catch(_){ v[k]={}; } }
     if(!v[k] || typeof v[k]!=='object' || Array.isArray(v[k])) v[k]={};
   });
+  // ★ 2026/07/14: 廃車の車両は搭乗者の紐付けを外す(未搭乗にする)。
+  //   既存の廃車済み車両(名嘉山7899・福留9652等)も、読み込み時に自動で外れる。
+  if(v.status==='廃車' && (v.driver || v.driverId)){
+    if(!v._prevDriver) v._prevDriver = v.driver||'';
+    if(!v._prevDriverId) v._prevDriverId = v.driverId||null;
+    v.driver = '';
+    v.driverId = null;
+  }
   return v;
 }
 // ★ 2026/07/07: 現在メモリ上の全データを正規化する共通関数。
@@ -1848,13 +1856,22 @@ async function syncFromSheet(){
         });
         contractors=companies;
       }
-      saveLocal();saveCompanies();normalizeAllData();
+      saveLocal();saveCompanies();
+      // ★ 2026/07/14: 正規化前に「廃車なのに搭乗者が残っている車両」があるか検知。
+      var _hadScrappedWithDriver = false;
+      try{
+        var _chk=function(v){ if(v && v.status==='廃車' && (v.driver||v.driverId)) _hadScrappedWithDriver=true; };
+        (vehicles||[]).forEach(_chk);
+        (companies||[]).forEach(function(c){ (c.vehicles||[]).forEach(_chk); });
+      }catch(e){}
+      normalizeAllData(); // ここで廃車の搭乗者紐付けも外れる
       // ★ 2026/07/14: サーバー読込後に車両ナンバー重複を除去(自社+委託会社)。
       //   既存の二重登録(例: 委託会社所属ドライバーの車両)を自動で1件に収束させる。
       try{
         var _vd=_dedupeVehicles();
-        if(_vd>0){
-          console.log('[sync] 車両ナンバー重複を自動除去: '+_vd+'件');
+        if(_vd>0 || _hadScrappedWithDriver){
+          if(_vd>0) console.log('[sync] 車両ナンバー重複を自動除去: '+_vd+'件');
+          if(_hadScrappedWithDriver) console.log('[sync] 廃車車両の搭乗者紐付けを解除しました');
           saveLocal(); saveCompanies();
           if(isSafeToSave(true)){
             fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())}).then(function(){isDirty=false;}).catch(function(){});
@@ -5988,13 +6005,25 @@ function saveVehicle(keepOpen){
         // 新たに廃車
         obj.scrappedAt = new Date().toISOString();
         obj.archiveExpiresAt = calcArchiveExpiry(obj.scrappedAt);
+        // ★ 2026/07/14: 廃車にしたら搭乗者の紐付けを外す(担当ドライバーを未搭乗に)。
+        //   従来は廃車後も driver/driverId が残り、ドライバー側に廃車が搭乗中として
+        //   表示され続けていた。廃車時に自動で外す。
+        obj._prevDriver = obj.driver||''; // 記録として残す(履歴確認用)
+        obj._prevDriverId = obj.driverId||null;
+        obj.driver = '';
+        obj.driverId = null;
       } else if(existing){
         obj.scrappedAt = existing.scrappedAt || new Date().toISOString();
         obj.archiveExpiresAt = existing.archiveExpiresAt || calcArchiveExpiry(obj.scrappedAt);
+        // 既に廃車の場合も、念のため搭乗者は外したままにする
+        obj.driver = '';
+        obj.driverId = null;
       }
     } else {
       obj.scrappedAt = new Date().toISOString();
       obj.archiveExpiresAt = calcArchiveExpiry(obj.scrappedAt);
+      obj.driver = '';
+      obj.driverId = null;
     }
   } else {
     obj.scrappedAt = null;
