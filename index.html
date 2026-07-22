@@ -1704,6 +1704,166 @@ function _dedupeVehicles(){
   }
   return removed;
 }
+
+// ================================================================
+// ★ 2026/07/22: 保存アーキテクチャ再構築
+//   目的: 「保存すると台数などの数字が勝手に変わる」バグの根絶。
+//   原因: 削除が即時サーバー保存されず、マージ(mergeById)が
+//         「サーバーにあって手元に無いid=他端末で追加された」と誤認して
+//         削除したばかりの相手を復活させていた。
+//   対策: 削除IDを台帳(tombstone)に記録し、マージ時に復活を禁止する。
+//         さらに正規化・整形・マージを1つの ingestServerData() に集約し、
+//         全経路(手動同期/自動保存/ポーリング/復帰)で挙動を統一する。
+// ================================================================
+
+// ── 削除台帳(tombstone) ──
+//   削除したエンティティのidを保持。マージ時にサーバー側に残っていても取り込まない。
+//   一定期間後(TTL)に自然消滅させ、台帳の肥大化を防ぐ。
+var TOMBSTONE_TTL_MS = 30*24*60*60*1000; // 30日
+var _tombstones = (function(){
+  try{
+    var raw = JSON.parse(localStorage.getItem('fleet_tombstones')||'{}');
+    if(!raw || typeof raw!=='object' || Array.isArray(raw)) return {};
+    // TTL切れを起動時に掃除
+    var now = Date.now(), changed=false;
+    Object.keys(raw).forEach(function(k){
+      if(!raw[k] || (now - raw[k]) > TOMBSTONE_TTL_MS){ delete raw[k]; changed=true; }
+    });
+    if(changed){ try{ localStorage.setItem('fleet_tombstones', JSON.stringify(raw)); }catch(_){} }
+    return raw;
+  }catch(_){ return {}; }
+})();
+function _persistTombstones(){
+  try{ localStorage.setItem('fleet_tombstones', JSON.stringify(_tombstones)); }catch(_){}
+}
+// 削除を記録する。id は文字列化して保持。
+function recordDeletion(id){
+  if(id==null || id==='') return;
+  _tombstones[String(id)] = Date.now();
+  _persistTombstones();
+}
+function isTombstoned(id){
+  if(id==null || id==='') return false;
+  return Object.prototype.hasOwnProperty.call(_tombstones, String(id));
+}
+// 復活(再登録・取引再開)時は台帳から外す。
+function clearTombstone(id){
+  if(id==null || id==='') return;
+  if(Object.prototype.hasOwnProperty.call(_tombstones, String(id))){
+    delete _tombstones[String(id)];
+    _persistTombstones();
+  }
+}
+
+// ── 統一マージ: サーバー配列を手元に取り込む(削除済みは除外) ──
+//   local を基準に、サーバーにしか無い id を追加する。ただし:
+//   ① 削除台帳(tombstone)にある id は取り込まない(復活禁止)
+//   ② 手元に既にある id はサーバー版で上書きしない(手元の編集を優先)
+function mergeServerArray(local, server){
+  local = Array.isArray(local)? local : [];
+  server = Array.isArray(server)? server : [];
+  var localIds = {};
+  local.forEach(function(x){ if(x && x.id!==''&&x.id!=null) localIds[String(x.id)]=true; });
+  var merged = local.slice();
+  server.forEach(function(s){
+    if(!s || s.id===''||s.id==null) return;
+    var key = String(s.id);
+    if(localIds[key]) return;          // 手元にある=編集優先で取り込まない
+    if(isTombstoned(s.id)) return;     // 削除済み=復活させない
+    merged.push(s);
+  });
+  return merged;
+}
+
+// ── 統一取り込み: サーバーの生データを正規化・マージして手元へ反映 ──
+//   全同期経路(syncFromSheet / syncAll / mergeAndSaveAll / ポーリング / 復帰)から
+//   これ1つを呼ぶ。opts.merge=true なら手元優先マージ、false なら置換。
+//   設定(settings)の反映もここで一元化する。
+function ingestServerData(data, opts){
+  opts = opts || {};
+  if(!data) return;
+  var doMerge = opts.merge!==false; // 既定はマージ
+  // --- drivers ---
+  if(Array.isArray(data.drivers)){
+    var srvD = data.drivers.map(_normalizeDriver).filter(function(d){ return d && d.name && String(d.name).trim() && d.id!==''; });
+    // tombstone除外(サーバーが削除済みを返しても捨てる)
+    srvD = srvD.filter(function(d){ return !isTombstoned(d.id); });
+    drivers = doMerge ? mergeServerArray(drivers, srvD) : srvD;
+    // 添付ファイル保護: サーバー解析で消えた場合ローカルを維持
+    var _oldD = (function(){ try{ return JSON.parse(localStorage.getItem('fleet_drivers')||'[]'); }catch(_){ return []; } })();
+    drivers.forEach(function(d){
+      if(!d.attachedFiles || !d.attachedFiles.length){
+        var od = _oldD.find(function(o){ return o.id==d.id; });
+        if(od && od.attachedFiles && od.attachedFiles.length) d.attachedFiles = od.attachedFiles;
+      }
+    });
+  }
+  // --- vehicles ---
+  if(Array.isArray(data.vehicles)){
+    var srvV = data.vehicles.map(_normalizeVehicle).filter(function(v){ return v && String(v.plate||'').trim() && v.id!==''; });
+    srvV = srvV.filter(function(v){ return !isTombstoned(v.id); });
+    vehicles = doMerge ? mergeServerArray(vehicles, srvV) : srvV;
+    var _oldV = (function(){ try{ return JSON.parse(localStorage.getItem('fleet_vehicles')||'[]'); }catch(_){ return []; } })();
+    vehicles.forEach(function(v){
+      if(!v.attachedFiles || !v.attachedFiles.length){
+        var ov = _oldV.find(function(o){ return o.id==v.id; });
+        if(ov && ov.attachedFiles && ov.attachedFiles.length) v.attachedFiles = ov.attachedFiles;
+      }
+    });
+  }
+  // --- companies(委託会社) ---
+  if(Array.isArray(data.companies)){
+    var srvC = data.companies.map(function(c){
+      if(c && typeof c==='object'){
+        c.drivers  = _normalizeArrayField(c.drivers).map(_normalizeDriver).filter(function(d){ return !isTombstoned(d.id); });
+        c.vehicles = _normalizeArrayField(c.vehicles).map(_normalizeVehicle).filter(function(v){ return !isTombstoned(v.id); });
+      }
+      return c;
+    }).filter(function(c){ return c && !isTombstoned(c.id); });
+    companies = doMerge ? mergeServerArray(companies, srvC) : srvC;
+    // マージ時: 手元にある会社の内部drivers/vehiclesにサーバー分を取り込む(削除済み除外)
+    if(doMerge){
+      companies.forEach(function(lc){
+        var sc = srvC.find(function(x){ return String(x.id)===String(lc.id); });
+        if(!sc) return;
+        lc.drivers  = mergeServerArray(lc.drivers, sc.drivers);
+        lc.vehicles = mergeServerArray(lc.vehicles, sc.vehicles);
+      });
+    }
+    contractors = companies;
+  }
+  // --- settings ---
+  if(Array.isArray(data.settings) && data.settings.length){
+    try{
+      var st = data.settings[0]||{};
+      if(st.value){
+        var parsed = JSON.parse(st.value);
+        if(parsed.mailTasks && Array.isArray(parsed.mailTasks)){ mailTasks = parsed.mailTasks; localStorage.setItem('fleet_mail_tasks', JSON.stringify(mailTasks)); }
+        if(parsed.officeAreas && typeof parsed.officeAreas==='object'){ officeAreas = parsed.officeAreas; }
+        if(parsed.officePostMap && typeof parsed.officePostMap==='object'){ officePostMap = parsed.officePostMap; }
+        if(parsed.unassignedFiles && Array.isArray(parsed.unassignedFiles)){
+          var _merged = unassignedFiles.slice(), _lids = {};
+          _merged.forEach(function(f){ if(f.fileId) _lids[f.fileId]=true; });
+          parsed.unassignedFiles.forEach(function(f){ if(f.fileId && !_lids[f.fileId]){ _merged.push(f); _lids[f.fileId]=true; } });
+          unassignedFiles = _merged;
+        }
+        if(parsed.docExclude && Array.isArray(parsed.docExclude)){ docExclude = parsed.docExclude; }
+        if(parsed.mailSettings && typeof parsed.mailSettings==='object'){ localStorage.setItem('fleet_mail_settings', JSON.stringify(parsed.mailSettings)); }
+        if(parsed.stampSettings && typeof parsed.stampSettings==='object'){ localStorage.setItem('fleet_stamp_settings', JSON.stringify(parsed.stampSettings)); }
+        if(parsed.alertSettings && typeof parsed.alertSettings==='object'){ localStorage.setItem('fleet_alert_settings', JSON.stringify(parsed.alertSettings)); }
+        if(parsed.password){ PASSWORD = parsed.password; localStorage.setItem('fleet_pw', PASSWORD); }
+        if(parsed._lastSaveTs){ lastServerTimestamp = parsed._lastSaveTs; localStorage.setItem('fleet_server_ts', lastServerTimestamp); }
+      }
+    }catch(e){}
+  }
+  // 正規化・重複排除を最後に一括適用(経路によらず同じ結果に収束させる)
+  normalizeAllData();
+  drivers = dedup(drivers);
+  vehicles = dedup(vehicles);
+  companies = dedup(companies);
+  companies.forEach(function(c){ c.drivers = dedup(c.drivers||[]); c.vehicles = dedup(c.vehicles||[]); });
+}
+
 try{
   drivers  = drivers.map(_normalizeDriver);
   vehicles = vehicles.map(_normalizeVehicle);
@@ -1824,60 +1984,20 @@ async function syncFromSheet(){
     // drivers/vehicles/companies取得
     const res=await fetch(API_URL+'?action=getAll');const json=await res.json();
     if(json.ok){
-      if(json.data.drivers?.length){drivers=json.data.drivers.map(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles','archivedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles','archivedFiles'].includes(k)?[]:{};} });if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];if(!Array.isArray(d.archivedFiles))d.archivedFiles=Array.isArray(d.archivedFiles)?d.archivedFiles:(d.archivedFiles&&typeof d.archivedFiles==='object'?Object.values(d.archivedFiles):[]);if(!Array.isArray(d.offices))d.offices=typeof d.offices==='string'?[d.offices]:[];if(!d.license)d.license={};if(!d.other)d.other={};if(!d.sub)d.sub={};return d;}).filter(function(d){return d && d.name && String(d.name).trim() && d.id!=="";});}
-        // attachedFiles保護: Sheet解析でファイルが消えた場合、ローカルを保持
-        var _oldDrvs=JSON.parse(localStorage.getItem("fleet_drivers")||"[]");
-        drivers.forEach(function(d){if(!d.attachedFiles||!d.attachedFiles.length){var od=_oldDrvs.find(function(o){return o.id==d.id;});if(od&&od.attachedFiles&&od.attachedFiles.length)d.attachedFiles=od.attachedFiles;}});
-      if(json.data.vehicles?.length){vehicles=json.data.vehicles.map(v=>{['shaken','jibai','nin','attachedFiles','archivedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=['attachedFiles','archivedFiles'].includes(k)?[]:{};} });if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];if(!Array.isArray(v.archivedFiles))v.archivedFiles=(v.archivedFiles&&typeof v.archivedFiles==='object'?Object.values(v.archivedFiles):[]);v.plate=String(v.plate||"");if(!v.shaken)v.shaken={};if(!v.jibai)v.jibai={};if(!v.nin)v.nin={};return v;}).filter(function(v){return v && String(v.plate||"").trim() && v.id!=="";});}
-        var _oldVehs=JSON.parse(localStorage.getItem("fleet_vehicles")||"[]");
-        vehicles.forEach(function(v){if(!v.attachedFiles||!v.attachedFiles.length){var ov=_oldVehs.find(function(o){return o.id==v.id;});if(ov&&ov.attachedFiles&&ov.attachedFiles.length)v.attachedFiles=ov.attachedFiles;}});
-      if(json.data.companies?.length){
-        companies=json.data.companies.map(c=>{
-          ['drivers','vehicles'].forEach(k=>{
-            if(typeof c[k]==='string')try{c[k]=JSON.parse(c[k]);}catch(e){c[k]=[];}
-            if(!Array.isArray(c[k]))c[k]=[];
-          });
-          // ネストされたdrivers/vehiclesの正規化(archivedFiles等のJSON文字列を配列に変換)
-          (c.drivers||[]).forEach(d=>{
-            ['license','other','sub','offices','otherDocs','leave','attachedFiles','archivedFiles'].forEach(k=>{
-              if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles','archivedFiles'].includes(k)?[]:{};}
-            });
-            if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];
-            if(!Array.isArray(d.archivedFiles))d.archivedFiles=(d.archivedFiles&&typeof d.archivedFiles==='object'?Object.values(d.archivedFiles):[]);
-          });
-          (c.vehicles||[]).forEach(v=>{
-            ['attachedFiles','archivedFiles'].forEach(k=>{
-              if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=[];}
-            });
-            if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];
-            if(!Array.isArray(v.archivedFiles))v.archivedFiles=(v.archivedFiles&&typeof v.archivedFiles==='object'?Object.values(v.archivedFiles):[]);
-          });
-          return c;
-        });
-        contractors=companies;
-      }
+      // ★ 2026/07/22: 統一取り込み(置換モード)。手動の「サーバーから取り直す」では
+      //   サーバーの内容で置き換える。ただし tombstone にある削除済みは復活させない。
+      //   廃車の搭乗者解除・重複除去は ingestServerData→normalizeAllData と _dedupeVehicles で担保。
+      ingestServerData({ drivers: json.data.drivers, vehicles: json.data.vehicles, companies: json.data.companies, settings: json.data.settings }, { merge:false });
       saveLocal();saveCompanies();
-      // ★ 2026/07/14: 正規化前に「廃車なのに搭乗者が残っている車両」があるか検知。
-      var _hadScrappedWithDriver = false;
-      try{
-        var _chk=function(v){ if(v && v.status==='廃車' && (v.driver||v.driverId)) _hadScrappedWithDriver=true; };
-        (vehicles||[]).forEach(_chk);
-        (companies||[]).forEach(function(c){ (c.vehicles||[]).forEach(_chk); });
-      }catch(e){}
-      normalizeAllData(); // ここで廃車の搭乗者紐付けも外れる
-      // ★ 2026/07/14: サーバー読込後に車両ナンバー重複を除去(自社+委託会社)。
-      //   既存の二重登録(例: 委託会社所属ドライバーの車両)を自動で1件に収束させる。
-      try{
-        var _vd=_dedupeVehicles();
-        if(_vd>0 || _hadScrappedWithDriver){
-          if(_vd>0) console.log('[sync] 車両ナンバー重複を自動除去: '+_vd+'件');
-          if(_hadScrappedWithDriver) console.log('[sync] 廃車車両の搭乗者紐付けを解除しました');
-          saveLocal(); saveCompanies();
-          if(isSafeToSave(true)){
-            fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())}).then(function(){isDirty=false;}).catch(function(){});
-          }
+      var _vd=0;
+      try{ _vd=_dedupeVehicles(); if(_vd>0) console.log('[sync] 車両ナンバー重複を自動除去: '+_vd+'件'); }catch(e){}
+      // 廃車搭乗者解除・重複除去でデータが変わった場合はサーバーへ反映
+      if(_vd>0){
+        saveLocal(); saveCompanies();
+        if(isSafeToSave(true)){
+          fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())}).then(function(){isDirty=false;}).catch(function(){});
         }
-      }catch(e){}
+      }
       renderAll();
     }
     // inbox取得（GASから）
@@ -1971,67 +2091,9 @@ async function syncAll(saveFirst){
     const res=await fetch(API_URL+'?action=getAll');
     const json=await res.json();
     if(json.ok){
-      if(json.data.drivers?.length){drivers=json.data.drivers.map(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles','archivedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles','archivedFiles'].includes(k)?[]:{};} });if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];if(!Array.isArray(d.archivedFiles))d.archivedFiles=Array.isArray(d.archivedFiles)?d.archivedFiles:(d.archivedFiles&&typeof d.archivedFiles==='object'?Object.values(d.archivedFiles):[]);if(!Array.isArray(d.offices))d.offices=typeof d.offices==='string'?[d.offices]:[];if(!d.license)d.license={};if(!d.other)d.other={};if(!d.sub)d.sub={};return d;}).filter(function(d){return d && d.name && String(d.name).trim() && d.id!=="";});}
-        // attachedFiles保護: Sheet解析でファイルが消えた場合、ローカルを保持
-        var _oldDrvs=JSON.parse(localStorage.getItem("fleet_drivers")||"[]");
-        drivers.forEach(function(d){if(!d.attachedFiles||!d.attachedFiles.length){var od=_oldDrvs.find(function(o){return o.id==d.id;});if(od&&od.attachedFiles&&od.attachedFiles.length)d.attachedFiles=od.attachedFiles;}});
-      if(json.data.vehicles?.length){vehicles=json.data.vehicles.map(v=>{['shaken','jibai','nin','attachedFiles','archivedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=['attachedFiles','archivedFiles'].includes(k)?[]:{};} });if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];if(!Array.isArray(v.archivedFiles))v.archivedFiles=(v.archivedFiles&&typeof v.archivedFiles==='object'?Object.values(v.archivedFiles):[]);v.plate=String(v.plate||"");if(!v.shaken)v.shaken={};if(!v.jibai)v.jibai={};if(!v.nin)v.nin={};return v;}).filter(function(v){return v && String(v.plate||"").trim() && v.id!=="";});}
-        var _oldVehs=JSON.parse(localStorage.getItem("fleet_vehicles")||"[]");
-        vehicles.forEach(function(v){if(!v.attachedFiles||!v.attachedFiles.length){var ov=_oldVehs.find(function(o){return o.id==v.id;});if(ov&&ov.attachedFiles&&ov.attachedFiles.length)v.attachedFiles=ov.attachedFiles;}});
-      if(json.data.companies?.length){
-        companies=json.data.companies.map(c=>{
-          ['drivers','vehicles'].forEach(k=>{if(typeof c[k]==='string')try{c[k]=JSON.parse(c[k]);}catch(e){c[k]=[];}if(!Array.isArray(c[k]))c[k]=[];});
-          // ネストされたdrivers/vehiclesの正規化(archivedFiles等のJSON文字列を配列に変換)
-          (c.drivers||[]).forEach(d=>{
-            ['license','other','sub','offices','otherDocs','leave','attachedFiles','archivedFiles'].forEach(k=>{
-              if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles','archivedFiles'].includes(k)?[]:{};}
-            });
-            if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];
-            if(!Array.isArray(d.archivedFiles))d.archivedFiles=(d.archivedFiles&&typeof d.archivedFiles==='object'?Object.values(d.archivedFiles):[]);
-          });
-          (c.vehicles||[]).forEach(v=>{
-            ['attachedFiles','archivedFiles'].forEach(k=>{
-              if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=[];}
-            });
-            if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];
-            if(!Array.isArray(v.archivedFiles))v.archivedFiles=(v.archivedFiles&&typeof v.archivedFiles==='object'?Object.values(v.archivedFiles):[]);
-          });
-          return c;
-        });
-        contractors=companies;
-      }
-      // 重複排除
-      drivers=dedup(drivers);
-      vehicles=dedup(vehicles);
-      companies=dedup(companies);
-      companies.forEach(c=>{c.drivers=dedup(c.drivers||[]);c.vehicles=dedup(c.vehicles||[]);});
-      // 設定データの読み込み
-      if(json.data.settings?.length){
-        var st=json.data.settings[0]||{};
-        if(st.value){
-          try{
-            var parsed=JSON.parse(st.value);
-            if(parsed.mailTasks&&Array.isArray(parsed.mailTasks)){mailTasks=parsed.mailTasks;localStorage.setItem('fleet_mail_tasks',JSON.stringify(mailTasks));}
-            if(parsed.officeAreas&&typeof parsed.officeAreas==='object'){officeAreas=parsed.officeAreas;}
-            if(parsed.officePostMap&&typeof parsed.officePostMap==='object'){officePostMap=parsed.officePostMap;}
-            if(parsed.unassignedFiles&&Array.isArray(parsed.unassignedFiles)){
-              var _merged=unassignedFiles.slice();
-              var _localIds={};
-              _merged.forEach(function(f){if(f.fileId)_localIds[f.fileId]=true;});
-              parsed.unassignedFiles.forEach(function(f){
-                if(f.fileId&&!_localIds[f.fileId]){_merged.push(f);_localIds[f.fileId]=true;}
-              });
-              unassignedFiles=_merged;
-            }
-            if(parsed.docExclude&&Array.isArray(parsed.docExclude)){docExclude=parsed.docExclude;}
-            if(parsed.mailSettings&&typeof parsed.mailSettings==='object'){localStorage.setItem('fleet_mail_settings',JSON.stringify(parsed.mailSettings));}
-            if(parsed.stampSettings&&typeof parsed.stampSettings==="object"){localStorage.setItem("fleet_stamp_settings",JSON.stringify(parsed.stampSettings));}
-            if(parsed.alertSettings&&typeof parsed.alertSettings==="object"){localStorage.setItem("fleet_alert_settings",JSON.stringify(parsed.alertSettings));}
-            if(parsed.password){PASSWORD=parsed.password;localStorage.setItem('fleet_pw',PASSWORD);}
-            if(parsed._lastSaveTs){lastServerTimestamp=parsed._lastSaveTs;localStorage.setItem('fleet_server_ts',lastServerTimestamp);}
-          }catch(e){}
-        }
-      }
+      // ★ 2026/07/22: 統一取り込み(マージモード)。手元の未保存編集を守りつつ
+      //   サーバーの他端末変更を取り込む。削除済み(tombstone)は復活しない。
+      ingestServerData({ drivers: json.data.drivers, vehicles: json.data.vehicles, companies: json.data.companies, settings: json.data.settings }, { merge:true });
       // ★ 未分類ファイルのクリーンアップ: 登録済みfileIdを除外+重複排除
       cleanUnassignedFiles();
       saveLocal();saveCompanies();renderAll();
@@ -2098,42 +2160,42 @@ async function mergeAndSaveAll(){
   try{
     var res = await fetch(API_URL+'?action=getAll');
     var json = await res.json();
-    if(!json.ok || !json.data){ 
+    if(!json.ok || !json.data){
       // サーバー取得失敗時は従来保存にフォールバック
       var r2=await fetch(API_URL,{method:'POST',body:JSON.stringify(buildSavePayload())});
       var j2=await r2.json(); return j2.ok;
     }
-    var srvD = json.data.drivers||[];
-    var srvV = json.data.vehicles||[];
-    var srvC = json.data.companies||[];
-    // マージ: 手元のデータを基準に、サーバーにしか無いもの(idベース)を追加
-    function mergeById(local, server){
-      var localIds = {};
-      local.forEach(function(x){ if(x && x.id!=='' && x.id!=null) localIds[String(x.id)]=true; });
-      var merged = local.slice();
-      server.forEach(function(s){
-        if(!s || s.id==='' || s.id==null) return;
-        if(!localIds[String(s.id)]){ merged.push(s); } // 手元に無い=他端末で登録された → 取り込む
-      });
-      return merged;
-    }
-    var mD = mergeById(drivers, srvD).filter(function(d){return d && d.name && String(d.name).trim();});
-    var mV = mergeById(vehicles, srvV).filter(function(v){return v && String(v.plate||'').trim();});
-    // 委託会社は id でマージ(会社単位)
-    var mC = mergeById(companies, srvC);
-    // 手元を更新
-    drivers = mD; vehicles = mV; companies = mC; contractors = companies;
-    normalizeAllData(); // ★ マージ後に正規化(サーバーの壊れた配列を取り込んでも修復)
+    // ★ 2026/07/22: 統一取り込み。tombstone対応で削除済みは復活しない。
+    //   settings は保存直前にこちらの手元値で上書きするため、ここでは反映しない。
+    ingestServerData({ drivers: json.data.drivers, vehicles: json.data.vehicles, companies: json.data.companies }, { merge:true });
+    contractors = companies;
     try{ localStorage.setItem('fleet_drivers',JSON.stringify(drivers)); localStorage.setItem('fleet_vehicles',JSON.stringify(vehicles)); localStorage.setItem('fleet_companies',JSON.stringify(companies)); }catch(e){}
-    // マージ後のデータで保存
-    var ts=new Date().toISOString();
+    // マージ後のデータで保存(手元の設定を含む buildSavePayload を使用)
     var payload = buildSavePayload();
     payload.drivers = drivers; payload.vehicles = vehicles; payload.companies = companies;
     var saveRes = await fetch(API_URL,{method:'POST',body:JSON.stringify(payload)});
     var saveJson = await saveRes.json();
-    if(saveJson.ok){ isDirty=false; try{renderAll&&renderAll();}catch(e){} return true; }
+    if(saveJson.ok){
+      isDirty=false;
+      lastServerTimestamp = saveJson.timestamp || (payload.settings && payload.settings._lastSaveTs) || lastServerTimestamp;
+      try{ localStorage.setItem('fleet_server_ts', lastServerTimestamp); }catch(e){}
+      try{ updateSaveCounts(_countAttachedFiles()); }catch(e){}
+      try{ renderAll && renderAll(); }catch(e){}
+      return true;
+    }
     return false;
   }catch(e){ console.warn('mergeAndSaveAll failed',e); return false; }
+}
+// 添付ファイル総数を数える(急減ガードの基準値更新用)
+function _countAttachedFiles(){
+  var f=0;
+  (drivers||[]).forEach(function(d){ f += (d.attachedFiles||[]).length; });
+  (vehicles||[]).forEach(function(v){ f += (v.attachedFiles||[]).length; });
+  (companies||[]).forEach(function(c){
+    (c.drivers||[]).forEach(function(d){ f += (d.attachedFiles||[]).length; });
+    (c.vehicles||[]).forEach(function(v){ f += (v.attachedFiles||[]).length; });
+  });
+  return f;
 }
 
 function buildSavePayload(){
@@ -5770,7 +5832,9 @@ function deleteArchivedDriver(id){
   pushUndo('ドライバー削除: '+d.name);
   drivers=drivers.filter(x=>x.id!=id);
   vehicles.forEach(v=>{if(v.driverId==id){v.driver='';v.driverId=null;}});
+  recordDeletion(id); // ★ 削除台帳に記録(マージで復活させない)
   saveLocal();renderArchive();renderDrivers(currentOfficeFilter);renderVehicles(currentOfficeFilter);renderDashboard();renderDocPage();
+  try{ saveNow(); }catch(e){} // ★ 削除を即時サーバー確定(復活バグ防止)
 }
 
 function restoreDriver(id){
@@ -5781,7 +5845,9 @@ function restoreDriver(id){
   d.status='在籍';
   d.leave={};
   d.retiredAt=null;
+  clearTombstone(id); // ★ 復活したので削除台帳から外す
   saveLocal();renderArchive();renderDrivers(currentOfficeFilter);renderDashboard();renderDocPage();
+  try{ saveNow(); }catch(e){}
 }
 
 function restoreVehicle(id){
@@ -5791,7 +5857,9 @@ function restoreVehicle(id){
   pushUndo('車両稼働復帰: '+v.plate);
   v.status='稼働';
   v.scrappedAt=null;
+  clearTombstone(id); // ★ 復活したので削除台帳から外す
   saveLocal();renderArchive();renderVehicles(currentOfficeFilter);renderDashboard();renderDocPage();
+  try{ saveNow(); }catch(e){}
 }
 
 function deleteArchivedVehicle(id){
@@ -5807,7 +5875,9 @@ function deleteArchivedVehicle(id){
   if(Array.isArray(companies)){
     companies.forEach(function(c){ if(Array.isArray(c.vehicles)) c.vehicles=c.vehicles.filter(function(x){return x.id!=id;}); });
   }
+  recordDeletion(id); // ★ 削除台帳に記録(マージで復活させない)
   saveLocal();renderArchive();renderVehicles(currentOfficeFilter);renderDashboard();renderDocPage();
+  try{ saveNow(); }catch(e){} // ★ 削除を即時サーバー確定
   try{ if(typeof renderCompanies==='function') renderCompanies(); }catch(e){}
   try{ if(typeof renderStorage==='function') renderStorage(); }catch(e){}
 }
@@ -5990,6 +6060,7 @@ function saveVehicle(keepOpen){
   }
   var selectedOffices=getSelectedOffices('v-offices');
   const obj={id:editingVehicleId||Date.now(),plate,status:vStatus,model:document.getElementById('v-model').value,kind:document.getElementById('v-kind').value,type:document.getElementById('v-type').value,office:selectedOffices[0]||'',offices:selectedOffices,driver:driverName,driverId:driverVal||null,color:document.getElementById('v-color').value||'白',owner:document.getElementById('v-owner').value,vehicleUser:document.getElementById('v-user').value,sub:document.getElementById('v-sub').value,note:document.getElementById('v-note').value,shaken:{exp:normalizeBirthDate(document.getElementById('v-shaken-exp').value),chassis:document.getElementById('v-shaken-chassis').value,type:document.getElementById('v-shaken-type').value},jibai:{exp:normalizeBirthDate(document.getElementById('v-jibai-exp').value),no:document.getElementById('v-jibai-no').value,company:document.getElementById('v-jibai-company').value},nin:{exp:normalizeBirthDate(document.getElementById('v-nin-exp').value),no:document.getElementById('v-nin-no').value,company:document.getElementById('v-nin-company').value}};
+  try{ clearTombstone(obj.id); }catch(e){} // ★ 登録した以上、万一の削除台帳残りは解除
   pushUndo('車両 '+(editingVehicleId?'編集':'追加')+': '+plate);
   if(editingVehicleId){
     const existing=vehicles.find(v=>v.id==editingVehicleId);
@@ -6845,6 +6916,7 @@ function saveDriver(keepOpen){
     office: selectedOffices[0]||'',
     offices: selectedOffices,
     tel:formatPhone(document.getElementById('d-tel').value),birth:normalizeBirthDate(document.getElementById('d-birth').value),addr:document.getElementById('d-addr').value,zip:document.getElementById('d-zip').value,license:{exp:normalizeBirthDate(document.getElementById('d-license-exp').value),no:document.getElementById('d-license-no').value,type:document.getElementById('d-license-type').value,cond:document.getElementById('d-license-cond').value},otherDocs,other:otherDocs[0]||{},sub:type==='外注（個人）'?{company:document.getElementById('d-sub-company').value,kana:document.getElementById('d-sub-kana').value,birth:normalizeBirthDate(document.getElementById('d-sub-birth').value),area:document.getElementById('d-sub-area').value,count:document.getElementById('d-sub-count').value,tel:formatPhone(document.getElementById('d-sub-tel').value)}:{},leave:(status==='退職'||status==='休止')?{date:normalizeBirthDate(document.getElementById('d-leave-date').value),reason:document.getElementById('d-leave-reason').value,note:document.getElementById('d-leave-note').value}:{},stampEnabled:!!document.getElementById('d-stamp')?.checked};
+  try{ clearTombstone(obj.id); }catch(e){} // ★ 登録した以上、万一の削除台帳残りは解除
   pushUndo('ドライバー '+(editingDriverId?'編集':'追加')+': '+name);
   // 既存の添付ファイル・アーカイブを保持
   if(editingDriverId){
@@ -7586,11 +7658,20 @@ function performUndo(){
   if(!undoStack.length){alert('取り消せる操作がありません');return;}
   var entry=undoStack.pop();
   drivers=entry.drivers;vehicles=entry.vehicles;companies=entry.companies;
+  // ★ 2026/07/22: 復元されたエンティティのidは削除台帳から外す(次の同期で再び消えないように)。
+  try{
+    var _restoredIds=[];
+    (drivers||[]).forEach(function(d){ if(d&&d.id!=null) _restoredIds.push(d.id); });
+    (vehicles||[]).forEach(function(v){ if(v&&v.id!=null) _restoredIds.push(v.id); });
+    (companies||[]).forEach(function(c){ if(c&&c.id!=null) _restoredIds.push(c.id); (c.drivers||[]).forEach(function(d){ if(d&&d.id!=null) _restoredIds.push(d.id); }); (c.vehicles||[]).forEach(function(v){ if(v&&v.id!=null) _restoredIds.push(v.id); }); });
+    _restoredIds.forEach(clearTombstone);
+  }catch(e){}
   saveLocal();renderAll();
   try{localStorage.setItem('fleet_undo',JSON.stringify(undoStack));}catch(e){}
   updateUndoBadge();
   setSyncStatus('元に戻しました: '+entry.label,'sync-ok');
   addLog('Undo','操作取消: '+entry.label);
+  try{ saveNow(); }catch(e){} // ★ 復元を即時サーバー確定
 }
 function updateUndoBadge(){
   var el=document.getElementById('undo-badge');
@@ -12224,6 +12305,7 @@ function saveCompany(){
     stampCompany:!!document.getElementById('cm-stamp-co')?.checked,
     stampRep:!!document.getElementById('cm-stamp-rep')?.checked
   };
+  try{ clearTombstone(obj.id); }catch(e){}
   pushUndo('委託会社 '+(editingCompanyId?'編集':'追加')+': '+name);
   if(editingCompanyId){const i=companies.findIndex(x=>x.id==editingCompanyId);if(i>=0)companies[i]=obj;else companies.push(obj);}
   else companies.push(obj);
@@ -12236,8 +12318,10 @@ function deleteCompany(id){
   if(idx<0) return;
   const c=companies[idx];
   if(!confirm('「'+c.name+'」を削除しますか？'))return;
+  recordDeletion(c.id); // ★ 会社ごと削除台帳に記録
   companies.splice(idx,1); // filterではなくsplice（1件だけ削除）
   saveCompanies();renderCompanyNav();
+  try{ saveNow(); }catch(e){} // ★ 即時サーバー確定
   showPage('dashboard',document.querySelector('.nav-item[data-page="dashboard"]'));
 }
 
@@ -12399,6 +12483,7 @@ function saveCompanyDriver(){
   const c=companies.find(x=>x.id==currentCompanyId);
   if(!c) return;
   if(!c.drivers) c.drivers=[];
+  try{ clearTombstone(obj.id); }catch(e){}
   pushUndo('委託ドライバー '+(editingCompanyDriverId?'編集':'追加'));
   if(editingCompanyDriverId){const i=c.drivers.findIndex(x=>x.id==editingCompanyDriverId);if(i>=0)c.drivers[i]=obj;else c.drivers.push(obj);}
   else c.drivers.push(obj);
@@ -12437,7 +12522,9 @@ function deleteCompanyDriver(companyId, driverId){
   const d=c.drivers?.find(x=>x.id==driverId);
   if(!d||!confirm(`「${d.name}」を削除しますか？`))return;
   c.drivers=c.drivers.filter(x=>x.id!=driverId);
+  recordDeletion(driverId); // ★ 削除台帳に記録
   saveCompanies();renderCompanyPage(companyId);renderDashboard();
+  try{ saveNow(); }catch(e){} // ★ 即時サーバー確定
 }
 
 // 委託会社車両モーダル
@@ -12498,6 +12585,7 @@ function saveCompanyVehicle(){
   const c=companies.find(x=>x.id==currentCompanyId);
   if(!c) return;
   if(!c.vehicles) c.vehicles=[];
+  try{ clearTombstone(obj.id); }catch(e){}
   pushUndo('委託車両 '+(editingCompanyVehicleId?'編集':'追加'));
   if(editingCompanyVehicleId){const i=c.vehicles.findIndex(x=>x.id==editingCompanyVehicleId);if(i>=0)c.vehicles[i]=obj;else c.vehicles.push(obj);}
   else c.vehicles.push(obj);
@@ -12534,8 +12622,10 @@ function deleteCompanyVehicle(companyId, vehicleId){
   }
   // 他の委託会社にも同IDがあれば削除(念のため)
   companies.forEach(function(cc){ if(cc.id!=companyId && Array.isArray(cc.vehicles)) cc.vehicles=cc.vehicles.filter(function(x){return x.id!=vehicleId;}); });
+  recordDeletion(vehicleId); // ★ 削除台帳に記録
   saveCompanies();
   try{ if(typeof saveLocal==='function') saveLocal(); }catch(e){}
+  try{ saveNow(); }catch(e){} // ★ 即時サーバー確定
   renderCompanyPage(companyId);renderDashboard();
   // データ管理・アーカイブ・車両一覧も更新
   try{ if(typeof renderDocPage==='function') renderDocPage(); }catch(e){}
@@ -14238,54 +14328,20 @@ setInterval(function(){
     .then(r=>r.json())
     .then(json=>{
       if(!json.ok||!json.data) return;
-      var updated=false;
-      if(json.data.drivers?.length){updated=true;}
-      if(json.data.vehicles?.length){updated=true;}
-      // settings（メールタスク等）を常に読み込む
-      if(json.data.settings?.length){
-        try{
-          var st=json.data.settings[0]||{};
-          if(st.value){
-            var parsed=JSON.parse(st.value);
-            if(parsed.mailTasks&&Array.isArray(parsed.mailTasks)){
-              var newMT=JSON.stringify(parsed.mailTasks);
-              if(newMT!==JSON.stringify(mailTasks)){mailTasks=parsed.mailTasks;localStorage.setItem('fleet_mail_tasks',JSON.stringify(mailTasks));updated=true;}
-            }
-            if(parsed.officeAreas&&typeof parsed.officeAreas==='object'){officeAreas=parsed.officeAreas;}
-            if(parsed.officePostMap&&typeof parsed.officePostMap==='object'){officePostMap=parsed.officePostMap;}
-            if(parsed.unassignedFiles&&Array.isArray(parsed.unassignedFiles)){
-              var _m2=unassignedFiles.slice();
-              var _ids2={};
-              _m2.forEach(function(f){if(f.fileId)_ids2[f.fileId]=true;});
-              parsed.unassignedFiles.forEach(function(f){
-                if(f.fileId&&!_ids2[f.fileId]){_m2.push(f);_ids2[f.fileId]=true;}
-              });
-              unassignedFiles=_m2;
-            }
-            if(parsed.docExclude&&Array.isArray(parsed.docExclude)){docExclude=parsed.docExclude;}
-            if(parsed.mailSettings&&typeof parsed.mailSettings==='object'){localStorage.setItem('fleet_mail_settings',JSON.stringify(parsed.mailSettings));}
-            if(parsed.stampSettings&&typeof parsed.stampSettings==="object"){localStorage.setItem("fleet_stamp_settings",JSON.stringify(parsed.stampSettings));}
-            if(parsed.alertSettings&&typeof parsed.alertSettings==="object"){localStorage.setItem("fleet_alert_settings",JSON.stringify(parsed.alertSettings));}
-            if(parsed.password){PASSWORD=parsed.password;localStorage.setItem('fleet_pw',PASSWORD);}
-            if(parsed._lastSaveTs){lastServerTimestamp=parsed._lastSaveTs;localStorage.setItem('fleet_server_ts',lastServerTimestamp);}
-          }
-        }catch(e){}
-      }
-      if(!updated) return;
-      if(json.data.drivers?.length){drivers=json.data.drivers.map(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles','archivedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles','archivedFiles'].includes(k)?[]:{};} });if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];if(!Array.isArray(d.archivedFiles))d.archivedFiles=Array.isArray(d.archivedFiles)?d.archivedFiles:(d.archivedFiles&&typeof d.archivedFiles==='object'?Object.values(d.archivedFiles):[]);if(!Array.isArray(d.offices))d.offices=typeof d.offices==='string'?[d.offices]:[];if(!d.license)d.license={};if(!d.other)d.other={};if(!d.sub)d.sub={};return d;}).filter(function(d){return d && d.name && String(d.name).trim() && d.id!=="";});}
-        // attachedFiles保護: Sheet解析でファイルが消えた場合、ローカルを保持
-        var _oldDrvs=JSON.parse(localStorage.getItem("fleet_drivers")||"[]");
-        drivers.forEach(function(d){if(!d.attachedFiles||!d.attachedFiles.length){var od=_oldDrvs.find(function(o){return o.id==d.id;});if(od&&od.attachedFiles&&od.attachedFiles.length)d.attachedFiles=od.attachedFiles;}});
-      if(json.data.vehicles?.length){vehicles=json.data.vehicles.map(v=>{['shaken','jibai','nin','attachedFiles','archivedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=['attachedFiles','archivedFiles'].includes(k)?[]:{};} });if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];if(!Array.isArray(v.archivedFiles))v.archivedFiles=(v.archivedFiles&&typeof v.archivedFiles==='object'?Object.values(v.archivedFiles):[]);v.plate=String(v.plate||"");if(!v.shaken)v.shaken={};if(!v.jibai)v.jibai={};if(!v.nin)v.nin={};return v;}).filter(function(v){return v && String(v.plate||"").trim() && v.id!=="";});}
-        var _oldVehs=JSON.parse(localStorage.getItem("fleet_vehicles")||"[]");
-        vehicles.forEach(function(v){if(!v.attachedFiles||!v.attachedFiles.length){var ov=_oldVehs.find(function(o){return o.id==v.id;});if(ov&&ov.attachedFiles&&ov.attachedFiles.length)v.attachedFiles=ov.attachedFiles;}});
-      if(json.data.companies?.length){companies=json.data.companies.map(c=>{['drivers','vehicles'].forEach(k=>{if(typeof c[k]==='string')try{c[k]=JSON.parse(c[k]);}catch(e){c[k]=[];}if(!Array.isArray(c[k]))c[k]=[];});(c.drivers||[]).forEach(d=>{['license','other','sub','offices','otherDocs','leave','attachedFiles','archivedFiles'].forEach(k=>{if(typeof d[k]==='string')try{d[k]=JSON.parse(d[k]);}catch(e){d[k]=['offices','otherDocs','attachedFiles','archivedFiles'].includes(k)?[]:{};} });if(!Array.isArray(d.attachedFiles))d.attachedFiles=[];if(!Array.isArray(d.archivedFiles))d.archivedFiles=(d.archivedFiles&&typeof d.archivedFiles==='object'?Object.values(d.archivedFiles):[]);});(c.vehicles||[]).forEach(v=>{['attachedFiles','archivedFiles'].forEach(k=>{if(typeof v[k]==='string')try{v[k]=JSON.parse(v[k]);}catch(e){v[k]=[];} });if(!Array.isArray(v.attachedFiles))v.attachedFiles=[];if(!Array.isArray(v.archivedFiles))v.archivedFiles=(v.archivedFiles&&typeof v.archivedFiles==='object'?Object.values(v.archivedFiles):[]);});return c;});contractors=companies;}
-      drivers=dedup(drivers);vehicles=dedup(vehicles);
-      companies.forEach(c=>{c.drivers=dedup(c.drivers||[]);c.vehicles=dedup(c.vehicles||[]);});
-      saveLocal();isDirty=false;
+      // ★ 2026/07/22: このポーラーは isDirty=false(未保存変更なし)の時だけ動くため、
+      //   統一取り込みを置換モードで実行。tombstoneで削除済みは復活しない。
+      //   settings も ingestServerData 内で反映される。
+      var _before = JSON.stringify({d:drivers.length,v:vehicles.length,c:companies.map(function(c){return (c.drivers||[]).length+'/'+(c.vehicles||[]).length;})});
+      ingestServerData({ drivers: json.data.drivers, vehicles: json.data.vehicles, companies: json.data.companies, settings: json.data.settings }, { merge:false });
+      var _after = JSON.stringify({d:drivers.length,v:vehicles.length,c:companies.map(function(c){return (c.drivers||[]).length+'/'+(c.vehicles||[]).length;})});
+      saveLocal();
+      // saveLocal は isDirty=true にするので、読込直後はfalseへ戻す(送信不要)
+      isDirty=false;
       try{renderAll();}catch(e){}
-      var ts=new Date().toLocaleTimeString();
-      setSyncStatus('自動読込 '+ts,'sync-ok');
+      if(_before!==_after){
+        var ts=new Date().toLocaleTimeString();
+        setSyncStatus('自動読込 '+ts,'sync-ok');
+      }
     }).catch(()=>{});
   // inbox も同期
   try{syncInboxFromSheet().then(()=>{try{renderInbox();}catch(e){}});}catch(e){}
