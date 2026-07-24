@@ -3443,11 +3443,14 @@ function renderDashboard(){
   const d=new Date();document.getElementById('today-label').textContent=`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} 現在`;
   const activeDrivers=drivers.filter(d=>!d.status||d.status==='在籍');
   // 全車両（自社＋委託会社）を集約
-  const coVehicles=[];companies.forEach(c=>(c.vehicles||[]).forEach(v=>coVehicles.push({...v,_co:c.name})));
-  const allVehicles=[...vehicles,...coVehicles];
-  const selfSyayu=vehicles.filter(v=>v.type==='社有').length;
-  const selfMochikomi=vehicles.filter(v=>v.type==='持込').length;
-  const selfOther=vehicles.length-selfSyayu-selfMochikomi;
+  // ★ 2026/07/24: 廃車を全ての集計・アラートから除外(アーカイブでのみ扱う)。
+  //   従来は廃車も台数に含まれ、データ管理/アーカイブの二重表示や台数の食い違いの原因になっていた。
+  const activeVehicles=vehicles.filter(v=>v.status!=='廃車');
+  const coVehicles=[];companies.forEach(c=>(c.vehicles||[]).forEach(v=>{ if(v.status!=='廃車') coVehicles.push({...v,_co:c.name}); }));
+  const allVehicles=[...activeVehicles,...coVehicles];
+  const selfSyayu=activeVehicles.filter(v=>v.type==='社有').length;
+  const selfMochikomi=activeVehicles.filter(v=>v.type==='持込').length;
+  const selfOther=activeVehicles.length-selfSyayu-selfMochikomi;
   const ev=allVehicles.filter(v=>[v.shaken?.exp,v.jibai?.exp,v.nin?.exp].some(e=>e&&daysUntil(e)<0)).length;
   const wv=allVehicles.filter(v=>[v.shaken?.exp,v.jibai?.exp,v.nin?.exp].some(e=>{const dd=daysUntil(e);return dd!==null&&dd>=0&&dd<=30;})).length;
   const ed=activeDrivers.filter(d=>d.license?.exp&&daysUntil(d.license.exp)<0).length;
@@ -9790,8 +9793,10 @@ function renderStorage(){
     ...companies.flatMap(co => (co.drivers||[]).map(d => ({...d, _src:co.name, _offices:Array.isArray(d.offices)?d.offices:[]})))
   ]);
   let allVehicles = dedup([
-    ...vehicles.map(v => ({...v, _src:'自社', _offices:Array.isArray(v.offices)&&v.offices.length?v.offices:v.office?[v.office]:[]})),
-    ...companies.flatMap(co => (co.vehicles||[]).map(v => ({...v, _src:co.name, _offices:Array.isArray(v.offices)?v.offices:[]})))
+    // ★ 2026/07/24: 廃車はアーカイブにのみ表示する(データ管理から除外)。
+    //   ドライバー側が退職者を除外しているのと同じ扱い。廃車が両方に出る不具合を修正。
+    ...vehicles.filter(v=>v.status!=='廃車').map(v => ({...v, _src:'自社', _offices:Array.isArray(v.offices)&&v.offices.length?v.offices:v.office?[v.office]:[]})),
+    ...companies.flatMap(co => (co.vehicles||[]).filter(v=>v.status!=='廃車').map(v => ({...v, _src:co.name, _offices:Array.isArray(v.offices)?v.offices:[]})))
   ]);
 
   if(search){
