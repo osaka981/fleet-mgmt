@@ -1716,44 +1716,16 @@ function _dedupeVehicles(){
 //         全経路(手動同期/自動保存/ポーリング/復帰)で挙動を統一する。
 // ================================================================
 
-// ── 削除台帳(tombstone) ──
-//   削除したエンティティのidを保持。マージ時にサーバー側に残っていても取り込まない。
-//   一定期間後(TTL)に自然消滅させ、台帳の肥大化を防ぐ。
-var TOMBSTONE_TTL_MS = 30*24*60*60*1000; // 30日
-var _tombstones = (function(){
-  try{
-    var raw = JSON.parse(localStorage.getItem('fleet_tombstones')||'{}');
-    if(!raw || typeof raw!=='object' || Array.isArray(raw)) return {};
-    // TTL切れを起動時に掃除
-    var now = Date.now(), changed=false;
-    Object.keys(raw).forEach(function(k){
-      if(!raw[k] || (now - raw[k]) > TOMBSTONE_TTL_MS){ delete raw[k]; changed=true; }
-    });
-    if(changed){ try{ localStorage.setItem('fleet_tombstones', JSON.stringify(raw)); }catch(_){} }
-    return raw;
-  }catch(_){ return {}; }
-})();
-function _persistTombstones(){
-  try{ localStorage.setItem('fleet_tombstones', JSON.stringify(_tombstones)); }catch(_){}
-}
-// 削除を記録する。id は文字列化して保持。
-function recordDeletion(id){
-  if(id==null || id==='') return;
-  _tombstones[String(id)] = Date.now();
-  _persistTombstones();
-}
-function isTombstoned(id){
-  if(id==null || id==='') return false;
-  return Object.prototype.hasOwnProperty.call(_tombstones, String(id));
-}
-// 復活(再登録・取引再開)時は台帳から外す。
-function clearTombstone(id){
-  if(id==null || id==='') return;
-  if(Object.prototype.hasOwnProperty.call(_tombstones, String(id))){
-    delete _tombstones[String(id)];
-    _persistTombstones();
-  }
-}
+// ── ★ 2026/07/25 ④: 削除台帳(tombstone) は撤去 ──
+//   旧仕様: 削除したidを localStorage に30日間記録し、サーバーに正しいデータが
+//   あっても問答無用でマージから除外し続けていた。端末ごとに持つため、ある端末で
+//   載ると「その端末だけ30日間データが見えない」という強い副作用があった。
+//   新仕様: 「サーバーが唯一の正」。削除は操作時に即時サーバー保存されるので、
+//   端末ローカルの除外リストは不要。関数名は呼び出し箇所が多いため無害化して残す。
+try{ localStorage.removeItem('fleet_tombstones'); }catch(_){}   // 過去の台帳を掃除
+function recordDeletion(id){ /* no-op: 削除は即時サーバー保存で確定する */ }
+function isTombstoned(id){ return false; }
+function clearTombstone(id){ /* no-op */ }
 
 // ── 統一マージ: サーバー配列を手元に取り込む(削除済みは除外) ──
 //   local を基準に、サーバーにしか無い id を追加する。ただし:
@@ -1769,7 +1741,6 @@ function mergeServerArray(local, server){
     if(!s || s.id===''||s.id==null) return;
     var key = String(s.id);
     if(localIds[key]) return;          // 手元にある=編集優先で取り込まない
-    if(isTombstoned(s.id)) return;     // 削除済み=復活させない
     merged.push(s);
   });
   return merged;
@@ -1786,8 +1757,6 @@ function ingestServerData(data, opts){
   // --- drivers ---
   if(Array.isArray(data.drivers)){
     var srvD = data.drivers.map(_normalizeDriver).filter(function(d){ return d && d.name && String(d.name).trim() && d.id!==''; });
-    // tombstone除外(サーバーが削除済みを返しても捨てる)
-    srvD = srvD.filter(function(d){ return !isTombstoned(d.id); });
     drivers = doMerge ? mergeServerArray(drivers, srvD) : srvD;
     // 添付ファイル保護: サーバー解析で消えた場合ローカルを維持
     var _oldD = (function(){ try{ return JSON.parse(localStorage.getItem('fleet_drivers')||'[]'); }catch(_){ return []; } })();
@@ -1801,7 +1770,6 @@ function ingestServerData(data, opts){
   // --- vehicles ---
   if(Array.isArray(data.vehicles)){
     var srvV = data.vehicles.map(_normalizeVehicle).filter(function(v){ return v && String(v.plate||'').trim() && v.id!==''; });
-    srvV = srvV.filter(function(v){ return !isTombstoned(v.id); });
     vehicles = doMerge ? mergeServerArray(vehicles, srvV) : srvV;
     var _oldV = (function(){ try{ return JSON.parse(localStorage.getItem('fleet_vehicles')||'[]'); }catch(_){ return []; } })();
     vehicles.forEach(function(v){
@@ -1815,11 +1783,11 @@ function ingestServerData(data, opts){
   if(Array.isArray(data.companies)){
     var srvC = data.companies.map(function(c){
       if(c && typeof c==='object'){
-        c.drivers  = _normalizeArrayField(c.drivers).map(_normalizeDriver).filter(function(d){ return !isTombstoned(d.id); });
-        c.vehicles = _normalizeArrayField(c.vehicles).map(_normalizeVehicle).filter(function(v){ return !isTombstoned(v.id); });
+        c.drivers  = _normalizeArrayField(c.drivers).map(_normalizeDriver);
+        c.vehicles = _normalizeArrayField(c.vehicles).map(_normalizeVehicle);
       }
       return c;
-    }).filter(function(c){ return c && !isTombstoned(c.id); });
+    }).filter(function(c){ return !!c; });
     companies = doMerge ? mergeServerArray(companies, srvC) : srvC;
     // マージ時: 手元にある会社の内部drivers/vehiclesにサーバー分を取り込む(削除済み除外)
     if(doMerge){
@@ -1988,6 +1956,7 @@ async function syncFromSheet(){
       //   サーバーの内容で置き換える。ただし tombstone にある削除済みは復活させない。
       //   廃車の搭乗者解除・重複除去は ingestServerData→normalizeAllData と _dedupeVehicles で担保。
       // ★ 2026/07/25 ②: 読み込みは「読むだけ」。ここからサーバーへ書き戻さない。
+      _updateServerCounts(json.data);   // ★④ 安全弁の基準値をサーバー実数へ追従
       _syncing = true;
       try{
         ingestServerData({ drivers: json.data.drivers, vehicles: json.data.vehicles, companies: json.data.companies, settings: json.data.settings }, { merge:false });
@@ -2045,6 +2014,7 @@ function setSyncStatus(msg,cls){
 }
 
 async function syncAll(saveFirst){
+  if(!saveFirst && (_saveTimer || _saveInFlight)) return;   // ★ 保存待ち/送信中は読まない
   const btn=document.getElementById('sync-all-btn');
   if(btn){btn.disabled=true;btn.textContent='同期中...';}
   try{
@@ -2060,6 +2030,7 @@ async function syncAll(saveFirst){
       // ★ 2026/07/22: 統一取り込み(マージモード)。手元の未保存編集を守りつつ
       //   サーバーの他端末変更を取り込む。削除済み(tombstone)は復活しない。
       // ★ 2026/07/25 ②: 取り込みは読むだけ。書き戻さない。
+      _updateServerCounts(json.data);   // ★④ 安全弁の基準値をサーバー実数へ追従
       _syncing = true;
       try{
         ingestServerData({ drivers: json.data.drivers, vehicles: json.data.vehicles, companies: json.data.companies, settings: json.data.settings }, { merge:true });
@@ -2189,7 +2160,7 @@ function saveToServer(){
 function _doSave(){
   if(_saveInFlight){ _savePending = true; return Promise.resolve(false); }
   _saveInFlight = true;
-  try{ setSyncStatus('保存中…',''); }catch(e){}
+  try{ setSyncStatus('保存中…',''); saveToast('busy','保存中…'); }catch(e){}
 
   // 委託会社モードは自社分だけを反映する専用ルート
   if(ownerMode){
@@ -2201,7 +2172,7 @@ function _doSave(){
   // 安全弁: データ急減時はここで止める(書かない)
   if(!isSafeToSave()){
     _saveInFlight=false; _savePending=false;
-    try{ setSyncStatus('保存を中止しました','sync-err'); }catch(e){}
+    try{ setSyncStatus('保存を中止しました','sync-err'); saveToast('err','保存を中止しました（データ急減の安全弁）'); }catch(e){}
     return Promise.resolve(false);
   }
 
@@ -2224,7 +2195,12 @@ function _postSaveAll(){
         isDirty = false;
         lastServerTimestamp = j.timestamp || new Date().toISOString();
         try{ localStorage.setItem('fleet_server_ts', lastServerTimestamp); }catch(e){}
-        try{ updateSaveCounts(_countAttachedFiles()); }catch(e){} // 基準値を現在値へ追従
+        // 保存成功=サーバーの内容は手元と一致。安全弁の基準値も手元の値へ更新。
+        try{
+          var _c=_localCounts();
+          _serverCounts={drivers:_c.drivers,vehicles:_c.vehicles,files:_c.files,at:new Date().toISOString()};
+          localStorage.setItem('fleet_server_counts', JSON.stringify(_serverCounts));
+        }catch(e){}
       }
       return j || {ok:false};
     });
@@ -2237,117 +2213,170 @@ function _afterSave(ok, errMsg){
     if(ok){
       setSyncStatus('保存しました '+ts,'sync-ok');
       localStorage.setItem('fleet_last_sync', ts);
+      saveToast('ok','保存しました');
     } else {
       setSyncStatus('保存に失敗しました'+(errMsg?'（'+errMsg+'）':'')+' 再試行してください','sync-err');
+      saveToast('err','保存に失敗しました'+(errMsg?'（'+errMsg+'）':''));
     }
   }catch(e){}
   if(_savePending){ _savePending=false; setTimeout(function(){ _doSave(); }, 200); }
+}
+
+// ================================================================
+// ★ 2026/07/25 ③: 保存の成否を毎回はっきり見せる
+//   画面下中央に固定表示。成功は2.5秒で自動的に消え、失敗は消えずに
+//   「再試行」ボタンを出す。どのページ・スマホでも同じ位置に出る。
+// ================================================================
+var _saveToastTimer=null;
+function saveToast(state, msg){
+  var el=document.getElementById('save-toast');
+  if(!el){
+    el=document.createElement('div');
+    el.id='save-toast';
+    el.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);'+
+      'z-index:99999;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;'+
+      'box-shadow:0 4px 16px rgba(0,0,0,.25);display:none;align-items:center;gap:10px;'+
+      'max-width:92vw;line-height:1.4;';
+    document.body.appendChild(el);
+  }
+  if(_saveToastTimer){ clearTimeout(_saveToastTimer); _saveToastTimer=null; }
+  var bg = state==='ok' ? '#2e7d32' : (state==='err' ? '#c62828' : '#37474f');
+  el.style.background=bg;
+  el.style.color='#fff';
+  el.style.display='flex';
+  if(state==='err'){
+    el.innerHTML='<span>'+esc(msg)+'</span>'+
+      '<button type="button" id="save-toast-retry" style="background:#fff;color:#c62828;border:0;'+
+      'border-radius:5px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer">再試行</button>'+
+      '<button type="button" id="save-toast-close" style="background:transparent;color:#fff;border:0;'+
+      'font-size:16px;cursor:pointer;padding:0 2px">×</button>';
+    var rb=document.getElementById('save-toast-retry');
+    if(rb) rb.onclick=function(){ saveToast('busy','再試行しています…'); _doSave(); };
+    var cb=document.getElementById('save-toast-close');
+    if(cb) cb.onclick=function(){ el.style.display='none'; };
+    return; // 失敗は自動で消さない
+  }
+  el.textContent=msg;
+  if(state==='ok'){
+    _saveToastTimer=setTimeout(function(){ el.style.display='none'; }, 2500);
+  }
 }
 
 // 旧API互換エイリアス(呼び出し箇所が多いため名前は残す。中身は同一経路)
 function scheduleAutoSave(){ return saveToServer(); }
 function saveNow(){ return saveToServer(); }
 
-// 空データでシートを上書きしない安全ガード
+// ================================================================
+// ★ 2026/07/25 ④: 安全弁(データ急減ブロック)を作り直し
+//   旧仕様の欠陥: 基準値を localStorage(fleet_save_counts)に持っていたため、
+//   一度おかしな値が記録されると、正しい件数を保存するたびに誤爆し続けた。
+//   新仕様: 基準値は「直近にサーバーから読んだ実際の件数」を使う。
+//   読み込みのたびに自動で正しい値へ追従するので、腐らない。
+// ================================================================
+
+// 直近にサーバーから読み取った実件数(読み込みのたびに更新)
+var _serverCounts = (function(){
+  try{ var v=JSON.parse(localStorage.getItem('fleet_server_counts')||'null'); return (v&&typeof v==='object')?v:null; }
+  catch(_){ return null; }
+})();
+
+// サーバーの生データから実件数を数えて基準値にする
+function _updateServerCounts(data){
+  if(!data) return;
+  function cnt(a){ return (Array.isArray(a)?a:[]).filter(function(x){ return x && String(x.id||'').trim()!==''; }).length; }
+  function files(a){
+    var n=0;
+    (Array.isArray(a)?a:[]).forEach(function(x){
+      if(!x) return;
+      var f=x.attachedFiles;
+      if(typeof f==='string'){ try{ f=JSON.parse(f||'[]'); }catch(_){ f=[]; } }
+      n += (Array.isArray(f)?f.length:0);
+    });
+    return n;
+  }
+  _serverCounts = {
+    drivers: cnt(data.drivers),
+    vehicles: cnt(data.vehicles),
+    files: files(data.drivers)+files(data.vehicles),
+    at: new Date().toISOString()
+  };
+  try{ localStorage.setItem('fleet_server_counts', JSON.stringify(_serverCounts)); }catch(_){}
+}
+
+// 現在の手元の件数
+function _localCounts(){
+  return { drivers: drivers.length, vehicles: vehicles.length, files: _countAttachedFiles() };
+}
+
+// 空データ・大幅減少でシートを上書きしない安全ガード
 function isSafeToSave(silent){
-  // 完全空データは常にブロック
-  if(drivers.length===0&&vehicles.length===0&&companies.length===0){
+  // 完全空データは常にブロック(例外なし)
+  if(drivers.length===0 && vehicles.length===0 && companies.length===0){
     console.warn('空データの保存をブロックしました');
     addLog('同期','空データ保存をブロック');
     return false;
   }
-  // 前回保存時の件数と比較
-  var prev=JSON.parse(localStorage.getItem('fleet_save_counts')||'{}');
-  var prevD=prev.drivers||0, prevV=prev.vehicles||0, prevF=prev.files||0;
-  // 現在の添付ファイル総数
-  var curF=0;
-  drivers.forEach(function(d){curF+=(d.attachedFiles||[]).length;});
-  vehicles.forEach(function(v){curF+=(v.attachedFiles||[]).length;});
-  companies.forEach(function(c){
-    (c.drivers||[]).forEach(function(d){curF+=(d.attachedFiles||[]).length;});
-    (c.vehicles||[]).forEach(function(v){curF+=(v.attachedFiles||[]).length;});
-  });
-  // 初回保存（前回データなし）は常に許可
-  if(!prev.drivers&&!prev.vehicles) return updateSaveCounts(curF);
 
-  // === 単一カテゴリ30%以上減少チェック ===
-  var warn=[];
-  // ドライバー減少チェック
-  if(prevD>=3 && drivers.length<prevD*0.7){
-    warn.push('ドライバー: '+prevD+'→'+drivers.length+'名('+Math.round((1-drivers.length/prevD)*100)+'%減)');
+  var base = _serverCounts;
+  if(!base || (!base.drivers && !base.vehicles)) return true;  // 基準が無ければ通す(初回)
+
+  var cur = _localCounts();
+  var warn = [];
+  if(base.drivers>=3 && cur.drivers < base.drivers*0.7){
+    warn.push('ドライバー: '+base.drivers+'→'+cur.drivers+'名('+Math.round((1-cur.drivers/base.drivers)*100)+'%減)');
   }
-  // 車両減少チェック
-  if(prevV>=3 && vehicles.length<prevV*0.7){
-    warn.push('車両: '+prevV+'→'+vehicles.length+'台('+Math.round((1-vehicles.length/prevV)*100)+'%減)');
+  if(base.vehicles>=3 && cur.vehicles < base.vehicles*0.7){
+    warn.push('車両: '+base.vehicles+'→'+cur.vehicles+'台('+Math.round((1-cur.vehicles/base.vehicles)*100)+'%減)');
   }
-  // 添付ファイル減少チェック
-  if(prevF>=5 && curF<prevF*0.5){
-    warn.push('添付ファイル: '+prevF+'→'+curF+'件('+Math.round((1-curF/prevF)*100)+'%減)');
+  if(base.files>=5 && cur.files < base.files*0.5){
+    warn.push('添付ファイル: '+base.files+'→'+cur.files+'件('+Math.round((1-cur.files/base.files)*100)+'%減)');
+  }
+  if(!warn.length) return true;
+
+  if(silent){
+    console.warn('データ急減検知(自動保存ブロック):', warn.join(', '));
+    addLog('同期','データ急減で保存ブロック: '+warn.join(', '));
+    return false;
   }
 
-  if(warn.length){
-    if(silent){
-      // 自動保存はブロック
-      console.warn('データ急減検知（自動保存ブロック）:',warn.join(', '));
-      addLog('同期','データ急減で自動保存ブロック: '+warn.join(', '));
-      return false;
-    }
-    // ★ 2026/07/01: 手動保存時も既定は「保存しない」。
-    //   減ったデータを保存すると、他端末の正しいデータを上書きして消してしまうため、
-    //   まず「サーバーから最新を取り直す」ことを促す。本当に減らした場合のみ二段階で承認。
-    var ok=confirm(
-      '⚠ この端末のデータが大幅に減っています:\n\n'+warn.join('\n')+'\n\n'+
-      'この状態で保存すると、他の端末（PC等）の正しいデータが\nこの少ないデータで上書きされ、消えてしまう恐れがあります。\n\n'+
-      '【OK】=保存せず、サーバーの最新データを取り直す（推奨・安全）\n'+
-      '【キャンセル】=退職・廃車などで本当に減らした場合のみ、次の確認へ進む'
-    );
-    if(ok){
-      // 推奨: 保存を中止してサーバーから取り直す
-      addLog('同期','急減のためサーバー再取得を選択（保存中止）');
-      try{
-        if(typeof syncFromSheet==='function'){
-          syncFromSheet().then(function(){ try{renderAll&&renderAll();}catch(e){} alert('サーバーの最新データを取り直しました。'); }).catch(function(){ location.reload(); });
-        } else { location.reload(); }
-      }catch(e){ location.reload(); }
-      return false;
-    }
-    // ★ 2026/07/07: 「基準値の方が壊れている」ケースの救済。
-    //   過去に誤って多い件数が基準値として保存されると、正しい件数のたびに急減誤検知になる。
-    //   その場合はここで基準値を今の正しい件数に更新して解除できる。
-    var okReset=confirm(
-      '基準値の方が間違っている可能性があります。\n\n'+
-      '前回の基準値: ドライバー'+prevD+'名 / 車両'+prevV+'台 / ファイル'+prevF+'件\n'+
-      '今の件数:     ドライバー'+drivers.length+'名 / 車両'+vehicles.length+'台 / ファイル'+curF+'件\n\n'+
-      '今の件数が正しい（＝前回の基準値が誤って多く記録された）場合は【OK】。\n'+
-      '基準値を今の件数に更新し、以降この警告を出さないようにします。\n\n'+
-      '本当にデータを減らした（退職・廃車など）場合は【キャンセル】。'
-    );
-    if(okReset){
-      addLog('同期','基準値を現在値に更新（急減警告を解除）: D'+drivers.length+'/V'+vehicles.length+'/F'+curF);
-      return updateSaveCounts(curF); // 基準値を今の件数に更新して保存許可
-    }
-    // キャンセル側 = 本当に減らした場合。二段階目の最終確認。
-    var ok2=confirm(
-      '本当にこの少ないデータで保存しますか？\n\n'+warn.join('\n')+'\n\n'+
-      'これは退職・廃車などで実際に減らした場合の操作です。\n'+
-      '他の端末で編集した内容がある場合、それが失われます。\n\n'+
-      'よろしければ【OK】、やめる場合は【キャンセル】。'
-    );
-    if(!ok2){
-      addLog('同期','ユーザーが急減保存をキャンセル');
-      return false;
-    }
-    addLog('同期','ユーザーが急減保存を承認（二段階確認）: '+warn.join(', '));
+  // 基準値はサーバーの実数なので「基準が壊れている」ケースは原則起きない。
+  // ここに来た＝本当に減っている。二択で確認する。
+  var ok = confirm(
+    '⚠ データが大幅に減っています\n\n'+warn.join('\n')+'\n\n'+
+    '（比較元＝サーバーの現在の件数 '+_fmtCountsAt(base)+'）\n\n'+
+    '【OK】＝このまま保存する（退職・廃車などで本当に減らした場合）\n'+
+    '【キャンセル】＝保存せず、サーバーの最新データを取り直す（安全）'
+  );
+  if(!ok){
+    addLog('同期','急減のためサーバー再取得を選択(保存中止)');
+    try{
+      if(typeof syncFromSheet==='function'){
+        syncFromSheet().then(function(){ try{renderAll&&renderAll();}catch(e){} alert('サーバーの最新データを取り直しました。'); });
+      }
+    }catch(e){}
+    return false;
   }
-  return updateSaveCounts(curF);
-}
-function updateSaveCounts(curF){
-  localStorage.setItem('fleet_save_counts',JSON.stringify({
-    drivers:drivers.length, vehicles:vehicles.length, files:curF,
-    time:new Date().toISOString()
-  }));
+  addLog('同期','ユーザーが急減保存を承認: '+warn.join(', '));
   return true;
 }
+
+function _fmtCountsAt(b){
+  var t='';
+  try{ t = b.at ? new Date(b.at).toLocaleTimeString() : ''; }catch(_){}
+  return 'ドライバー'+b.drivers+' / 車両'+b.vehicles+' / ファイル'+b.files+(t?' @'+t:'');
+}
+
+// 旧APIの互換。基準値はサーバー読み込み時に更新されるため、ここでは何もしない。
+function updateSaveCounts(curF){ return true; }
+
+// コンソール用: 基準値の確認・リセット
+function showSaveBaseline(){ console.log('安全弁の基準値(サーバー実数):', _serverCounts, '/ 手元:', _localCounts()); }
+function resetSaveBaseline(){
+  try{ localStorage.removeItem('fleet_server_counts'); localStorage.removeItem('fleet_save_counts'); }catch(_){}
+  _serverCounts=null;
+  console.log('安全弁の基準値をリセットしました。次回のサーバー読み込みで再設定されます。');
+}
+
 
 // ====== ヘルパー ======
 // 営業所所属チェック（offices配列 + 旧office単一フィールド両方対応）
@@ -14304,6 +14333,7 @@ function loadScript(url){
 // 3分ごとに自動読込（他端末の変更を取得 + inbox同期）
 setInterval(function(){
   if(isDirty) return;
+  if(_saveTimer || _saveInFlight) return;   // ★ 保存待ち/送信中は読まない(削除の復活防止)
   if(sessionStorage.getItem('fleet_session')!=='ok') return;
   fetch(API_URL+'?action=getAll')
     .then(r=>r.json())
@@ -14314,6 +14344,7 @@ setInterval(function(){
       //   settings も ingestServerData 内で反映される。
       var _before = JSON.stringify({d:drivers.length,v:vehicles.length,c:companies.map(function(c){return (c.drivers||[]).length+'/'+(c.vehicles||[]).length;})});
       // ★ 2026/07/25 ②: ポーリングは読むだけ。_syncing 中は書き込みが発火しない。
+      _updateServerCounts(json.data);   // ★④ 安全弁の基準値をサーバー実数へ追従
       _syncing = true;
       try{
         ingestServerData({ drivers: json.data.drivers, vehicles: json.data.vehicles, companies: json.data.companies, settings: json.data.settings }, { merge:false });
