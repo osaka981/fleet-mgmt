@@ -2031,14 +2031,23 @@ async function syncAll(saveFirst){
       //   サーバーの他端末変更を取り込む。削除済み(tombstone)は復活しない。
       // ★ 2026/07/25 ②: 取り込みは読むだけ。書き戻さない。
       _updateServerCounts(json.data);   // ★④ 安全弁の基準値をサーバー実数へ追従
-      _syncing = true;
-      try{
-        ingestServerData({ drivers: json.data.drivers, vehicles: json.data.vehicles, companies: json.data.companies, settings: json.data.settings }, { merge:true });
-        cleanUnassignedFiles();
-        saveLocal();saveCompanies();
-        isDirty=false;
-      } finally { _syncing = false; }
-      renderAll();
+      // ★ 2026/07/25 修正: マージ(手元優先)をやめ「置換」にする。
+      //   マージだと、古いデータを持った端末が永久にサーバーへ収束しなかった
+      //   (スマホだけ42人/39台のまま、等)。即時保存になったので手元に未保存の
+      //   変更は原則存在せず、サーバーの内容をそのまま正とするのが正しい。
+      if(isDirty){
+        // 保存に失敗した変更が手元に残っている場合だけ、上書き取り込みを見送る
+        try{ saveToast('err','未保存の変更があります。保存してから同期してください'); }catch(e){}
+      } else {
+        _syncing = true;
+        try{
+          ingestServerData({ drivers: json.data.drivers, vehicles: json.data.vehicles, companies: json.data.companies, settings: json.data.settings }, { merge:false });
+          cleanUnassignedFiles();
+          saveLocal();saveCompanies();
+          isDirty=false;
+        } finally { _syncing = false; }
+        renderAll();
+      }
     }
     // Step3: 受信更新
     setSyncStatus('受信更新中...','');
@@ -14361,6 +14370,38 @@ setInterval(function(){
   // inbox も同期
   try{syncInboxFromSheet().then(()=>{try{renderInbox();}catch(e){}});}catch(e){}
 }, 3*60*1000);
+
+// ================================================================
+// ★ 2026/07/25: バージョン表示
+//   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
+//   どのコードが動いているか画面左下で必ず確認できるようにする。
+// ================================================================
+var FLEET_VERSION = '2026.07.25-b';
+(function(){
+  function put(){
+    if(document.getElementById('fleet-ver')) return;
+    var d=document.createElement('div');
+    d.id='fleet-ver';
+    d.textContent='v'+FLEET_VERSION;
+    d.style.cssText='position:fixed;left:6px;bottom:4px;z-index:9998;font-size:10px;'+
+      'color:#9aa;background:rgba(255,255,255,.7);padding:1px 5px;border-radius:4px;'+
+      'pointer-events:none;font-family:monospace;';
+    document.body.appendChild(d);
+  }
+  if(document.body) put(); else document.addEventListener('DOMContentLoaded',put);
+  console.log('%cフリート管理 v'+FLEET_VERSION,'color:#0a0;font-weight:bold');
+})();
+
+// この端末の手元データを捨て、サーバーの内容で作り直す(コンソール用)
+function forceReloadFromServer(){
+  ['fleet_drivers','fleet_vehicles','fleet_companies','fleet_unassigned',
+   'fleet_server_counts','fleet_save_counts','fleet_tombstones'].forEach(function(k){
+    try{ localStorage.removeItem(k); }catch(_){}
+  });
+  isDirty=false;
+  console.log('手元データを消去しました。再読み込みします…');
+  setTimeout(function(){ location.reload(); }, 300);
+}
 
 // ★ 2026/07/25 ②: タブを閉じる / 裏に回す 際のサーバー書き込み(sendBeacon)は全廃。
 //   これが「古いデータを持ったタブが、閉じるだけでサーバーを上書きする」経路だった。
