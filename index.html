@@ -7909,11 +7909,50 @@ function sfDragLeave(e){document.getElementById('sf-upload').classList.remove('d
 function sfDrop(e){e.preventDefault();document.getElementById('sf-upload').classList.remove('drag-over');sfAddFiles(e.dataTransfer.files);}
 function sfFileChange(e){sfAddFiles(e.target.files);}
 
+// ★ 2026/07/29: 画像を送信前に縮小する。
+//   スマホ写真は3〜5MB、base64化で更に1.33倍になり、電波の弱い場所では
+//   アップロードが頻繁に失敗していた(実際に免許証が1件消失)。
+//   長辺1600pxまで縮小しJPEG品質0.82で再エンコードすると概ね200〜400KBに収まる。
+//   免許証・車検証の文字は判読できる解像度を維持している。
+const SF_MAX_EDGE = 1600;
+const SF_JPEG_Q   = 0.82;
+function sfCompressImage(dataUrl, mime){
+  return new Promise(function(resolve){
+    if(!/^image\/(jpeg|jpg|png)$/i.test(mime||'')) return resolve({dataUrl, type:mime});
+    const img = new Image();
+    img.onload = function(){
+      try{
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if(!w || !h) return resolve({dataUrl, type:mime});
+        const scale = Math.min(1, SF_MAX_EDGE / Math.max(w, h));
+        if(scale >= 1 && dataUrl.length < 1200000) return resolve({dataUrl, type:mime});
+        w = Math.round(w*scale); h = Math.round(h*scale);
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);   // PNG透過を白地に
+        ctx.drawImage(img, 0, 0, w, h);
+        const out = cv.toDataURL('image/jpeg', SF_JPEG_Q);
+        if(out && out.length < dataUrl.length) resolve({dataUrl: out, type:'image/jpeg'});
+        else resolve({dataUrl, type:mime});
+      }catch(e){ resolve({dataUrl, type:mime}); }
+    };
+    img.onerror = function(){ resolve({dataUrl, type:mime}); };
+    img.src = dataUrl;
+  });
+}
+
 function sfAddFiles(files){
   for(const f of files){
     const reader=new FileReader();
-    reader.onload=ev=>{
-      sfFiles.push({name:f.name,dataUrl:ev.target.result,type:f.type});
+    reader.onload=async ev=>{
+      const before = (ev.target.result||'').length;
+      const c = await sfCompressImage(ev.target.result, f.type);
+      const after = (c.dataUrl||'').length;
+      if(after < before) console.log('[form] 画像を圧縮: '+Math.round(before/1024)+'KB → '+Math.round(after/1024)+'KB');
+      let nm = f.name;
+      if(c.type==='image/jpeg' && !/\.(jpe?g)$/i.test(nm)) nm = nm.replace(/\.[^.]+$/, '') + '.jpg';
+      sfFiles.push({name:nm, dataUrl:c.dataUrl, type:c.type});
       renderSfPreviews();
     };
     reader.readAsDataURL(f);
@@ -8227,26 +8266,51 @@ async function submitSelfForm(){
       var ext=(f.name||'').split('.').pop()||'jpg';
       var renamedName=name+'_'+catLabel+'.'+ext;
       document.getElementById('sf-submit').textContent=`写真アップロード中 (${fi+1}/${sfFiles.length})...`;
-      try{
-        const upRes = await fetch(API_URL, {
-          method:'POST',
-          body: JSON.stringify({
-            action: 'uploadFile',
-            folder: '_受信ボックス',
-            subFolder: name + '_' + new Date().toISOString().slice(0,10),
-            fileName: renamedName,
-            mimeType: f.type,
-            dataUrl: f.dataUrl
-          })
-        });
-        const upData = await upRes.json();
-        if(upData.ok){
-          uploadedFiles.push({name:renamedName, type:f.type, url:upData.url, fileId:upData.fileId, dataUrl:'', category:f.category||'', otherName:f.otherName||''});
-        } else {
-          uploadedFiles.push({name:renamedName, type:f.type, dataUrl:'', url:'', fileId:'', category:f.category||'', otherName:f.otherName||'', error:upData.error||'upload failed'});
+      // ★ 2026/07/29: 電波が弱い場所での失敗対策。
+      //   旧実装は1回だけ試し、失敗しても空のfileIdのまま先へ進み「送信完了」を表示していた。
+      //   そのため本人は送ったつもりで、実際には画像が1枚も保存されていなかった。
+      //   → 最大3回まで間隔を空けて自動再試行し、それでも駄目なら送信自体を中止する。
+      let ok = false, lastErr = '';
+      for(let attempt=1; attempt<=3 && !ok; attempt++){
+        if(attempt>1){
+          document.getElementById('sf-submit').textContent =
+            `再試行中 (${fi+1}/${sfFiles.length}) ${attempt}回目...`;
+          await new Promise(r=>setTimeout(r, attempt*2000));   // 2秒 → 4秒
         }
-      }catch(e){
-        uploadedFiles.push({name:renamedName, type:f.type, dataUrl:'', url:'', fileId:'', category:f.category||'', otherName:f.otherName||'', error:e.message});
+        try{
+          const upRes = await fetch(API_URL, {
+            method:'POST',
+            body: JSON.stringify({
+              action: 'uploadFile',
+              folder: '_受信ボックス',
+              subFolder: name + '_' + new Date().toISOString().slice(0,10),
+              fileName: renamedName,
+              mimeType: f.type,
+              dataUrl: f.dataUrl
+            })
+          });
+          const upData = await upRes.json();
+          if(upData && upData.ok && upData.fileId){
+            uploadedFiles.push({name:renamedName, type:f.type, url:upData.url, fileId:upData.fileId, dataUrl:'', category:f.category||'', otherName:f.otherName||''});
+            ok = true;
+          } else {
+            lastErr = (upData && upData.error) || 'アップロード失敗';
+          }
+        }catch(e){
+          lastErr = e.message || '通信エラー';
+        }
+      }
+      if(!ok){
+        // ★ 送信を中止して利用者に知らせる。入力内容は消さない。
+        document.getElementById('sf-submit').disabled = false;
+        document.getElementById('sf-submit').textContent = '送信する';
+        sfLockForm(false);
+        alert('写真の送信に失敗しました。\n\n'
+          + '「' + renamedName + '」を送れませんでした。\n'
+          + '（' + lastErr + '）\n\n'
+          + '電波の良い場所に移動して、もう一度「送信する」を押してください。\n'
+          + '入力内容と写真はそのまま残っています。');
+        return;
       }
     }
   }
@@ -8255,12 +8319,30 @@ async function submitSelfForm(){
   document.getElementById('sf-submit').textContent='データ送信中...';
   payload.id = entryId;
   payload.files = uploadedFiles.map(f=>({name:f.name, type:f.type||'', url:f.url||'', fileId:f.fileId||'', category:f.category||'', otherName:f.otherName||''}));
-  try{
-    const formRes = await fetch(API_URL,{method:'POST',body:JSON.stringify(payload)});
-    const formJson = await formRes.json();
-    if(!formJson.ok) console.error('submitForm error:', formJson.error);
-  }catch(e){
-    console.error('submitForm fetch error:', e);
+  // ★ 2026/07/29: 本体送信も3回まで再試行し、失敗したら明示して中止する
+  let formOk = false, formErr = '';
+  for(let attempt=1; attempt<=3 && !formOk; attempt++){
+    if(attempt>1){
+      document.getElementById('sf-submit').textContent = `データ送信 再試行 ${attempt}回目...`;
+      await new Promise(r=>setTimeout(r, attempt*2000));
+    }
+    try{
+      const formRes = await fetch(API_URL,{method:'POST',body:JSON.stringify(payload)});
+      const formJson = await formRes.json();
+      if(formJson && formJson.ok) formOk = true;
+      else formErr = (formJson && formJson.error) || '送信失敗';
+    }catch(e){
+      formErr = e.message || '通信エラー';
+    }
+  }
+  if(!formOk){
+    document.getElementById('sf-submit').disabled = false;
+    document.getElementById('sf-submit').textContent = '送信する';
+    sfLockForm(false);
+    alert('送信に失敗しました。\n\n（' + formErr + '）\n\n'
+      + '写真はアップロード済みですが、送信データが届いていません。\n'
+      + '電波の良い場所で、もう一度「送信する」を押してください。');
+    return;
   }
 
   // ★ Step3: ローカルinboxにも保存
@@ -14376,7 +14458,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.07.25-b';
+var FLEET_VERSION = '2026.07.29-a';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
