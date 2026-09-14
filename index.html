@@ -7709,8 +7709,46 @@ async function checkConflict(){
 }
 
 // ====== 操作の取り消し（Undo） ======
-var undoStack=JSON.parse(localStorage.getItem('fleet_undo')||'[]');
+/* ★ 2026/09/14: 取り消し履歴が端末を圧迫していた（実測 3.7MB）。
+   件数の上限(20件)はあったが、1件ごとに drivers・vehicles・companies の
+   全コピーを持つため、上限として機能していなかった。
+   localStorage は同じドメインの全アプリで共有されるので、日報アプリと
+   計数アプリの保存にも影響する（日報の未送信ぶんが保存できなくなる）。
+   ・画面上の取り消しは今までどおり20件まで（メモリ上に持つ）
+   ・端末に残すのは新しい順で合計400KBまで
+   ・24時間より古い履歴は読み込み時に捨てる（前日の操作を取り消すのは
+     サーバー側が変わっている可能性があり、かえって危険） */
 var UNDO_MAX=20;
+var UNDO_LS_BYTES=400*1024;
+var UNDO_KEEP_HOURS=24;
+var undoStack=(function(){
+  try{
+    var a=JSON.parse(localStorage.getItem('fleet_undo')||'[]');
+    if(!Array.isArray(a)) return [];
+    var cut=Date.now()-UNDO_KEEP_HOURS*3600000;
+    return a.filter(function(e){ return e && e.time && e.time>cut; });
+  }catch(e){ return []; }
+})();
+var _undoWarned=false;
+function _undoPersist(){
+  // 新しいものから順に、上限バイトに収まるだけ端末へ残す
+  var keep=[], bytes=0;
+  for(var i=undoStack.length-1;i>=0;i--){
+    var t=JSON.stringify(undoStack[i]);
+    if(bytes + t.length*2 > UNDO_LS_BYTES) break;
+    bytes += t.length*2; keep.unshift(undoStack[i]);
+  }
+  try{ localStorage.setItem('fleet_undo',JSON.stringify(keep)); return true; }
+  catch(e){
+    // 容量が尽きたら履歴は捨てる。取り消し履歴より本体データの保存を優先する。
+    try{ localStorage.removeItem('fleet_undo'); }catch(e2){}
+    if(!_undoWarned){
+      _undoWarned=true;
+      try{ setSyncStatus('端末の空き容量が足りず、取り消し履歴を保存できません','sync-err'); }catch(e3){}
+    }
+    return false;
+  }
+}
 function pushUndo(label){
   undoStack.push({
     label:label,
@@ -7720,7 +7758,7 @@ function pushUndo(label){
     companies:JSON.parse(JSON.stringify(companies))
   });
   if(undoStack.length>UNDO_MAX) undoStack.shift();
-  try{localStorage.setItem('fleet_undo',JSON.stringify(undoStack));}catch(e){/* storage full */}
+  _undoPersist();
   updateUndoBadge();
 }
 function performUndo(){
@@ -7736,7 +7774,7 @@ function performUndo(){
     _restoredIds.forEach(clearTombstone);
   }catch(e){}
   saveLocal();renderAll();
-  try{localStorage.setItem('fleet_undo',JSON.stringify(undoStack));}catch(e){}
+  _undoPersist();
   updateUndoBadge();
   setSyncStatus('元に戻しました: '+entry.label,'sync-ok');
   addLog('Undo','操作取消: '+entry.label);
