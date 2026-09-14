@@ -6980,7 +6980,10 @@ function saveDriver(keepOpen){
     }
   }
 
+  // ★ 2026/09/14: 編集なら既存の uid を引き継ぎ、新規なら発行する
+  const _prevDrv = editingDriverId ? drivers.find(d=>d.id==editingDriverId) : null;
   const obj={id:editingDriverId||Date.now(),name,kana,type,status,
+    uid:(_prevDrv && _prevDrv.uid) || newDriverUid(),
     empNo:document.getElementById('d-empno')?.value?.trim()||'',
     office: selectedOffices[0]||'',
     offices: selectedOffices,
@@ -7706,6 +7709,15 @@ async function checkConflict(){
     }
     return false;
   }catch(e){return false;}
+}
+
+/* ★ 2026/09/14: ドライバーの「変わらない鍵」。
+   ドライバーの登録はフリートが起点なので、uid もここで発行する。
+   経営管理はこれを引き継ぎ、日報アプリ・計数アプリまで同じ値が流れる。
+   氏名で突き合わせると同姓同名や表記ゆれで崩れるが、uid なら崩れない。
+   一度振ったら二度と変えない・使い回さない。 */
+function newDriverUid(){
+  return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 }
 
 // ====== 操作の取り消し（Undo） ======
@@ -11888,6 +11900,7 @@ function execRegisterFromInbox(id){
     newId = Date.now();
     c.drivers.push({
       id:newId,
+      uid:newDriverUid(),          // ★ 2026/09/14: 変わらない鍵
       name:item.name,
       kana:item.kana||'',
       offices:[selectedOffice],
