@@ -635,8 +635,18 @@ body.modal-open{overflow:hidden}
           <div id="sf-consent-body"
                style="max-height:220px;overflow-y:auto;padding:12px;font-size:11.5px;line-height:1.8;color:#333"></div>
         </div>
-        <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;cursor:pointer;font-size:13px;font-weight:600">
-          <input type="checkbox" id="sf-consent" style="margin-top:3px;width:18px;height:18px;flex:none"
+        <!-- ★ 2026/09/17: 最後まで読まないとチェックできないようにする。
+             読まずに同意できる状態だと、同意を取った意味が薄くなるため。
+             本文を最後までスクロールした時点で有効になる。
+             スクロールの必要がない短い表示（大きな画面など）では、
+             最初から有効にする。 -->
+        <div id="sf-consent-hint" style="margin-top:8px;font-size:11px;color:#e65100;font-weight:600">
+          ▼ 最後までお読みください（読み終わるとチェックできます）
+        </div>
+        <label id="sf-consent-wrap"
+               style="display:flex;align-items:flex-start;gap:8px;margin-top:6px;cursor:not-allowed;font-size:13px;font-weight:600;opacity:.45">
+          <input type="checkbox" id="sf-consent" disabled
+                 style="margin-top:3px;width:18px;height:18px;flex:none"
                  onchange="sfConsentChanged()">
           <span id="sf-consent-label">上記に同意します</span>
         </label>
@@ -8085,7 +8095,7 @@ function sfRegCodeHint(){
    同意を取った意味が薄れるため、送信内容に版と日時を含める。
    利用目的の追加や第三者提供の範囲を広げたときは再同意が必要。
    表現の手直しだけなら再同意は不要。 */
-const CONSENT_VER = '2026-09-17.4';
+const CONSENT_VER = '2026-09-17.5';
 const CONSENT_CONTACT =
   '大阪急配株式会社　管理部<br>'+
   '〒591-8001　大阪府堺市北区常磐町3-12-5<br>'+
@@ -8151,6 +8161,41 @@ const CONSENT_TEXT = {
 ` + CONSENT_CONTACT
 };
 
+/* ★ 2026/09/17: 同意本文を最後まで読んだかを見る。
+   本文の一番下まで来たらチェックボックスを有効にする。
+   端末の文字サイズや画面の大きさでスクロールが不要な場合もあるので、
+   その場合は待たせずに有効にする。 */
+function sfConsentUnlock(){
+  const cb=document.getElementById('sf-consent');
+  const wrap=document.getElementById('sf-consent-wrap');
+  const hint=document.getElementById('sf-consent-hint');
+  if(!cb) return;
+  cb.disabled=false;
+  if(wrap){ wrap.style.opacity='1'; wrap.style.cursor='pointer'; }
+  if(hint) hint.style.display='none';
+}
+function sfConsentLock(){
+  const cb=document.getElementById('sf-consent');
+  const wrap=document.getElementById('sf-consent-wrap');
+  const hint=document.getElementById('sf-consent-hint');
+  if(!cb) return;
+  cb.checked=false; cb.disabled=true;
+  if(wrap){ wrap.style.opacity='.45'; wrap.style.cursor='not-allowed'; }
+  if(hint) hint.style.display='';
+}
+function sfConsentWatch(){
+  const body=document.getElementById('sf-consent-body');
+  if(!body) return;
+  const check=()=>{
+    // スクロールの必要がない（全部見えている）ならそのまま有効に
+    if(body.scrollHeight - body.clientHeight <= 4){ sfConsentUnlock(); return; }
+    // 一番下から少しの余裕を見て判定（端末によって端数が出るため）
+    if(body.scrollTop + body.clientHeight >= body.scrollHeight - 8) sfConsentUnlock();
+  };
+  body.onscroll=check;
+  setTimeout(check,120);      // 表示直後の状態も見る
+}
+
 function sfPaintConsent(){
   const who = (sfWho==='co') ? 'co' : 'own';
   const body=document.getElementById('sf-consent-body');
@@ -8162,8 +8207,9 @@ function sfPaintConsent(){
   if(label) label.textContent = (who==='co')
     ? '上記の個人情報の取扱いに同意します'
     : '上記の個人情報の取扱い、貸与車両の取扱い、安全運転の誓約に同意します';
-  const cb=document.getElementById('sf-consent');
-  if(cb) cb.checked=false;
+  sfConsentLock();            // ★ 所属を変えたら読み直してもらう
+  if(body) body.scrollTop=0;  // 先頭から読み直してもらう
+  sfConsentWatch();
   sfCheckMinor();
 }
 function sfConsentChanged(){ /* 送信時に確認するため、ここでは何もしない */ }
@@ -8572,7 +8618,9 @@ async function submitSelfForm(){
      どの版に、いつ、どの立場（自社／委託）で同意したかを残す。 */
   const _consentEl=document.getElementById('sf-consent');
   if(!_consentEl||!_consentEl.checked){
-    errEl.textContent='同意事項をご確認のうえ、チェックを入れてください';
+    errEl.textContent = (_consentEl && _consentEl.disabled)
+      ? '同意事項を最後までお読みください'
+      : '同意事項をご確認のうえ、チェックを入れてください';
     try{ document.getElementById('sf-consent-group').scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){}
     return;
   }
