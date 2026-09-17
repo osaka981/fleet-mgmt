@@ -482,6 +482,31 @@ body.modal-open{overflow:hidden}
         <div class="self-form-logo-sub" id="sf-subtitle">書類提出フォーム</div>
       </div>
 
+      <!-- ★ 2026/09/17: 所属を最初に選ばせる。
+           これまで自社と委託会社が1画面に混在し、自社の方にも
+           「登録番号（委託会社の方のみ）」が常に見えていて迷いやすかった。
+           また委託の方が登録番号を空のまま送れてしまい、
+           どの会社の人か分からない申請が届く余地があった。
+           所属を先に決め、委託の場合は会社の特定を必須にする。 -->
+      <div class="self-form-group" id="sf-who-group">
+        <label class="self-form-label">ご所属 *</label>
+        <div style="display:flex;gap:10px">
+          <label id="sf-who-own-label" onclick="sfSetWho('own')"
+                 style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 10px;border:2px solid #ddd;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;text-align:center">
+            大阪急配の方
+            <span style="font-size:10px;color:#888;font-weight:400">持込を含む</span>
+          </label>
+          <label id="sf-who-co-label" onclick="sfSetWho('co')"
+                 style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 10px;border:2px solid #ddd;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;text-align:center">
+            委託会社の方
+            <span style="font-size:10px;color:#888;font-weight:400">会社コードが必要</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 所属を選ぶまでは以降を出さない -->
+      <div id="sf-after-who" style="display:none">
+
       <!-- モード選択 -->
       <div class="self-form-group">
         <label class="self-form-label">提出種別 *</label>
@@ -512,11 +537,12 @@ body.modal-open{overflow:hidden}
         </select>
       </div>
 
-      <!-- 共通：登録番号（委託会社の方のみ） -->
-      <div class="self-form-group" id="sf-regcode-group">
-        <label class="self-form-label">登録番号（委託会社の方のみ）</label>
-        <input type="text" id="sf-regcode" class="self-form-input" placeholder="KYH001" style="letter-spacing:.1em;text-transform:uppercase">
-        <div style="font-size:11px;color:#888;margin-top:4px">委託会社から配布されている場合のみ入力してください</div>
+      <!-- ★ 2026/09/17: 委託会社のときだけ出し、必須にする -->
+      <div class="self-form-group" id="sf-regcode-group" style="display:none">
+        <label class="self-form-label">会社コード *</label>
+        <input type="text" id="sf-regcode" class="self-form-input" placeholder="KYH001" style="letter-spacing:.1em;text-transform:uppercase"
+               oninput="sfRegCodeHint()">
+        <div style="font-size:11px;color:#888;margin-top:4px" id="sf-regcode-hint">所属している会社から配布されたコードを入力してください</div>
       </div>
 
       <!-- 共通：氏名 -->
@@ -598,6 +624,7 @@ body.modal-open{overflow:hidden}
 
       <button class="self-form-btn" id="sf-submit" onclick="submitSelfForm()">送信する</button>
       <div id="sf-err" style="font-size:12px;color:#e53935;text-align:center;margin-top:8px;min-height:16px"></div>
+      </div><!-- /sf-after-who -->
     </div>
     <div id="self-form-success" style="display:none" class="self-form-success">
       <div class="self-form-success-title" style="margin-top:16px">送信が完了しました</div>
@@ -6988,6 +7015,43 @@ function saveDriver(keepOpen){
     office: selectedOffices[0]||'',
     offices: selectedOffices,
     tel:formatPhone(document.getElementById('d-tel').value),birth:normalizeBirthDate(document.getElementById('d-birth').value),addr:document.getElementById('d-addr').value,zip:document.getElementById('d-zip').value,license:{exp:normalizeBirthDate(document.getElementById('d-license-exp').value),no:document.getElementById('d-license-no').value,type:document.getElementById('d-license-type').value,cond:document.getElementById('d-license-cond').value},otherDocs,other:otherDocs[0]||{},sub:type==='外注（個人）'?{company:document.getElementById('d-sub-company').value,kana:document.getElementById('d-sub-kana').value,birth:normalizeBirthDate(document.getElementById('d-sub-birth').value),area:document.getElementById('d-sub-area').value,count:document.getElementById('d-sub-count').value,tel:formatPhone(document.getElementById('d-sub-tel').value)}:{},leave:(status==='退職'||status==='休止')?{date:normalizeBirthDate(document.getElementById('d-leave-date').value),reason:document.getElementById('d-leave-reason').value,note:document.getElementById('d-leave-note').value}:{},stampEnabled:!!document.getElementById('d-stamp')?.checked};
+  /* ★ 2026/09/17: 新規登録のとき、同じ人が二重に登録されるのを防ぐ。
+     QRの自己入力フォームから申請が届いて手で登録する運用なので、
+     同じ人が2回申請すると uid が2つ生まれ、経営管理や日報アプリとの
+     突き合わせが氏名頼りに戻ってしまう。
+     氏名・生年月日・電話のいずれかが一致する人を挙げて確認する。
+     退職者も対象にする（復帰や再委託で戻ってくることがある）。 */
+  if(!editingDriverId){
+    const _nm=v=>String(v||'').replace(/\s+/g,'');
+    const _tel=v=>String(v||'').replace(/[^\d]/g,'');
+    const _all=[];
+    (drivers||[]).forEach(d=>_all.push({d:d, src:'自社'}));
+    (companies||[]).forEach(c=>{
+      const list=Array.isArray(c.drivers)?c.drivers:[];
+      list.forEach(d=>_all.push({d:d, src:c.name||'委託'}));
+    });
+    const hits=[];
+    _all.forEach(({d,src})=>{
+      if(!d) return;
+      const why=[];
+      if(_nm(d.name) && _nm(d.name)===_nm(obj.name)) why.push('氏名');
+      if(_tel(d.tel) && _tel(d.tel)===_tel(obj.tel)) why.push('電話');
+      if(d.birth && obj.birth && d.birth===obj.birth) why.push('生年月日');
+      if(why.length) hits.push({d,src,why});
+    });
+    if(hits.length){
+      const lines=hits.slice(0,8).map(h=>
+        '　・'+(h.d.name||'(氏名なし)')+'（'+h.src+'／'+(h.d.status||'在籍')+'）'
+        +'　一致: '+h.why.join('・')).join('\n');
+      const msg='同じ人がすでに登録されている可能性があります。\n\n'+lines
+        +(hits.length>8?'\n　ほか '+(hits.length-8)+'件':'')
+        +'\n\n二重に登録すると、経営管理や日報アプリとの紐付けが\n'
+        +'氏名頼りになり、集計が分かれることがあります。\n\n'
+        +'同じ人であれば「キャンセル」を押し、既存の方を開いて編集してください。\n'
+        +'別人であれば「OK」で続行します。';
+      if(!confirm(msg)) return false;
+    }
+  }
   try{ clearTombstone(obj.id); }catch(e){} // ★ 登録した以上、万一の削除台帳残りは解除
   pushUndo('ドライバー '+(editingDriverId?'編集':'追加')+': '+name);
   // 既存の添付ファイル・アーカイブを保持
@@ -7895,6 +7959,12 @@ function initSelfForm(){
     document.getElementById('sf-office').innerHTML='<option value="">選択してください</option>'+sfOffices.map(o=>`<option>${o}</option>`).join('');
     document.getElementById('sf-new-office').innerHTML='<option value="">選択してください</option><option value="未定">未定（後で設定）</option>'+sfOffices.map(o=>`<option>${o}</option>`).join('');
     sfSetMode('update');
+    /* ★ 2026/09/17: QRに会社コードが入っていれば委託会社として開始し、
+       入っていなければ所属の選択から始める。 */
+    try{
+      const _qs=(location.search||'')+'&'+(location.hash||'');
+      if(/[?&#]company=\d+/.test(_qs)) sfSetWho('co');
+    }catch(e){}
     // ★ 2026/07/04: QRに会社番号が埋め込まれていれば登録番号に自動セット
     try{
       var qs = location.search || '';
@@ -7934,6 +8004,43 @@ function initSelfForm(){
 }
 
 let sfMode = 'update'; // 'update' or 'new'
+
+/* ★ 2026/09/17: 所属（自社／委託会社）の選択。
+   委託会社を選んだときだけ会社コードの欄を出し、必須にする。
+   QRに会社コードが埋め込まれている場合は、最初から委託会社として扱う。 */
+let sfWho = '';
+function sfSetWho(who){
+  sfWho = who;
+  const own = who==='own';
+  const a=document.getElementById('sf-who-own-label');
+  const b=document.getElementById('sf-who-co-label');
+  if(a){ a.style.borderColor = own?'#4a90e2':'#ddd'; a.style.color = own?'#4a90e2':'#888'; }
+  if(b){ b.style.borderColor = own?'#ddd':'#4a90e2'; b.style.color = own?'#888':'#4a90e2'; }
+  const rc=document.getElementById('sf-regcode-group');
+  if(rc) rc.style.display = own ? 'none' : 'block';
+  if(own){ const i=document.getElementById('sf-regcode'); if(i) i.value=''; }
+  const after=document.getElementById('sf-after-who');
+  if(after) after.style.display='block';
+  const sub=document.getElementById('sf-subtitle');
+  if(sub && !who) sub.textContent='書類提出フォーム';
+  if(!own) setTimeout(()=>{ const i=document.getElementById('sf-regcode'); if(i&&!i.readOnly) i.focus(); },80);
+  sfRegCodeHint();
+}
+// 入力された会社コードから会社名を出す（間違いに気づけるように）
+function sfRegCodeHint(){
+  const el=document.getElementById('sf-regcode-hint');
+  const v=document.getElementById('sf-regcode');
+  if(!el||!v) return;
+  const code=normalizeRegCode(v.value||'');
+  if(!code){ el.textContent='所属している会社から配布されたコードを入力してください'; el.style.color='#888'; return; }
+  let co=null;
+  try{
+    const cos=JSON.parse(localStorage.getItem('fleet_companies')||'[]');
+    co=(Array.isArray(cos)?cos:[]).find(c=>String(c.regCode)===String(code));
+  }catch(e){}
+  if(co){ el.textContent='▶ '+(co.name||'')+' として登録されます'; el.style.color='#1565c0'; }
+  else  { el.textContent='このコードの会社が見つかりません。お手元のコードをご確認ください'; el.style.color='#e53935'; }
+}
 
 function sfSetMode(mode){
   sfMode = mode;
@@ -8230,6 +8337,20 @@ async function submitSelfForm(){
 
   // 共通：登録番号取得（正規化）
   const regcode = normalizeRegCode(document.getElementById('sf-regcode')?.value||'');
+
+  /* ★ 2026/09/17: 所属の確認。
+     委託会社の方はどの会社かが分からないと受け取れないので必須にする。
+     これまでは空でも送れてしまい、会社不明の申請が届く余地があった。 */
+  if(!sfWho){ errEl.textContent='ご所属（大阪急配／委託会社）を選んでください'; return; }
+  if(sfWho==='co'){
+    if(!regcode){ errEl.textContent='会社コードを入力してください'; return; }
+    let _co=null;
+    try{
+      const _cos=JSON.parse(localStorage.getItem('fleet_companies')||'[]');
+      _co=(Array.isArray(_cos)?_cos:[]).find(c=>String(c.regCode)===String(regcode));
+    }catch(e){}
+    if(!_co){ errEl.textContent='会社コードが正しくありません。お手元のコードをご確認ください'; return; }
+  }
 
   // ★ 写真のカテゴリチェック
   if(!sfFiles.length){errEl.textContent='写真を1枚以上アップロードしてください';return;}
