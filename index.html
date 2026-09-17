@@ -567,7 +567,8 @@ body.modal-open{overflow:hidden}
       <div id="sf-new-fields" style="display:none">
         <div class="self-form-group">
           <label class="self-form-label">生年月日 *</label>
-          <input type="text" id="sf-birth" class="self-form-input" placeholder="19900123" inputmode="numeric">
+          <input type="text" id="sf-birth" class="self-form-input" placeholder="19900123" inputmode="numeric"
+                 oninput="sfCheckMinor()" onblur="sfCheckMinor()">
           <div style="font-size:11px;color:#888;margin-top:4px">西暦8桁で入力（例：19900123）</div>
         </div>
         <div class="self-form-group">
@@ -620,6 +621,42 @@ body.modal-open{overflow:hidden}
           <div class="self-form-upload-sub" id="sf-upload-sub">免許証・車検証・保険証書の写真（複数可）</div>
         </div>
         <div id="sf-previews" style="margin-top:10px"></div>
+      </div>
+
+      <!-- ★ 2026/09/17: 同意事項。送信ボタンの直前に置く（読まずに送れる位置に
+           置くと同意の意味が薄れるため）。所属によって内容が変わる。
+           委託会社の方は大阪急配と直接の契約関係がないため、貸与車両や
+           安全運転の誓約は求めず、個人情報の取扱いのみとする。
+           それらは委託会社との契約で定める。 -->
+      <div class="self-form-group" id="sf-consent-group" style="margin-top:18px">
+        <div style="border:1px solid #d7dde5;border-radius:8px;background:#fafbfc">
+          <div style="padding:10px 12px;border-bottom:1px solid #e7ebf0;font-size:13px;font-weight:700"
+               id="sf-consent-title">同意事項</div>
+          <div id="sf-consent-body"
+               style="max-height:220px;overflow-y:auto;padding:12px;font-size:11.5px;line-height:1.8;color:#333"></div>
+        </div>
+        <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;cursor:pointer;font-size:13px;font-weight:600">
+          <input type="checkbox" id="sf-consent" style="margin-top:3px;width:18px;height:18px;flex:none"
+                 onchange="sfConsentChanged()">
+          <span id="sf-consent-label">上記に同意します</span>
+        </label>
+        <div id="sf-minor-box" style="display:none;margin-top:10px;padding:10px 12px;border:1px solid #ffcc80;background:#fff8e1;border-radius:8px;font-size:12px;line-height:1.7">
+          <div style="font-weight:700;color:#e65100;margin-bottom:4px">18歳未満の方</div>
+          親権者の方の同意が必要です。下の欄に親権者の方のお名前と連絡先をご記入ください。
+          <div class="self-form-group" style="margin-top:8px">
+            <label class="self-form-label">親権者の氏名 *</label>
+            <input type="text" id="sf-guardian-name" class="self-form-input" placeholder="山田 花子">
+          </div>
+          <div class="self-form-group">
+            <label class="self-form-label">親権者の電話番号 *</label>
+            <input type="tel" id="sf-guardian-tel" class="self-form-input" placeholder="090-0000-0000"
+                   onblur="this.value=formatPhone(this.value)">
+          </div>
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-weight:600">
+            <input type="checkbox" id="sf-guardian-consent" style="margin-top:3px;width:18px;height:18px;flex:none">
+            <span>親権者として上記に同意します</span>
+          </label>
+        </div>
       </div>
 
       <button class="self-form-btn" id="sf-submit" onclick="submitSelfForm()">送信する</button>
@@ -8025,6 +8062,7 @@ function sfSetWho(who){
   if(sub && !who) sub.textContent='書類提出フォーム';
   if(!own) setTimeout(()=>{ const i=document.getElementById('sf-regcode'); if(i&&!i.readOnly) i.focus(); },80);
   sfRegCodeHint();
+  sfPaintConsent();
 }
 // 入力された会社コードから会社名を出す（間違いに気づけるように）
 function sfRegCodeHint(){
@@ -8040,6 +8078,115 @@ function sfRegCodeHint(){
   }catch(e){}
   if(co){ el.textContent='▶ '+(co.name||'')+' として登録されます'; el.style.color='#1565c0'; }
   else  { el.textContent='このコードの会社が見つかりません。お手元のコードをご確認ください'; el.style.color='#e53935'; }
+}
+
+/* ★ 2026/09/17: 同意事項の本文。
+   改訂したら CONSENT_VER を上げる。「誰がどの版に同意したか」を残さないと
+   同意を取った意味が薄れるため、送信内容に版と日時を含める。
+   利用目的の追加や第三者提供の範囲を広げたときは再同意が必要。
+   表現の手直しだけなら再同意は不要。 */
+const CONSENT_VER = '2026-09-17.2';
+const CONSENT_CONTACT =
+  '大阪急配株式会社　管理部<br>'+
+  '〒591-8001　大阪府堺市北区常磐町3-12-5<br>'+
+  'TEL 0722589811<br>'+
+  '個人情報のお問い合わせ窓口：管理部　川村 宝';
+
+const CONSENT_TEXT = {
+  own: `
+<b>個人情報の取扱いについて</b><br>
+大阪急配株式会社は、このフォームでお預かりする情報を次の目的で利用します。<br>
+１．従事員・車両の管理、および委託元または荷主への各種届出（従事員の現況届、車両の現況届、雇用証明書、適合証明書など）<br>
+２．運転免許証その他の資格・保険の有効期限の管理と更新のご案内<br>
+３．業務の割当、実績の集計、報酬または給与の計算と支払<br>
+４．事故・違反・苦情が発生した際の事実確認と対応<br><br>
+<b>お預かりする情報</b><br>
+氏名、フリガナ、生年月日、住所、電話番号／運転免許証の番号・種類・条件・有効期限／車両のナンバー・車種・色・分類／運転免許証・車検証・保険証書などの画像<br><br>
+<b>第三者への提供</b><br>
+次の場合に限り、必要な範囲で提供します。提供する項目は、提供先が求める範囲に限ります。<br>
+・担当する業務の<b>委託元または荷主</b>（日本郵便株式会社、集荷先の企業など）への届出および報告。担当する業務によって提供先は異なります<br>
+・保険会社への事故報告<br>
+・法令に基づく官公署からの照会<br>
+上記以外の目的で第三者に提供することはありません。<br><br>
+<b>保管と削除</b><br>
+退職または契約終了後、法令で保存が義務づけられている期間が経過したのち削除します。<br><br>
+<b>ご本人の権利</b><br>
+ご自身の情報の開示、訂正、削除を求めることができます。下記までご連絡ください。<br><br>
+<b>貸与車両について（車両の貸与を受ける方のみ）</b><br>
+１．貸与された車両は、大阪急配の業務にのみ使用します<br>
+２．他人に運転させません<br>
+３．日常点検を行い、異常を認めたときは直ちに報告します<br>
+４．事故または違反を起こしたときは、直ちに大阪急配へ報告します<br>
+５．駐車違反その他の反則金は、運転者本人の負担とします<br>
+６．契約終了時は速やかに返却します<br><br>
+<b>安全運転の誓約</b><br>
+１．道路交通法その他の法令を遵守します<br>
+２．酒気を帯びた状態、薬物の影響下、過度の疲労がある状態では運転しません<br>
+３．運転中に携帯電話を手に持って使用しません<br>
+４．定められた点呼または始業前の確認に応じます<br><br>
+` + CONSENT_CONTACT,
+  co: `
+<b>個人情報の取扱いについて</b><br>
+大阪急配株式会社は、お客様のご所属先へ業務の一部を委託しており、その業務の遂行に必要な範囲でお客様の情報をお預かりします。<br>
+なお、ご所属先との委託契約において、ご所属先はお客様の個人情報を当社へ提供することについてご本人の同意を得るものと定めています。<br><br>
+<b>利用目的</b><br>
+１．従事員および車両の管理<br>
+２．委託元または荷主（お客様の担当する業務の発注者）への届出、報告、および提出書類の作成<br>
+３．運転免許証その他の資格・保険の有効期限の管理<br>
+４．業務の割当、実績の集計、委託料の計算と支払<br>
+５．事故・違反・苦情が発生した際の事実確認と対応<br><br>
+<b>お預かりする情報</b><br>
+氏名、フリガナ、生年月日、住所、電話番号／運転免許証の番号・種類・条件・有効期限／車両のナンバー・車種・色・分類／運転免許証・車検証・保険証書などの画像<br><br>
+<b>第三者への提供</b><br>
+次の場合に、必要な範囲で提供します。提供する項目は、提供先が求める範囲に限ります。<br>
+・お客様が担当する業務の<b>委託元または荷主</b>（配送先の企業、郵便局など）への提出および報告。担当する業務によって提供先は異なります<br>
+・ご所属の会社への確認および連絡<br>
+・保険会社への事故報告<br>
+・法令に基づく官公署からの照会<br>
+上記以外の目的で第三者に提供することはありません。<br><br>
+<b>保管と削除</b><br>
+ご所属の会社との委託契約が終了し、または業務への従事を終えたのち、法令で保存が義務づけられている期間が経過した時点で削除します。<br><br>
+<b>お問い合わせ</b><br>
+情報の開示、訂正、削除のご希望は、ご所属の会社または下記までご連絡ください。<br><br>
+` + CONSENT_CONTACT
+};
+
+function sfPaintConsent(){
+  const who = (sfWho==='co') ? 'co' : 'own';
+  const body=document.getElementById('sf-consent-body');
+  const title=document.getElementById('sf-consent-title');
+  const label=document.getElementById('sf-consent-label');
+  if(body) body.innerHTML = CONSENT_TEXT[who];
+  if(title) title.textContent = (who==='co')
+    ? '個人情報の取扱いについて' : '同意事項（個人情報・貸与車両・安全運転）';
+  if(label) label.textContent = (who==='co')
+    ? '上記の個人情報の取扱いに同意します'
+    : '上記の個人情報の取扱い、貸与車両の取扱い、安全運転の誓約に同意します';
+  const cb=document.getElementById('sf-consent');
+  if(cb) cb.checked=false;
+  sfCheckMinor();
+}
+function sfConsentChanged(){ /* 送信時に確認するため、ここでは何もしない */ }
+
+/* ★ 2026/09/17: 18歳未満なら親権者の同意欄を出す。
+   断ることはないとのことなので、実際に起こりうる。 */
+function sfIsMinor(birthRaw){
+  const b = normalizeBirthDate(birthRaw||'');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(b)) return false;
+  const d = new Date(b+'T00:00:00');
+  if(isNaN(d)) return false;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if(m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age < 18;
+}
+function sfCheckMinor(){
+  const box=document.getElementById('sf-minor-box');
+  if(!box) return;
+  const el=document.getElementById('sf-birth');
+  const show = (sfMode==='new') && el && sfIsMinor(el.value);
+  box.style.display = show ? 'block' : 'none';
 }
 
 function sfSetMode(mode){
@@ -8059,6 +8206,7 @@ function sfSetMode(mode){
   if(kReq1)kReq1.style.display=isNew?'inline':'none';
   if(kReq2)kReq2.style.display=isNew?'inline':'none';
   document.getElementById('sf-subtitle').textContent = isNew ? '新規登録フォーム' : '書類提出フォーム';
+  try{ sfCheckMinor(); }catch(e){}
 }
 
 function sfDragOver(e){e.preventDefault();document.getElementById('sf-upload').classList.add('drag-over');}
@@ -8419,6 +8567,29 @@ async function submitSelfForm(){
       files:sfFiles.map(f=>({name:f.name,category:f.category||'',otherName:f.otherName||'',dataUrl:f.dataUrl.slice(0,200)}))
     };
   }
+
+  /* ★ 2026/09/17: 同意の確認と記録。
+     どの版に、いつ、どの立場（自社／委託）で同意したかを残す。 */
+  const _consentEl=document.getElementById('sf-consent');
+  if(!_consentEl||!_consentEl.checked){
+    errEl.textContent='同意事項をご確認のうえ、チェックを入れてください';
+    try{ document.getElementById('sf-consent-group').scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){}
+    return;
+  }
+  let _guardian=null;
+  if(sfMode==='new' && sfIsMinor(document.getElementById('sf-birth')?.value)){
+    const gn=(document.getElementById('sf-guardian-name')?.value||'').trim();
+    const gt=formatPhone((document.getElementById('sf-guardian-tel')?.value||'').trim());
+    const gc=document.getElementById('sf-guardian-consent')?.checked;
+    if(!gn){ errEl.textContent='親権者の氏名を入力してください'; return; }
+    if(!gt){ errEl.textContent='親権者の電話番号を入力してください'; return; }
+    if(!gc){ errEl.textContent='親権者の同意にチェックを入れてください'; return; }
+    _guardian={ name:gn, tel:gt, consentAt:new Date().toISOString() };
+  }
+  payload.consentVersion = CONSENT_VER;
+  payload.consentAt      = new Date().toISOString();
+  payload.consentType    = (sfWho==='co') ? 'co' : 'own';
+  if(_guardian) payload.guardian = _guardian;
 
   document.getElementById('sf-submit').disabled=true;
   document.getElementById('sf-submit').textContent='送信中...';
