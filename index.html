@@ -868,7 +868,8 @@ body.modal-open{overflow:hidden}
           <div id="mail-inbox-section" style="display:none">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
               <div style="font-size:12px;color:#888">QRフォームからの受信データ</div>
-              <button class="btn btn-sm" onclick="syncInboxFromSheet().then(()=>{renderInbox();alert('受信ボックスを更新しました')})">受信更新</button>
+              <!-- ★ 2026/09/18: 受信と送信履歴をまとめて更新する -->
+              <button class="btn btn-sm" onclick="refreshMailAll(this)">送受信を更新</button>
             </div>
             <div id="inbox-list"></div>
           </div>
@@ -2047,29 +2048,65 @@ async function syncFromSheet(){
   }catch(e){setSyncStatus('読み込みエラー','sync-err');}
 }
 
+/* ★ 2026/09/18: 受信ボックスをサーバー基準にそろえる。
+   これまでは「サーバーに有ってこの端末に無いもの」を足すだけだったため、
+   状態の変更（未確認→登録済）も、他の端末での削除も反映されなかった。
+   削除は fleet_inbox_deleted という端末ごとのリストで隠していたので、
+   「消したのに別の端末では残っている」「別の端末で消えたのにここでは残る」
+   という食い違いが起きていた。
+   サーバー（inboxシート）を正とし、この端末の内容をそれに合わせる。
+   端末側だけが持つ情報（どのドライバーとして登録したか等）は引き継ぐ。 */
+/* ★ 2026/09/18: 受信ボックスと送信履歴をまとめて取り込む。
+   別々に押すのが手間で、片方だけ古いまま見てしまうことがあるため。 */
+async function refreshMailAll(btn){
+  const label = btn ? btn.textContent : '';
+  if(btn){ btn.disabled=true; btn.textContent='更新中...'; }
+  let okIn=false, okHist=false;
+  try{ okIn = await syncInboxFromSheet(); }catch(e){}
+  try{ okHist = await loadMailHistoryFromServer(true); }catch(e){}
+  try{ renderInbox(); }catch(e){}
+  try{ renderMailHistory(); }catch(e){}
+  if(btn){ btn.disabled=false; btn.textContent = label || '送受信を更新'; }
+  if(okIn || okHist){
+    const n=(JSON.parse(localStorage.getItem('fleet_inbox')||'[]')).filter(i=>i&&i.status==='未確認').length;
+    alert('更新しました。' + (n ? '\n未確認が '+n+'件 あります。' : ''));
+  }else{
+    alert('更新できませんでした。通信をご確認ください。');
+  }
+}
+
 async function syncInboxFromSheet(){
   try{
     const res = await fetch(API_URL+'?action=getInbox');
     const json = await res.json();
-    if(!json.ok || !json.inbox?.length) return;
+    if(!json.ok || !Array.isArray(json.inbox)) return false;
 
-    // ローカルのinboxと統合（idで重複除去、GAS側が新しければ追加）
     const localInbox = JSON.parse(localStorage.getItem('fleet_inbox')||'[]');
-    const localIds = new Set(localInbox.map(i=>String(i.id)));
-    const deletedIds=new Set(JSON.parse(localStorage.getItem('fleet_inbox_deleted')||'[]'));
-    const newItems = json.inbox.filter(i => !localIds.has(String(i.id)) && !deletedIds.has(String(i.id)));
-    if(newItems.length){
-      const merged = [...newItems, ...localInbox]
-        .sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp))
-        .slice(0,200);
-      localStorage.setItem('fleet_inbox', JSON.stringify(merged));
-      renderInbox();
-      // バッジ更新
-      const unread = merged.filter(i=>i.status==='未確認').length;
-      const badge = document.getElementById('inbox-badge');
-      if(badge) badge.textContent = unread ? String(unread) : '';
-    }
-  }catch(e){ console.log('inbox sync error:', e); }
+    const localById = {};
+    localInbox.forEach(i=>{ if(i) localById[String(i.id)] = i; });
+
+    const merged = json.inbox.map(srv=>{
+      const loc = localById[String(srv.id)] || {};
+      // 端末側にしか無い情報は残す（サーバーは状態しか持っていない）
+      return Object.assign({}, srv, {
+        _registeredId:        srv._registeredId        || loc._registeredId,
+        _registeredKind:      srv._registeredKind      || loc._registeredKind,
+        _registeredVehicleId: srv._registeredVehicleId || loc._registeredVehicleId,
+      });
+    }).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).slice(0,300);
+
+    localStorage.setItem('fleet_inbox', JSON.stringify(merged));
+    // 端末ごとの削除リストはもう使わない（サーバーの有無で決まる）
+    try{ localStorage.removeItem('fleet_inbox_deleted'); }catch(e){}
+
+    renderInbox();
+    const unread = merged.filter(i=>i.status==='未確認').length;
+    const badge = document.getElementById('inbox-badge');
+    if(badge) badge.textContent = unread ? String(unread) : '';
+    const nav = document.getElementById('inbox-nav-badge');
+    if(nav) nav.textContent = unread ? String(unread) : '';
+    return true;
+  }catch(e){ console.log('inbox sync error:', e); return false; }
 }
 // ★ 2026/07/25 ①: 旧・手動保存ルート。書き込みは saveToServer() に一本化したため
 //   ここは委譲のみ。競合検知つきの独自POSTは廃止(古い手元データで上書きする原因だった)。
@@ -2748,6 +2785,10 @@ async function doLogin(){
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-screen').style.display='block';
     renderAll();syncAll(false);
+    /* ★ 2026/09/18: ログインした時点で、受信ボックスと送信履歴をまとめて取り込む。
+       毎回「受信更新」を押すのが手間で、押し忘れると古い内容を見ることになる。 */
+    try{ syncInboxFromSheet(); }catch(e){}
+    try{ loadMailHistoryFromServer(true); }catch(e){}
     try{ showPage('dashboard', document.querySelector('.nav-item[data-page="dashboard"]')); }catch(e){}
     return;
   }
@@ -2777,6 +2818,9 @@ async function doLogin(){
       addLog('ログイン','Sheet同期後パスワード認証成功');resetSessionTimer();
       document.getElementById('app-screen').style.display='block';
       renderAll();syncAll(false);
+      // ★ 2026/09/18: こちらの経路でも受信ボックスと送信履歴を取り込む
+      try{ syncInboxFromSheet(); }catch(e){}
+      try{ loadMailHistoryFromServer(true); }catch(e){}
       try{ showPage('dashboard', document.querySelector('.nav-item[data-page="dashboard"]')); }catch(e){}
     } else {
       recordLoginAttempt(false);
@@ -5047,6 +5091,7 @@ function recordMailHistory(info){
       attachments: Array.isArray(info.attachments) ? info.attachments : [],
       result: info.result || 'sent', // sent / error
       sender: info.sender || '',     // ★ 2026/09/18: 差出人（GAS側で補完される）
+      files: Array.isArray(info.files) ? info.files : [],  // ★ 送ったファイル（id と名前）
     });
     // 1年以上前は自動削除
     const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear()-1);
@@ -5088,7 +5133,8 @@ async function loadMailHistoryFromServer(force){
         body: it.body || '',
         attachments: Array.isArray(it.attachments) ? it.attachments : [],
         result: it.result || 'sent',
-        sender: it.sender || ''
+        sender: it.sender || '',
+        files: Array.isArray(it.files) ? it.files : []   // ★ 送ったファイル
       };
     });
     mailSentHistory = Object.values(byId)
@@ -5142,6 +5188,7 @@ function renderMailHistory(){
           <div style="font-size:12px;font-weight:600;color:#222;margin-bottom:2px;overflow-wrap:anywhere;">${esc_f(h.subject||'(件名なし)')}</div>
           <div style="font-size:10.5px;color:#666;word-break:break-all;overflow-wrap:anywhere;">宛先: ${esc_f(h.to||'-')}${attCount?` ／ 添付対象: ${attCount}名`:''}</div>
           ${h.sender?`<div style="font-size:10px;color:#999;word-break:break-all;">差出人: ${esc_f(h.sender)}</div>`:''}
+          ${(h.files||[]).length?`<div style="font-size:10px;color:#1565c0;">📎 送信したPDF ${(h.files||[]).length}件（内容を見るから開けます）</div>`:''}
         </div>
         <button onclick="_showMailHistoryDetail('${h.id}')" style="font-size:10px;padding:4px 10px;border:1px solid #ccc;border-radius:6px;background:#f7f7f5;cursor:pointer;white-space:nowrap;">内容を見る</button>
       </div>
@@ -5171,6 +5218,22 @@ function _showMailHistoryDetail(id){
       ${h.sender?`<div style="margin-bottom:8px;"><span style="color:#888;">差出人：</span>${esc_f(h.sender)}</div>`:''}
       <div style="margin-bottom:8px;"><span style="color:#888;">件名：</span>${esc_f(h.subject||'-')}</div>
       <div style="margin-bottom:8px;"><span style="color:#888;">添付対象：</span>${att}</div>
+      ${(h.files||[]).length ? `
+        <!-- ★ 2026/09/18: 送信したPDFをその場で開けるようにする -->
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #eee;">
+          <div style="color:#888;margin-bottom:6px;">送信したPDF（${(h.files||[]).length}件）</div>
+          ${(h.files||[]).map(f=>`
+            <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid #eee;
+                 border-radius:6px;margin-bottom:5px;background:#fafafa;">
+              <span style="flex:1;min-width:0;font-size:11.5px;overflow-wrap:anywhere;">📄 ${esc_f(f.name||'ファイル')}</span>
+              <a href="https://drive.google.com/file/d/${esc_f(f.id)}/view" target="_blank" rel="noopener"
+                 style="font-size:10.5px;padding:4px 10px;border:1px solid #1565c0;border-radius:6px;
+                        color:#1565c0;text-decoration:none;white-space:nowrap;">開く</a>
+            </div>`).join('')}
+          <div style="font-size:10px;color:#999;margin-top:4px;line-height:1.6;">
+            Googleドライブで開きます。ファイルが削除されている場合は表示できません。
+          </div>
+        </div>` : ''}
       <div style="margin-bottom:8px;"><span style="color:#888;">結果：</span>${h.result==='error'?'<span style="color:#c0392b;font-weight:700">送信失敗</span>':'<span style="color:#1a8a5f;font-weight:700">送信済</span>'}</div>
       <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eee;">
         <div style="color:#888;margin-bottom:6px;">本文：</div>
@@ -11774,17 +11837,26 @@ function execInboxBulkSave(ids, targetVal){
   renderInbox(); renderFileMgr();
 }
 
-function deleteInboxItem(id){
-  if(!confirm('この受信データを削除しますか？'))return;
+/* ★ 2026/09/18: 削除は全端末に反映させる。
+   サーバーから消えて初めて削除とし、失敗したら元に戻す。
+   これまでは端末ごとの削除リストで隠すだけだったので、
+   他の端末には残り続けていた。 */
+async function deleteInboxItem(id){
+  if(!confirm('この受信データを削除しますか？\n\nすべての端末から削除されます。'))return;
   const inbox=JSON.parse(localStorage.getItem('fleet_inbox')||'[]');
-  const filtered=inbox.filter(i=>i.id!==id);
+  const filtered=inbox.filter(i=>String(i.id)!==String(id));
   localStorage.setItem('fleet_inbox',JSON.stringify(filtered));
-  // ★ 削除済みIDリストに追加（復活防止）
-  const deletedIds=JSON.parse(localStorage.getItem('fleet_inbox_deleted')||'[]');
-  deletedIds.push(String(id));
-  localStorage.setItem('fleet_inbox_deleted',JSON.stringify(deletedIds));
   renderInbox();
-  fetch(API_URL,{method:'POST',body:JSON.stringify({action:'deleteInbox',id})}).catch(()=>{});
+  try{
+    const r=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'deleteInbox',id})});
+    const j=await r.json();
+    if(!j||!j.ok) throw new Error((j&&j.error)||'削除できませんでした');
+  }catch(e){
+    // 戻す（画面から消えたまま他の端末に残る、という食い違いを避ける）
+    localStorage.setItem('fleet_inbox',JSON.stringify(inbox));
+    renderInbox();
+    alert('削除できませんでした。通信をご確認ください。\n\n'+(e.message||''));
+  }
 }
 
 function restoreInboxItem(id){
@@ -11797,8 +11869,11 @@ function restoreInboxItem(id){
   delete item._registeredKind;
   delete item._registeredVehicleId;
   localStorage.setItem('fleet_inbox',JSON.stringify(inbox));
-  fetch(API_URL,{method:'POST',body:JSON.stringify({action:'updateInboxStatus',id,status:'未確認'})}).catch(()=>{});
   renderInbox();
+  // ★ 2026/09/18: 状態の変更を全端末へ。失敗したら知らせる
+  fetch(API_URL,{method:'POST',body:JSON.stringify({action:'updateInboxStatus',id,status:'未確認'})})
+    .then(r=>r.json()).then(j=>{ if(!j||!j.ok) throw 0; })
+    .catch(()=>{ alert('状態の変更を他の端末へ反映できませんでした。通信をご確認ください。'); });
 }
 
 function markInboxRegistered(id){
@@ -11808,7 +11883,10 @@ function markInboxRegistered(id){
   if(!item) return;
   item.status='登録済';
   localStorage.setItem('fleet_inbox',JSON.stringify(inbox));
-  fetch(API_URL,{method:'POST',body:JSON.stringify({action:'updateInboxStatus',id,status:'登録済'})}).catch(()=>{});
+  // ★ 2026/09/18: 状態の変更を全端末へ。失敗したら知らせる
+  fetch(API_URL,{method:'POST',body:JSON.stringify({action:'updateInboxStatus',id,status:'登録済'})})
+    .then(r=>r.json()).then(j=>{ if(!j||!j.ok) throw 0; })
+    .catch(()=>{ alert('状態の変更を他の端末へ反映できませんでした。通信をご確認ください。'); });
   renderInbox();
 }
 
@@ -14134,13 +14212,21 @@ async function sendMail(){
         : '添付'+fileIds.length+'件を送信しました')
       + '\n宛先: ' + to, true);
     // ★ 2026/06/30: メール送信履歴(内容含む)に記録
-    try{ recordMailHistory({office, to, subject, body, attachments:[`PDF/添付 ${fileIds.length}件`], result:'sent'}); }catch(e){}
+    /* ★ 2026/09/18: 何を送ったか後から開けるように、ファイルのIDも残す。
+       これまでは「PDF/添付 9件」という文字列だけで、中身を確認できなかった。 */
+    try{ recordMailHistory({office, to, subject, body,
+      attachments:[`PDF/添付 ${fileIds.length}件`],
+      files: fileIds.map((id,i)=>({ id, name: attachNames[i] || ('ファイル'+(i+1)) })),
+      result:'sent'}); }catch(e){}
     closeModal('mail-modal');
     const tag = document.getElementById('doc-tag')?.value||'定期（3ヶ月）';
     recordHistory(office, [{name:'メール送信_'+subject, fileIds:fileIds}], tag);
   } else {
     // ★ 一部でも失敗した場合も履歴に残す(失敗として)
-    try{ recordMailHistory({office, to, subject, body, attachments:[`PDF/添付 ${fileIds.length}件`], result:'error'}); }catch(e){}
+    try{ recordMailHistory({office, to, subject, body,
+      attachments:[`PDF/添付 ${fileIds.length}件`],
+      files: fileIds.map((id,i)=>({ id, name: attachNames[i] || ('ファイル'+(i+1)) })),
+      result:'error'}); }catch(e){}
     mailProgressDone(
       totalParts+'通のうち '+successCount+'通を送信しました。\n'
       +'残りは送信できていません。「送信履歴」でご確認ください。', false);
@@ -15070,7 +15156,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.07.29-a';
+var FLEET_VERSION = '2026.09.18-a';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
@@ -15085,6 +15171,45 @@ var FLEET_VERSION = '2026.07.29-a';
   if(document.body) put(); else document.addEventListener('DOMContentLoaded',put);
   console.log('%cフリート管理 v'+FLEET_VERSION,'color:#0a0;font-weight:bold');
 })();
+
+/* ★ 2026/09/18: 新しい版が出ていたら自動で読み直す。
+   スマホ（特にホーム画面に追加したもの）は古いファイルを強く保持するため、
+   差し替えても反映されず「PCでは直っているのにスマホは変わらない」が起きる。
+   計数アプリと同じ方法で、自分自身を no-store で取り直して版を比べ、
+   違えば ?u=時刻 を付けて開き直す。クエリが変わるのでキャッシュを迂回できる。
+   入力中や送信中に画面が切り替わると困るので、そのときは見送る。 */
+async function fleetCheckUpdate(){
+  try{
+    // 入力中・送信中・モーダルが開いているときは動かさない
+    if(document.getElementById('mail-progress')) return;
+    if(typeof isDirty!=='undefined' && isDirty) return;
+    const ae=document.activeElement;
+    if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
+    if(document.querySelector('.modal-bg')) return;
+
+    const r=await fetch(location.pathname+'?chk='+Date.now(),{cache:'no-store'});
+    const t=await r.text();
+    const m=t.match(/FLEET_VERSION = '([^']+)'/);
+    if(!m || m[1]===FLEET_VERSION) return;
+    // 一度試して変わらなければ、無限に開き直さず画面で知らせる
+    if(sessionStorage.getItem('fleet-upd-try')===m[1]){
+      const d=document.getElementById('fleet-ver');
+      if(d){
+        d.textContent='v'+FLEET_VERSION+'（新しい版 '+m[1]+' あり／開き直してください）';
+        d.style.color='#c0392b'; d.style.background='rgba(255,235,235,.95)';
+      }
+      return;
+    }
+    sessionStorage.setItem('fleet-upd-try',m[1]);
+    const d=document.getElementById('fleet-ver');
+    if(d){ d.textContent='新しい版に更新しています…'; d.style.color='#1565c0'; }
+    setTimeout(()=>location.replace(location.pathname+'?u='+Date.now()),500);
+  }catch(e){}
+}
+setTimeout(fleetCheckUpdate,2000);
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible') setTimeout(fleetCheckUpdate,1000);
+});
 
 // この端末の手元データを捨て、サーバーの内容で作り直す(コンソール用)
 function forceReloadFromServer(){
