@@ -13767,6 +13767,97 @@ function mailFilterDrivers(office,filter){
   });
 }
 
+/* ══ ★ 2026/09/18: 書類の生成と送信の進捗を全画面で見せる ══
+   これまではボタンの文字が変わるだけで、スマホでは押せたかどうかも
+   分かりにくかった。添付が多いと1分近くかかるため、何が起きているか
+   見えないと「固まった」と思って押し直し、二重送信につながる。
+   段階（生成中／送信中）と何件目かを大きく出し、途中で止められるようにする。 */
+let _mailAbort = null;      // 中断の合図
+let _mailStep  = { phase:'', now:0, total:0, detail:'' };
+
+function mailProgressOpen(){
+  _mailAbort = false;
+  let ov = document.getElementById('mail-progress');
+  if(ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'mail-progress';
+  ov.style.cssText =
+    'position:fixed;inset:0;z-index:99999;background:rgba(20,22,26,.92);'+
+    'display:flex;flex-direction:column;align-items:center;justify-content:center;'+
+    'padding:24px;color:#fff;font-family:inherit;';
+  ov.innerHTML = `
+    <div style="width:100%;max-width:420px;text-align:center">
+      <div id="mp-spin" style="width:54px;height:54px;margin:0 auto 20px;border:4px solid rgba(255,255,255,.22);
+           border-top-color:#fff;border-radius:50%;animation:mpspin 1s linear infinite"></div>
+      <div id="mp-phase" style="font-size:19px;font-weight:700;letter-spacing:.04em;margin-bottom:8px">準備しています</div>
+      <div id="mp-detail" style="font-size:13px;opacity:.85;line-height:1.7;margin-bottom:18px;word-break:break-all">　</div>
+      <div style="height:8px;background:rgba(255,255,255,.18);border-radius:4px;overflow:hidden;margin-bottom:8px">
+        <div id="mp-bar" style="height:100%;width:0%;background:#fff;border-radius:4px;transition:width .3s"></div>
+      </div>
+      <div id="mp-count" style="font-size:12px;opacity:.75;margin-bottom:22px">　</div>
+      <div style="font-size:11.5px;opacity:.6;line-height:1.8;margin-bottom:18px">
+        添付が多いと1分ほどかかることがあります。<br>
+        この画面のままお待ちください。
+      </div>
+      <button id="mp-cancel" onclick="mailProgressCancel()"
+        style="padding:11px 28px;border:1px solid rgba(255,255,255,.5);border-radius:8px;
+               background:transparent;color:#fff;font-size:13px;font-weight:600;cursor:pointer">
+        中止する
+      </button>
+    </div>
+    <style>@keyframes mpspin{to{transform:rotate(360deg)}}</style>`;
+  document.body.appendChild(ov);
+}
+function mailProgressSet(phase, now, total, detail){
+  _mailStep = { phase, now, total, detail };
+  const p=document.getElementById('mp-phase');
+  const d=document.getElementById('mp-detail');
+  const b=document.getElementById('mp-bar');
+  const c=document.getElementById('mp-count');
+  if(p) p.textContent = phase;
+  if(d) d.textContent = detail || '　';
+  if(total>0){
+    const pct = Math.min(100, Math.round(now/total*100));
+    if(b) b.style.width = pct+'%';
+    if(c) c.textContent = now+' / '+total;
+  }else{
+    if(b) b.style.width = '0%';
+    if(c) c.textContent = '　';
+  }
+}
+function mailProgressCancel(){
+  if(!confirm('処理を中止しますか？\n\nすでに送信を始めているぶんは止められません。\n'
+    +'送信済みかどうかは「送信履歴」でご確認ください。')) return;
+  _mailAbort = true;
+  const p=document.getElementById('mp-phase');
+  const d=document.getElementById('mp-detail');
+  const btn=document.getElementById('mp-cancel');
+  if(p) p.textContent='中止しています';
+  if(d) d.textContent='いま実行中のぶんが終わるまでお待ちください';
+  if(btn){ btn.disabled=true; btn.style.opacity='.4'; }
+}
+function mailProgressDone(msg, ok){
+  const ov=document.getElementById('mail-progress');
+  if(!ov) return;
+  const sp=document.getElementById('mp-spin');
+  if(sp) sp.style.display='none';
+  const p=document.getElementById('mp-phase');
+  const d=document.getElementById('mp-detail');
+  const b=document.getElementById('mp-bar');
+  const c=document.getElementById('mp-count');
+  const btn=document.getElementById('mp-cancel');
+  if(p){ p.textContent = ok ? '送信しました' : '中止しました'; p.style.color = ok ? '#7ee2a8' : '#ffcc80'; }
+  if(d) d.textContent = msg || '';
+  if(b){ b.style.width='100%'; b.style.background = ok ? '#7ee2a8' : '#ffcc80'; }
+  if(c) c.textContent='　';
+  if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.textContent='閉じる';
+    btn.onclick=()=>{ const o=document.getElementById('mail-progress'); if(o) o.remove(); }; }
+}
+function mailProgressClose(){
+  const ov=document.getElementById('mail-progress');
+  if(ov) ov.remove();
+}
+
 async function sendMail(){
   const to = document.getElementById('mail-to').value.trim();
   if(!to){ alert('宛先メールアドレスを入力してください'); return; }
@@ -13835,10 +13926,18 @@ async function sendMail(){
     if(!confirm(confirmMsg)){ btn.disabled=false; btn.textContent='送信する'; return; }
   }
 
+  // ★ 2026/09/18: ここから全画面で進捗を出す
+  mailProgressOpen();
+  const _docName = t=>({genkyo:'現況届',koyou:'雇用証明書',houkoku:'報告書'}[t]||t);
+
   // Step1: PDF生成（現況届・雇用証明書等）
   if(pdfTypes.length){
-    btn.textContent = 'PDF生成中...';
+    let _pi=0;
     for(const docType of pdfTypes){
+      if(_mailAbort){ mailProgressDone('書類の生成を中止しました。メールは送信していません。', false);
+        btn.disabled=false; btn.textContent='送信する'; return; }
+      _pi++;
+      mailProgressSet('書類を作成しています', _pi, pdfTypes.length, _docName(docType));
       try{
         const offD = drivers.filter(d=>belongsToOffice(d,office)&&(!d.status||d.status==='在籍'));
         const offV = vehicles.filter(v=>belongsToOffice(v,office)&&(!v.status||v.status==='稼働'));
@@ -13883,10 +13982,13 @@ async function sendMail(){
   });
 
   if(subTargets.length && subDocTypes.length){
-    btn.textContent = '再委託先書類生成中...';
     for(var si=0;si<subTargets.length;si++){
+      // ★ 2026/09/18: ここでも中止を受け付ける
+      if(_mailAbort){ mailProgressDone('書類の生成を中止しました。メールは送信していません。', false);
+        btn.disabled=false; btn.textContent='送信する'; return; }
       var st=subTargets[si];
-      btn.textContent='再委託先書類 ('+(si+1)+'/'+subTargets.length+') '+st.driverName+'...';
+      mailProgressSet('再委託先の書類を作成しています', si+1, subTargets.length,
+        (st.driverName||st.companyName||''));
 
       var targetDriver=null;
       if(st.type==='person'){
@@ -13974,9 +14076,15 @@ async function sendMail(){
     const partSubject = totalParts > 1 ? subject + ' (' + (part+1) + '/' + totalParts + ')' : subject;
     const partBody = totalParts > 1 && part > 0 ? '※ 添付ファイルが多いため分割送信しています（' + (part+1) + '/' + totalParts + '通目）\n\n' + body : body;
 
-    btn.textContent = totalParts > 1
-      ? `送信中（${part+1}/${totalParts}通目 添付${chunk.length}件）...`
-      : `送信中（添付${chunk.length}件）...`;
+    // ★ 2026/09/18: 送信の進捗も全画面に出す
+    if(_mailAbort && part>0){
+      mailProgressDone(part+'通目まで送信済みです。残りは中止しました。\n'
+        +'送信済みの内容は「送信履歴」でご確認ください。', false);
+      btn.disabled=false; btn.textContent='送信する'; return;
+    }
+    mailProgressSet('メールを送信しています', part, totalParts,
+      (totalParts>1 ? (part+1)+'通目 ' : '') + '添付' + chunk.length + '件'
+      + (chunk.length ? '　ファイルを添えています' : ''));
 
     /* ★ 2026/09/18: 送信を始めた時点で記録する。
        応答を受け取ってから記録すると、接続が切れたときに残らず、
@@ -14000,10 +14108,15 @@ async function sendMail(){
       });
       const json = await res.json();
       if(json.ok) successCount++;
-      else alert('❌ 送信エラー（' + (part+1) + '通目）: ' + (json.error||'不明'));
+      else {
+        // ★ 2026/09/18: 全画面の進捗を出したままだと何も見えないので閉じてから知らせる
+        mailProgressClose();
+        alert('送信エラー（' + (part+1) + '通目）: ' + (json.error||'不明'));
+      }
     }catch(e){
       /* ★ 2026/09/18: 通信が切れても、送信自体は完了していることが多い。
          「失敗した」と思って押し直すと二重に届くので、確認を促す。 */
+      mailProgressClose();
       alert('通信が途中で切れました（' + (part+1) + '通目）。\n\n'
         +'添付が多いと応答を受け取る前に接続が切れますが、\n'
         +'メールは送信されている場合があります。\n\n'
@@ -14013,9 +14126,13 @@ async function sendMail(){
   }
 
   if(successCount === totalParts){
-    alert(totalParts > 1
-      ? `メールを${totalParts}通に分割して送信しました（合計添付${fileIds.length}件）`
-      : `メールを送信しました（添付${fileIds.length}件）`);
+    // ★ 2026/09/18: 送信できたことが分かるように全画面で知らせる
+    mailProgressSet('送信しました', totalParts, totalParts, '');
+    mailProgressDone(
+      (totalParts > 1
+        ? totalParts+'通に分けて送信しました（合計添付'+fileIds.length+'件）'
+        : '添付'+fileIds.length+'件を送信しました')
+      + '\n宛先: ' + to, true);
     // ★ 2026/06/30: メール送信履歴(内容含む)に記録
     try{ recordMailHistory({office, to, subject, body, attachments:[`PDF/添付 ${fileIds.length}件`], result:'sent'}); }catch(e){}
     closeModal('mail-modal');
@@ -14024,6 +14141,9 @@ async function sendMail(){
   } else {
     // ★ 一部でも失敗した場合も履歴に残す(失敗として)
     try{ recordMailHistory({office, to, subject, body, attachments:[`PDF/添付 ${fileIds.length}件`], result:'error'}); }catch(e){}
+    mailProgressDone(
+      totalParts+'通のうち '+successCount+'通を送信しました。\n'
+      +'残りは送信できていません。「送信履歴」でご確認ください。', false);
   }
 
   btn.disabled = false; btn.textContent = '送信する';
