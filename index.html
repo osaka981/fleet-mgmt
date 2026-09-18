@@ -12,8 +12,8 @@
 <link rel="apple-touch-icon" sizes="180x180">
 <title>フリート管理</title>
 <style>
-:root{--bg:#f7f4f2;--bg-card:#ffffff;--bg-input:#faf8f7;--bg-sidebar:#ffffff;--text:#463830;--text-sub:#7a6157;--border:#e7ddd7;--topbar-bg:#8b5e4a;--topbar-text:#f6ece6;--modal-bg:rgba(40,28,22,.45);--hover:#f7f2ef;--accent:#8b5e4a;--danger:#b3261e;--warn:#c98a14;--ok:#1d7a52;--bg-danger:#fbe9e7;--bg-warn:#fbeacf;--bg-ok:#e6f4ec}
-.dark-mode{--bg:#16191d;--bg-card:#1e2227;--bg-input:#23282e;--bg-sidebar:#1c2025;--text:#e6e8ea;--text-sub:#9aa5b1;--border:#2e343b;--topbar-bg:#4a352b;--topbar-text:#f6ece6;--modal-bg:rgba(0,0,0,.65);--hover:#262c33;--accent:#c9906f;--danger:#f2857c;--warn:#e5b45c;--ok:#5fc79a;--bg-danger:#3d1f1c;--bg-warn:#3a2b12;--bg-ok:#123528}
+:root{--bg:#f0efec;--bg-card:#ffffff;--bg-input:#f7f6f3;--bg-sidebar:#ffffff;--text:#33322f;--text-sub:#6b6a65;--border:#e2e0da;--topbar-bg:#33322f;--topbar-text:#f2f1ee;--modal-bg:rgba(30,30,28,.45);--hover:#f4f3f0;--accent:#33322f;--accent-soft:#6b6a65;--danger:#b3261e;--warn:#c98a14;--ok:#1d7a52;--bg-danger:#fbe9e7;--bg-warn:#fbeacf;--bg-ok:#e6f4ec}
+.dark-mode{--bg:#17181a;--bg-card:#1f2123;--bg-input:#26282b;--bg-sidebar:#1c1e20;--text:#e8e7e4;--text-sub:#9d9c98;--border:#323538;--topbar-bg:#2c2e31;--topbar-text:#f2f1ee;--modal-bg:rgba(0,0,0,.65);--hover:#282b2e;--accent:#cfcdc7;--accent-soft:#9d9c98;--danger:#f2857c;--warn:#e5b45c;--ok:#5fc79a;--bg-danger:#3d1f1c;--bg-warn:#3a2b12;--bg-ok:#123528}
 .dark-mode html,.dark-mode body,.dark-mode{background:var(--bg)!important;color:var(--text)!important}
 /* ★ 2026/09/18: 対応していたのは18か所だけで、大半の画面が白いままだった。
    色を直接書いている箇所が1800以上あるため全部は置き換えられないが、
@@ -28,8 +28,8 @@
 .dark-mode td{border-color:var(--border)!important}
 .dark-mode tr:hover td{background:var(--hover)!important}
 .dark-mode .btn{background:var(--bg-card)!important;color:var(--text)!important;border-color:var(--border)!important}
-.dark-mode .btn-primary{background:var(--accent)!important;color:#1a1410!important;border-color:var(--accent)!important}
-.dark-mode .btn-danger{background:var(--danger)!important;color:#1a1410!important;border-color:var(--danger)!important}
+.dark-mode .btn-primary{background:var(--accent)!important;color:#1f2123!important;border-color:var(--accent)!important}
+.dark-mode .btn-danger{background:var(--danger)!important;color:#1f2123!important;border-color:var(--danger)!important}
 .dark-mode .modal,.dark-mode .modal-content{background:var(--bg-card)!important;color:var(--text)!important}
 .dark-mode .filter-chip{color:var(--text-sub)!important}
 .dark-mode .filter-chip.active{color:var(--text)!important}
@@ -87,12 +87,12 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f
 .dark-mode .login-sub,.dark-mode .login-label{color:var(--text-sub)!important}
 .dark-mode .login-input{background:var(--bg-input)!important;color:var(--text)!important;border-color:var(--border)!important}
 .dark-mode .login-input::placeholder{color:var(--text-sub)!important}
-.dark-mode .login-btn{background:var(--accent)!important;color:#1a1410!important;border-color:var(--accent)!important}
+.dark-mode .login-btn{background:var(--bg-input)!important;color:var(--text)!important;border:1px solid var(--border)!important}
 .login-label{font-size:11.5px;color:var(--text-sub);text-align:left;display:block;margin-bottom:5px;font-weight:500}
 .login-input{width:100%;padding:10px 12px;font-size:13px;border:1px solid var(--border);border-radius:7px;background:var(--bg-input);color:var(--text);font-family:inherit;letter-spacing:.15em;margin-bottom:14px}
 .login-input:focus{outline:none;border-color:#4a90e2}
 /* ★ 2026/09/18: ボタンとリンクが青のままで、クレイの配色から浮いていた */
-.login-btn{width:100%;padding:11px;font-size:13.5px;font-weight:600;border-radius:7px;border:none;background:var(--accent);color:#fff;cursor:pointer}
+.login-btn{width:100%;padding:11px;font-size:13.5px;font-weight:600;border-radius:7px;border:none;background:var(--topbar-bg);color:var(--topbar-text);cursor:pointer}
 .login-btn:hover{filter:brightness(1.06)}
 .login-btn:hover{background:#357abd}
 .login-err{font-size:11px;color:#e53935;margin-top:10px;min-height:16px}
@@ -14644,8 +14644,11 @@ function mountThemeButtons(){
   applyTheme();
 }
 initDarkMode();
-document.addEventListener('DOMContentLoaded', mountThemeButtons);
-if(document.readyState!=='loading') mountThemeButtons();
+/* ★ 2026/09/18: ヘッダー右のアイコンは一旦出さない。
+   表示モードの切り替えは、これまでどおり設定の中から行う。
+   出したくなったら下の2行を有効に戻すだけでよい。 */
+// document.addEventListener('DOMContentLoaded', mountThemeButtons);
+// if(document.readyState!=='loading') mountThemeButtons();
 
 // 住所フィールドでEnterキー → 郵便番号自動変換
 document.addEventListener('keydown',function(e){
@@ -15329,7 +15332,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.18-c';
+var FLEET_VERSION = '2026.09.18-e';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
