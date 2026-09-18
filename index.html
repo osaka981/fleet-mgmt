@@ -2179,10 +2179,39 @@ async function syncFromSheet(){
    端末側だけが持つ情報（どのドライバーとして登録したか等）は引き継ぐ。 */
 /* ★ 2026/09/18: 受信ボックスと送信履歴をまとめて取り込む。
    別々に押すのが手間で、片方だけ古いまま見てしまうことがあるため。 */
+/* ★ 2026/09/18: 郵便局からの返信を取り込む。
+   これまで返信のたびに Gmail を開く必要があった。
+   送信先として登録してあるアドレスからのものだけを対象にする
+   （GASを動かしているアカウントは個人のメールも受けるため、
+    宛先を指定しないと無関係なものまで入ってくる）。 */
+async function fetchMailReplies(){
+  try{
+    var settings = (typeof getMailSettings==='function') ? getMailSettings() : {};
+    var addrs = [];
+    Object.keys(settings).forEach(function(k){
+      String(settings[k]||'').split(/[,;\s]+/).forEach(function(a){
+        a=String(a||'').trim();
+        if(a && a.indexOf('@')>0 && addrs.indexOf(a)<0) addrs.push(a);
+      });
+    });
+    if(!addrs.length) return { ok:false, note:'送信先アドレスが登録されていません' };
+    const res = await fetch(API_URL, { method:'POST',
+      body: JSON.stringify({ action:'fetchReplies', addresses: addrs, days: 14 }) });
+    const json = await res.json();
+    if(json && json.ok && json.added) console.log('[mail] 返信を'+json.added+'件取り込みました');
+    return json || { ok:false };
+  }catch(e){
+    console.warn('[mail] 返信を取り込めませんでした', e);
+    return { ok:false, error:e.message };
+  }
+}
+
 async function refreshMailAll(btn){
   const label = btn ? btn.textContent : '';
   if(btn){ btn.disabled=true; btn.textContent='更新中...'; }
-  let okIn=false, okHist=false;
+  let okIn=false, okHist=false, added=0;
+  // ★ 2026/09/18: 先に返信を取り込んでから、受信ボックスを読み直す
+  try{ const r=await fetchMailReplies(); if(r&&r.ok) added=r.added||0; }catch(e){}
   try{ okIn = await syncInboxFromSheet(); }catch(e){}
   try{ okHist = await loadMailHistoryFromServer(true); }catch(e){}
   try{ renderInbox(); }catch(e){}
@@ -2190,7 +2219,9 @@ async function refreshMailAll(btn){
   if(btn){ btn.disabled=false; btn.textContent = label || '送受信を更新'; }
   if(okIn || okHist){
     const n=(JSON.parse(localStorage.getItem('fleet_inbox')||'[]')).filter(i=>i&&i.status==='未確認').length;
-    alert('更新しました。' + (n ? '\n未確認が '+n+'件 あります。' : ''));
+    alert('更新しました。'
+      + (added ? '\n郵便局からの返信を '+added+'件 取り込みました。' : '')
+      + (n ? '\n未確認が '+n+'件 あります。' : ''));
   }else{
     alert('更新できませんでした。通信をご確認ください。');
   }
@@ -2914,8 +2945,12 @@ async function doLogin(){
     renderAll();syncAll(false);
     /* ★ 2026/09/18: ログインした時点で、受信ボックスと送信履歴をまとめて取り込む。
        毎回「受信更新」を押すのが手間で、押し忘れると古い内容を見ることになる。 */
-    try{ syncInboxFromSheet(); }catch(e){}
-    try{ loadMailHistoryFromServer(true); }catch(e){}
+    // ★ 2026/09/18: 返信の取り込み → 受信ボックス → 送信履歴、の順で
+    (async function(){
+      try{ await fetchMailReplies(); }catch(e){}
+      try{ await syncInboxFromSheet(); }catch(e){}
+      try{ await loadMailHistoryFromServer(true); }catch(e){}
+    })();
     try{ showPage('dashboard', document.querySelector('.nav-item[data-page="dashboard"]')); }catch(e){}
     return;
   }
@@ -2946,8 +2981,11 @@ async function doLogin(){
       document.getElementById('app-screen').style.display='block';
       renderAll();syncAll(false);
       // ★ 2026/09/18: こちらの経路でも受信ボックスと送信履歴を取り込む
-      try{ syncInboxFromSheet(); }catch(e){}
-      try{ loadMailHistoryFromServer(true); }catch(e){}
+      (async function(){
+        try{ await fetchMailReplies(); }catch(e){}
+        try{ await syncInboxFromSheet(); }catch(e){}
+        try{ await loadMailHistoryFromServer(true); }catch(e){}
+      })();
       try{ showPage('dashboard', document.querySelector('.nav-item[data-page="dashboard"]')); }catch(e){}
     } else {
       recordLoginAttempt(false);
@@ -11955,6 +11993,37 @@ function renderInbox(){
 
   const renderItem = (item, isCompact) => {
     const isNew = item.mode==='new';
+    /* ★ 2026/09/18: 郵便局からの返信は、QRフォームの提出とは中身が違う。
+       件名と本文を見せ、Gmailで開くための導線を付ける。 */
+    if(item.kind==='reply'){
+      const stBadge = item.status==='登録済'
+        ? '<span style="font-size:10px;background:var(--bg-ok);color:var(--ok);padding:1px 6px;border-radius:99px">確認済</span>'
+        : '<span style="font-size:10px;background:var(--bg-warn);color:var(--warn);padding:1px 6px;border-radius:99px">未確認</span>';
+      return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px">
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <input type="checkbox" class="inbox-check" data-inbox-id="${item.id}" onchange="inboxUpdateBulkBar()" style="width:15px;height:15px;cursor:pointer;flex-shrink:0;margin-top:3px">
+          <button onclick="event.stopPropagation();toggleInboxStar('${item.id}')" title="${item.starred?'保護を外す':'お気に入り'}"
+            style="background:transparent;border:none;cursor:pointer;font-size:16px;line-height:1;padding:0 2px;flex-shrink:0;margin-top:1px;color:${item.starred?'#f5a623':'var(--text-sub)'}">${item.starred?'★':'☆'}</button>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
+              <span style="font-size:10px;background:var(--bg-input);color:var(--text-sub);padding:1px 6px;border-radius:99px">返信</span>
+              ${stBadge}
+              <span style="font-size:10px;color:var(--text-sub)">${new Date(item.timestamp).toLocaleString('ja-JP')}</span>
+            </div>
+            <div style="font-size:12.5px;font-weight:600;overflow-wrap:anywhere;margin-bottom:2px">${esc_f(item.subject||'(件名なし)')}</div>
+            <div style="font-size:10.5px;color:var(--text-sub);overflow-wrap:anywhere">${esc_f(item.name||'')}</div>
+            <div style="font-size:11.5px;color:var(--text);margin-top:5px;white-space:pre-wrap;overflow-wrap:anywhere;
+                 max-height:74px;overflow:hidden">${esc_f((item.body||'').slice(0,300))}</div>
+            ${(item.files||[]).length?`<div style="font-size:10px;color:var(--text-sub);margin-top:4px">添付 ${(item.files||[]).length}件（Gmailで確認してください）</div>`:''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+            ${item.gmailUrl?`<a href="${esc_f(item.gmailUrl)}" target="_blank" rel="noopener" style="font-size:10px;padding:3px 9px;border:1px solid var(--accent);border-radius:6px;color:var(--accent);text-decoration:none;white-space:nowrap">Gmailで開く</a>`:''}
+            ${item.status!=='登録済'?`<button class="btn btn-sm" onclick="markInboxRegistered('${item.id}')" style="font-size:10px;padding:3px 9px">確認済</button>`:''}
+            <button class="btn btn-sm btn-danger" onclick="deleteInboxItem('${item.id}')" style="font-size:10px;padding:3px 9px">削除</button>
+          </div>
+        </div>
+      </div>`;
+    }
     const fileCount = (item.files||[]).length;
     const filesHTML = fileCount ? `
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
@@ -12105,7 +12174,8 @@ function inboxBulkDelete(){
   let inbox=JSON.parse(localStorage.getItem('fleet_inbox')||'[]');
   const deletedIds=JSON.parse(localStorage.getItem('fleet_inbox_deleted')||'[]');
   ids.forEach(id=>{
-    inbox=inbox.filter(i=>i.id!==id);
+    // ★ 2026/09/18: 返信のIDは文字列なので、型を揃えて比べる
+    inbox=inbox.filter(i=>String(i.id)!==String(id));
     deletedIds.push(String(id));
     fetch(API_URL,{method:'POST',body:JSON.stringify({action:'deleteInbox',id})}).catch(()=>{});
   });
@@ -12215,7 +12285,7 @@ async function deleteInboxItem(id){
 function restoreInboxItem(id){
   if(!confirm('この項目を未確認に戻しますか？\n登録済のドライバー・車両データは削除されません。'))return;
   const inbox=JSON.parse(localStorage.getItem('fleet_inbox')||'[]');
-  const item=inbox.find(i=>i.id===id);
+  const item=inbox.find(i=>String(i.id)===String(id));
   if(!item) return;
   item.status='未確認';
   delete item._registeredId;
@@ -12232,7 +12302,8 @@ function restoreInboxItem(id){
 function markInboxRegistered(id){
   if(!confirm('この項目を「登録済」にしますか？\n（二重登録防止用）'))return;
   const inbox=JSON.parse(localStorage.getItem('fleet_inbox')||'[]');
-  const item=inbox.find(i=>i.id===id);
+  // ★ 2026/09/18: 返信のIDは文字列なので、型を揃えて比べる
+  const item=inbox.find(i=>String(i.id)===String(id));
   if(!item) return;
   item.status='登録済';
   localStorage.setItem('fleet_inbox',JSON.stringify(inbox));
@@ -12585,7 +12656,7 @@ function execInboxSave(inboxId, targetVal){
 
 function registerFromInbox(id){
   const inbox=JSON.parse(localStorage.getItem('fleet_inbox')||'[]');
-  const item=inbox.find(i=>i.id===id);
+  const item=inbox.find(i=>String(i.id)===String(id));
   if(!item)return;
 
   // regcodeがある場合は管理側で委託会社を解決（正規化して比較）
@@ -12703,7 +12774,7 @@ function registerFromInbox(id){
 
 function execRegisterFromInbox(id){
   const inbox=JSON.parse(localStorage.getItem('fleet_inbox')||'[]');
-  const item=inbox.find(i=>i.id===id);
+  const item=inbox.find(i=>String(i.id)===String(id));
   if(!item)return;
 
   const selectedOffice = document.getElementById('reg-office')?.value||'';
@@ -15577,7 +15648,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.18-i';
+var FLEET_VERSION = '2026.09.18-j';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
