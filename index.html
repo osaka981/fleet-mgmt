@@ -13717,6 +13717,29 @@ async function sendMail(){
   const btn = document.getElementById('mail-send-btn');
   btn.disabled = true;
 
+  /* ★ 2026/09/18: 二重送信の防止。
+     添付が多いと送信に30秒以上かかり、スマホのブラウザは応答を
+     受け取る前に接続を切る。画面は「送信中」のまま止まるが、
+     GAS側は最後まで走り切るのでメールは届いている。
+     実際に 2026/06/30 は 12:20 と 12:31 の2回送られ、郵便局へ
+     同じ書類が2通届いていた。
+     直前に同じ宛先・同じ件名で送っていれば、10分間は止める。 */
+  try{
+    const _sig = office+'|'+to+'|'+subject;
+    const _last = JSON.parse(localStorage.getItem('fleet_mail_last')||'{}');
+    const _prev = _last[_sig];
+    if(_prev && (Date.now()-_prev) < 10*60*1000){
+      const _min = Math.ceil((10*60*1000-(Date.now()-_prev))/60000);
+      const _go = confirm(
+        '同じ宛先・同じ件名のメールを ' + Math.round((Date.now()-_prev)/60000) + '分前に送信しています。\n\n'
+        +'添付が多いと画面が「送信中」のまま止まることがありますが、\n'
+        +'メール自体は送信済みの場合があります。\n'
+        +'Gmailの送信済みトレイをご確認ください。\n\n'
+        +'それでも送信しますか？（あと'+_min+'分は確認を表示します）');
+      if(!_go){ btn.disabled=false; btn.textContent='送信する'; return; }
+    }
+  }catch(e){}
+
   // 添付ファイル収集
   const fileIds = [];
   const pdfTypes = [];
@@ -13893,6 +13916,16 @@ async function sendMail(){
       ? `送信中（${part+1}/${totalParts}通目 添付${chunk.length}件）...`
       : `送信中（添付${chunk.length}件）...`;
 
+    /* ★ 2026/09/18: 送信を始めた時点で記録する。
+       応答を受け取ってから記録すると、接続が切れたときに残らず、
+       二重送信の判定ができない。 */
+    try{
+      const _sig = office+'|'+to+'|'+subject;
+      const _last = JSON.parse(localStorage.getItem('fleet_mail_last')||'{}');
+      _last[_sig] = Date.now();
+      localStorage.setItem('fleet_mail_last', JSON.stringify(_last));
+    }catch(e){}
+
     try{
       const res = await fetch(API_URL, {
         method: 'POST',
@@ -13907,7 +13940,13 @@ async function sendMail(){
       if(json.ok) successCount++;
       else alert('❌ 送信エラー（' + (part+1) + '通目）: ' + (json.error||'不明'));
     }catch(e){
-      alert('❌ 通信エラー（' + (part+1) + '通目）: ' + e.message);
+      /* ★ 2026/09/18: 通信が切れても、送信自体は完了していることが多い。
+         「失敗した」と思って押し直すと二重に届くので、確認を促す。 */
+      alert('通信が途中で切れました（' + (part+1) + '通目）。\n\n'
+        +'添付が多いと応答を受け取る前に接続が切れますが、\n'
+        +'メールは送信されている場合があります。\n\n'
+        +'押し直す前に、Gmailの送信済みトレイをご確認ください。\n\n'
+        +'詳細: ' + e.message);
     }
   }
 
