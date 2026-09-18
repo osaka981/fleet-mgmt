@@ -12,8 +12,14 @@
 <link rel="apple-touch-icon" sizes="180x180">
 <title>フリート管理</title>
 <style>
-:root{--bg:#f0efec;--bg-card:#ffffff;--bg-input:#f7f6f3;--bg-sidebar:#ffffff;--text:#33322f;--text-sub:#6b6a65;--border:#e2e0da;--topbar-bg:#33322f;--topbar-text:#f2f1ee;--modal-bg:rgba(30,30,28,.45);--hover:#f4f3f0;--accent:#33322f;--accent-soft:#6b6a65;--danger:#b3261e;--warn:#c98a14;--ok:#1d7a52;--bg-danger:#fbe9e7;--bg-warn:#fbeacf;--bg-ok:#e6f4ec}
-.dark-mode{--bg:#17181a;--bg-card:#1f2123;--bg-input:#26282b;--bg-sidebar:#1c1e20;--text:#e8e7e4;--text-sub:#9d9c98;--border:#323538;--topbar-bg:#2c2e31;--topbar-text:#f2f1ee;--modal-bg:rgba(0,0,0,.65);--hover:#282b2e;--accent:#cfcdc7;--accent-soft:#9d9c98;--danger:#f2857c;--warn:#e5b45c;--ok:#5fc79a;--bg-danger:#3d1f1c;--bg-warn:#3a2b12;--bg-ok:#123528}
+/* ★ 2026/09/18: 配色は元の白地＋青に戻した。
+   明暗の切り替えと、色を変数で持つ仕組みはそのまま残している。
+   （テーマを変えたくなったら、この2行の値を差し替えるだけでよい） */
+:root{--bg:#f5f5f5;--bg-card:#ffffff;--bg-input:#f8f9fa;--bg-sidebar:#f9fafb;--text:#333333;--text-sub:#888888;--border:#e8e8e8;--topbar-bg:#ffffff;--topbar-text:#333333;--modal-bg:rgba(0,0,0,.45);--hover:#f0f4ff;--accent:#4a90e2;--accent-soft:#8ab4ea;--danger:#e53935;--warn:#f57f17;--ok:#2e7d32;--bg-danger:#ffebee;--bg-warn:#fff3e0;--bg-ok:#e8f5e9}
+/* ★ 2026/09/18: ダークの配色を紺から無彩色に変えた。
+   元は背景が #1a1a2e（濃い紺）で、青いボタンやリンクとぶつかって見づらかった。
+   下地を色のないグレーにすると、青が「押せる場所」として素直に読める。 */
+.dark-mode{--bg:#1b1c1e;--bg-card:#232528;--bg-input:#2a2d31;--bg-sidebar:#202225;--text:#e4e5e7;--text-sub:#9b9da1;--border:#34373b;--topbar-bg:#232528;--topbar-text:#e4e5e7;--modal-bg:rgba(0,0,0,.65);--hover:#2c2f33;--accent:#6aa9e8;--accent-soft:#8fc0ef;--danger:#ef8b86;--warn:#e8b563;--ok:#77c78f;--bg-danger:#3a2220;--bg-warn:#3a2e15;--bg-ok:#1d3326}
 .dark-mode html,.dark-mode body,.dark-mode{background:var(--bg)!important;color:var(--text)!important}
 /* ★ 2026/09/18: 対応していたのは18か所だけで、大半の画面が白いままだった。
    色を直接書いている箇所が1800以上あるため全部は置き換えられないが、
@@ -28,8 +34,8 @@
 .dark-mode td{border-color:var(--border)!important}
 .dark-mode tr:hover td{background:var(--hover)!important}
 .dark-mode .btn{background:var(--bg-card)!important;color:var(--text)!important;border-color:var(--border)!important}
-.dark-mode .btn-primary{background:var(--accent)!important;color:#1f2123!important;border-color:var(--accent)!important}
-.dark-mode .btn-danger{background:var(--danger)!important;color:#1f2123!important;border-color:var(--danger)!important}
+.dark-mode .btn-primary{background:var(--accent)!important;color:#14181c!important;border-color:var(--accent)!important}
+.dark-mode .btn-danger{background:var(--danger)!important;color:#14181c!important;border-color:var(--danger)!important}
 .dark-mode .modal,.dark-mode .modal-content{background:var(--bg-card)!important;color:var(--text)!important}
 .dark-mode .filter-chip{color:var(--text-sub)!important}
 .dark-mode .filter-chip.active{color:var(--text)!important}
@@ -45,15 +51,14 @@
 .dark-mode [style*="color:#666"],.dark-mode [style*="color:#aaa"]{color:var(--text-sub)!important}
 .dark-mode [style*="border:1px solid #e"],.dark-mode [style*="border:1px solid #d"],
 .dark-mode [style*="border:0.5px solid #e"]{border-color:var(--border)!important}
-/* ヘッダーはクレイ。明るいほうでも文字が読めるようにする */
-.topbar{background:var(--topbar-bg)!important;color:var(--topbar-text)!important;border-bottom:none!important}
+/* ヘッダーは元どおり白。下に細い罫線を引く */
+.topbar{background:var(--topbar-bg)!important;color:var(--topbar-text)!important;border-bottom:1px solid var(--border)!important}
 .topbar h1{color:var(--topbar-text)!important}
-.topbar span{color:var(--topbar-text)!important;opacity:.85}
 /* 右上のアイコン */
 .theme-btns{margin-left:auto;display:flex;align-items:center;gap:4px}
-.theme-btn{background:transparent;border:none;color:var(--topbar-text);cursor:pointer;font-size:19px;
-  line-height:1;padding:5px 6px;border-radius:6px;opacity:.92}
-.theme-btn:hover{background:rgba(255,255,255,.14);opacity:1}
+.theme-btn{background:transparent;border:none;color:var(--text-sub);cursor:pointer;font-size:18px;
+  line-height:1;padding:5px 7px;border-radius:6px}
+.theme-btn:hover{background:var(--hover);color:var(--text)}
 .dark-mode .topbar{background:var(--topbar-bg)!important;border-color:var(--border)!important}
 .dark-mode .topbar h1{color:var(--text)!important}
 .dark-mode .content,.dark-mode .page{background:var(--bg)!important}
@@ -75,7 +80,7 @@ html,body{overflow-x:hidden;max-width:100vw}
 html{background:#fff;zoom:1.15}
 body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f5f5;color:#1a1a1a;font-size:15px}
 #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh}
-.login-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:40px;width:340px;text-align:center;box-shadow:0 1px 6px rgba(70,56,48,.06)}
+.login-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:40px;width:340px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.08)}
 /* ★ 2026/09/18: ログイン画面が明暗の切り替えから漏れていて、
    暗い下地に白いカードだけが浮いてまぶしかった。
    「フリート管理」の文字も細く薄かったので、太さと濃さを上げる。 */
@@ -87,12 +92,12 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f
 .dark-mode .login-sub,.dark-mode .login-label{color:var(--text-sub)!important}
 .dark-mode .login-input{background:var(--bg-input)!important;color:var(--text)!important;border-color:var(--border)!important}
 .dark-mode .login-input::placeholder{color:var(--text-sub)!important}
-.dark-mode .login-btn{background:var(--bg-input)!important;color:var(--text)!important;border:1px solid var(--border)!important}
+.dark-mode .login-btn{background:var(--accent)!important;color:#14181c!important;border-color:var(--accent)!important}
 .login-label{font-size:11.5px;color:var(--text-sub);text-align:left;display:block;margin-bottom:5px;font-weight:500}
 .login-input{width:100%;padding:10px 12px;font-size:13px;border:1px solid var(--border);border-radius:7px;background:var(--bg-input);color:var(--text);font-family:inherit;letter-spacing:.15em;margin-bottom:14px}
 .login-input:focus{outline:none;border-color:#4a90e2}
 /* ★ 2026/09/18: ボタンとリンクが青のままで、クレイの配色から浮いていた */
-.login-btn{width:100%;padding:11px;font-size:13.5px;font-weight:600;border-radius:7px;border:none;background:var(--topbar-bg);color:var(--topbar-text);cursor:pointer}
+.login-btn{width:100%;padding:11px;font-size:13.5px;font-weight:600;border-radius:7px;border:none;background:var(--accent);color:#fff;cursor:pointer}
 .login-btn:hover{filter:brightness(1.06)}
 .login-btn:hover{background:#357abd}
 .login-err{font-size:11px;color:#e53935;margin-top:10px;min-height:16px}
@@ -14886,11 +14891,9 @@ function mountThemeButtons(){
   applyTheme();
 }
 initDarkMode();
-/* ★ 2026/09/18: ヘッダー右のアイコンは一旦出さない。
-   表示モードの切り替えは、これまでどおり設定の中から行う。
-   出したくなったら下の2行を有効に戻すだけでよい。 */
-// document.addEventListener('DOMContentLoaded', mountThemeButtons);
-// if(document.readyState!=='loading') mountThemeButtons();
+/* ★ 2026/09/18: ヘッダー右に、表示モードと設定のアイコンを置く。 */
+document.addEventListener('DOMContentLoaded', mountThemeButtons);
+if(document.readyState!=='loading') mountThemeButtons();
 
 // 住所フィールドでEnterキー → 郵便番号自動変換
 document.addEventListener('keydown',function(e){
@@ -15574,7 +15577,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.18-g';
+var FLEET_VERSION = '2026.09.18-i';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
