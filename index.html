@@ -1133,6 +1133,19 @@ body.modal-open{overflow:hidden}
               #page-settings div[style*="display:flex;gap:16px"]{flex-direction:column!important}
             }
           </style>
+          <!-- ★ 2026/09/18: GASの版。アプリだけ新しくして貼り忘れると
+               新しい機能が黙って失敗するので、ここで確かめられるようにする。 -->
+          <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:#888">システムの状態</div>
+          <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:28px">
+            <div style="font-size:11.5px;color:var(--text-sub);line-height:1.8" id="gas-ver-note">確認しています…</div>
+            <div style="font-size:11px;color:var(--text-sub);margin-top:8px;line-height:1.7">
+              アプリ本体は新しい版があれば自動で読み直します。<br>
+              GAS（メール送信・PDF生成・バックアップ）は自動更新できません。<br>
+              Apps Script エディタに貼り、「デプロイの更新」まで行ってください。
+            </div>
+            <button class="btn btn-sm" style="font-size:11px;margin-top:10px" onclick="checkGasVersion(true)">いま確認する</button>
+          </div>
+
           <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:#888">文字サイズ</div>
           <div style="background:#f8f9fa;border:1px solid #e8e8e8;border-radius:10px;padding:16px;margin-bottom:28px">
             <div style="font-size:12px;color:#555;margin-bottom:12px">画面全体の文字と表示サイズを変更します。見やすい大きさを選んでください。</div>
@@ -15229,7 +15242,7 @@ function calendarShowDetail(dateKey){
   detail.style.display='block';
 }
 
-function renderSettingsAll(){renderSettingsOffices();generateQR();loadAiSettings();renderMailSettings();loadAlertSettings();loadStampSettings();renderOperationLogs();loadSessionTimeout();var dt=document.getElementById('dark-mode-toggle');if(dt)dt.checked=document.documentElement.classList.contains('dark-mode');highlightFontSizeBtn();}
+function renderSettingsAll(){try{checkGasVersion(false);}catch(e){} renderSettingsOffices();generateQR();loadAiSettings();renderMailSettings();loadAlertSettings();loadStampSettings();renderOperationLogs();loadSessionTimeout();var dt=document.getElementById('dark-mode-toggle');if(dt)dt.checked=document.documentElement.classList.contains('dark-mode');highlightFontSizeBtn();}
 
 // ★ 2026/07/13: 文字サイズ設定(特大/大/中/小)。html要素のzoomで全体を拡縮する。
 //   中=1.15(従来の既定値)を基準に、小/大/特大を用意。端末ごとにlocalStorageへ保存。
@@ -15648,7 +15661,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.18-j';
+var FLEET_VERSION = '2026.09.18-k';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
@@ -15670,6 +15683,46 @@ var FLEET_VERSION = '2026.09.18-j';
    計数アプリと同じ方法で、自分自身を no-store で取り直して版を比べ、
    違えば ?u=時刻 を付けて開き直す。クエリが変わるのでキャッシュを迂回できる。
    入力中や送信中に画面が切り替わると困るので、そのときは見送る。 */
+async /* ★ 2026/09/18: GAS の版を確かめる。
+   アプリだけ新しくして GAS を貼り忘れると、新しい機能が黙って失敗する。
+   足りない機能があれば画面で知らせる。
+   （GAS のコードをアプリから書き換えることはできない。
+     Apps Script のエディタで貼り、デプロイを更新する必要がある） */
+const GAS_NEEDED = ['setDriverUids','logMailHistory','getMailHistory','fetchReplies','updateInboxStar'];
+let _gasInfo = null;
+async function checkGasVersion(show){
+  try{
+    const r=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'version'})});
+    const j=await r.json();
+    if(!j||!j.ok){ throw new Error('版を取得できません'); }
+    _gasInfo=j;
+    const have=j.actions||[];
+    const miss=GAS_NEEDED.filter(a=>have.indexOf(a)<0);
+    if(miss.length){
+      console.warn('[GAS] 足りない機能:', miss.join(', '));
+      const el=document.getElementById('gas-ver-note');
+      if(el){
+        el.innerHTML='<span style="color:var(--danger)">GASが古いままです（'+(j.version||'版不明')+'）<br>'
+          +'足りない機能: '+miss.join('、')+'<br>'
+          +'Apps Script に最新を貼り、デプロイを更新してください。</span>';
+      }
+      if(show) alert('GASが古いままです。\n\n足りない機能: '+miss.join('、')
+        +'\n\nApps Script エディタに最新のコードを貼り、\n「デプロイの更新」まで行ってください。');
+    }else{
+      const el=document.getElementById('gas-ver-note');
+      if(el) el.innerHTML='GAS '+(j.version||'')+'　'+(j.account||'')+'　<span style="color:var(--ok)">最新です</span>';
+      if(show) alert('GASは最新です。\n版: '+(j.version||'')+'\n実行アカウント: '+(j.account||''));
+    }
+    return j;
+  }catch(e){
+    const el=document.getElementById('gas-ver-note');
+    if(el) el.innerHTML='<span style="color:var(--danger)">GASに接続できません（'+(e.message||'')+'）</span>';
+    if(show) alert('GASに接続できませんでした。\n\n'+(e.message||''));
+    return null;
+  }
+}
+setTimeout(function(){ checkGasVersion(false); }, 4000);
+
 async function fleetCheckUpdate(){
   try{
     // 入力中・送信中・モーダルが開いているときは動かさない
