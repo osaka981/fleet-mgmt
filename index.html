@@ -4144,6 +4144,8 @@ function mailMainTab(section){
   document.querySelector('#mail-main-tabs [data-mtab="'+section+'"]')?.classList.add('active');
   document.getElementById('mail-send-section').style.display=section==='send'?'block':'none';
   document.getElementById('mail-inbox-section').style.display=section==='inbox'?'block':'none';
+  // ★ 2026/09/18: 履歴を開いたらサーバーからも取り込む（1分に1回まで）
+  try{ loadMailHistoryFromServer().then(ok=>{ if(ok) renderMailHistory(); }); }catch(e){}
   const histSec=document.getElementById('mail-history-section');
   if(histSec) histSec.style.display=section==='history'?'block':'none';
   // タスク追加ボタンは送信タブのみ
@@ -5044,6 +5046,7 @@ function recordMailHistory(info){
       body: info.body || '',
       attachments: Array.isArray(info.attachments) ? info.attachments : [],
       result: info.result || 'sent', // sent / error
+      sender: info.sender || '',     // ★ 2026/09/18: 差出人（GAS側で補完される）
     });
     // 1年以上前は自動削除
     const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear()-1);
@@ -5058,15 +5061,70 @@ function recordMailHistory(info){
 
 function saveHistory(){localStorage.setItem('fleet_history',JSON.stringify(submitHistory));}
 
+/* ★ 2026/09/18: 送信履歴を全端末で共有する。
+   これまで履歴は各端末の localStorage にしか残らず、送った端末でしか
+   見られなかった。GAS側に受け口を作ったので、そこから取り込む。
+   端末に残っているぶんと突き合わせ、新しい順に並べ直す。
+   通信できないときは端末のぶんだけを出す（オフラインでも見られる）。 */
+let _mailHistLoaded = 0;
+async function loadMailHistoryFromServer(force){
+  if(!force && Date.now() - _mailHistLoaded < 60*1000) return false;
+  try{
+    const res = await fetch(API_URL, { method:'POST',
+      body: JSON.stringify({ action:'getMailHistory', limit:300 }) });
+    const json = await res.json();
+    if(!json || !json.ok || !Array.isArray(json.items)) return false;
+    const byId = {};
+    // 端末のぶんを先に入れ、サーバーのぶんで上書きする
+    (mailSentHistory||[]).forEach(h=>{ if(h) byId[String(h.id)] = h; });
+    json.items.forEach(it=>{
+      if(!it) return;
+      byId[String(it.id)] = {
+        id: it.id,
+        datetime: it.datetime || '',
+        office: it.office || '',
+        to: it.to || '',
+        subject: it.subject || '',
+        body: it.body || '',
+        attachments: Array.isArray(it.attachments) ? it.attachments : [],
+        result: it.result || 'sent',
+        sender: it.sender || ''
+      };
+    });
+    mailSentHistory = Object.values(byId)
+      .sort((a,b)=>String(b.datetime||'').localeCompare(String(a.datetime||'')));
+    saveMailHistory();
+    _mailHistLoaded = Date.now();
+    return true;
+  }catch(e){
+    console.warn('[mail] 送信履歴を取得できませんでした', e);
+    return false;
+  }
+}
+async function reloadMailHistory(btn){
+  if(btn){ btn.disabled=true; btn.textContent='取得中'; }
+  const ok = await loadMailHistoryFromServer(true);
+  if(btn){ btn.disabled=false; btn.textContent='最新を取得'; }
+  renderMailHistory();
+  if(!ok) alert('送信履歴を取得できませんでした。通信をご確認ください。\n端末に残っているぶんを表示しています。');
+}
+
 // メール送信履歴を一覧表示(内容クリックで全文表示)
 function renderMailHistory(){
   const el = document.getElementById('mail-history-list');
   if(!el) return;
+  /* ★ 2026/09/18: 長い宛先（メールアドレスやURL）がスマホで画面からはみ出し、
+     横スクロールしないと読めなかった。折り返すようにする。 */
+  const _head = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <span style="font-size:10.5px;color:#888">全端末の送信履歴です</span>
+      <button onclick="reloadMailHistory(this)"
+        style="font-size:10px;padding:4px 10px;border:1px solid #ccc;border-radius:6px;background:#f7f7f5;cursor:pointer">最新を取得</button>
+    </div>`;
   if(!mailSentHistory.length){
-    el.innerHTML = '<div style="padding:24px;text-align:center;color:#888;font-size:12px">メール送信履歴はありません。書類をメール送信すると自動で記録されます。</div>';
+    el.innerHTML = _head + '<div style="padding:24px;text-align:center;color:#888;font-size:12px">メール送信履歴はありません。書類をメール送信すると自動で記録されます。</div>';
     return;
   }
-  el.innerHTML = mailSentHistory.map(h=>{
+  el.innerHTML = _head + mailSentHistory.map(h=>{
     const dt = new Date(h.datetime);
     const dstr = dt.toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
     const resBadge = h.result==='error'
@@ -5081,8 +5139,9 @@ function renderMailHistory(){
             <span style="font-size:11px;font-weight:700;color:#333;">${esc_f(h.office||'')}</span>
             <span style="font-size:10px;color:#999;">${dstr}</span>
           </div>
-          <div style="font-size:12px;font-weight:600;color:#222;margin-bottom:2px;">${esc_f(h.subject||'(件名なし)')}</div>
-          <div style="font-size:10.5px;color:#666;">宛先: ${esc_f(h.to||'-')}${attCount?` ／ 添付対象: ${attCount}名`:''}</div>
+          <div style="font-size:12px;font-weight:600;color:#222;margin-bottom:2px;overflow-wrap:anywhere;">${esc_f(h.subject||'(件名なし)')}</div>
+          <div style="font-size:10.5px;color:#666;word-break:break-all;overflow-wrap:anywhere;">宛先: ${esc_f(h.to||'-')}${attCount?` ／ 添付対象: ${attCount}名`:''}</div>
+          ${h.sender?`<div style="font-size:10px;color:#999;word-break:break-all;">差出人: ${esc_f(h.sender)}</div>`:''}
         </div>
         <button onclick="_showMailHistoryDetail('${h.id}')" style="font-size:10px;padding:4px 10px;border:1px solid #ccc;border-radius:6px;background:#f7f7f5;cursor:pointer;white-space:nowrap;">内容を見る</button>
       </div>
@@ -5104,15 +5163,18 @@ function _showMailHistoryDetail(id){
       <span style="font-size:14px;font-weight:700;">送信メールの内容</span>
       <button onclick="this.closest('.modal-bg').remove()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:#888;">✕</button>
     </div>
-    <div style="padding:16px 18px;font-size:12.5px;color:#333;line-height:1.7;">
+    <!-- ★ 2026/09/18: 長いメールアドレスやURLがスマホで画面からはみ出していたので折り返す -->
+    <div style="padding:16px 18px;font-size:12.5px;color:#333;line-height:1.7;word-break:break-all;overflow-wrap:anywhere;">
       <div style="margin-bottom:8px;"><span style="color:#888;">送信日時：</span>${dt}</div>
       <div style="margin-bottom:8px;"><span style="color:#888;">営業所：</span>${esc_f(h.office||'-')}</div>
       <div style="margin-bottom:8px;"><span style="color:#888;">宛先：</span>${esc_f(h.to||'-')}</div>
+      ${h.sender?`<div style="margin-bottom:8px;"><span style="color:#888;">差出人：</span>${esc_f(h.sender)}</div>`:''}
       <div style="margin-bottom:8px;"><span style="color:#888;">件名：</span>${esc_f(h.subject||'-')}</div>
       <div style="margin-bottom:8px;"><span style="color:#888;">添付対象：</span>${att}</div>
+      <div style="margin-bottom:8px;"><span style="color:#888;">結果：</span>${h.result==='error'?'<span style="color:#c0392b;font-weight:700">送信失敗</span>':'<span style="color:#1a8a5f;font-weight:700">送信済</span>'}</div>
       <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eee;">
         <div style="color:#888;margin-bottom:6px;">本文：</div>
-        <div style="white-space:pre-wrap;background:#f9f8f6;border:1px solid #eee;border-radius:8px;padding:12px;font-size:12px;">${esc_f(h.body||'(本文なし)')}</div>
+        <div style="white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere;background:#f9f8f6;border:1px solid #eee;border-radius:8px;padding:12px;font-size:12px;">${esc_f(h.body||'(本文なし)')}</div>
       </div>
     </div>
   </div>`;
