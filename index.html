@@ -1,9 +1,13 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" translate="no" class="notranslate">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<!-- ★ 2026/09/18: 自動翻訳を止める。「HOME」が「家」、「人と車両」が
+     「人の車両」と訳され、画面の意味が変わっていた。 -->
+<meta name="google" content="notranslate">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="大阪急配">
 <meta name="theme-color" content="#ffffff">
@@ -771,11 +775,11 @@ body.modal-open{overflow:hidden}
   <!-- ★ 2026/09/18: スマホ用の下部タブ。毎日使う4つだけを置く -->
   <nav class="bottom-nav" id="bottom-nav" aria-label="メインメニュー">
     <button data-bn="dashboard" onclick="bnGo('dashboard')">
-      <span class="bn-ico">⌂</span><span class="bn-lbl">HOME</span>
+      <span class="bn-ico">⌂</span><span class="bn-lbl">ホーム</span>
       <span class="bn-badge" id="bn-badge-home" style="display:none"></span>
     </button>
     <button data-bn="drivers" onclick="bnGo('drivers')">
-      <span class="bn-ico">👤</span><span class="bn-lbl">人と車両</span>
+      <span class="bn-ico">👤</span><span class="bn-lbl">ドライバー</span>
     </button>
     <button data-bn="documents" onclick="bnGo('documents')">
       <span class="bn-ico">▤</span><span class="bn-lbl">書類</span>
@@ -801,10 +805,10 @@ body.modal-open{overflow:hidden}
              これまで「ドライバー管理」「車両管理」「委託会社管理」が
              〈管理〉の折りたたみの中にあり、毎日開くものなのに2手かかっていた。
              毎日使うものを上に出し、たまにしか触らないものを下にまとめる。 -->
-        <div class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard',this)" data-page="dashboard"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg>HOME <span id="dash-alert-badge" style="background:#e53935;color:#fff;border-radius:99px;padding:0 5px;font-size:9px;margin-left:2px"></span></div>
+        <div class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard',this)" data-page="dashboard"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg>ホーム <span id="dash-alert-badge" style="background:#e53935;color:#fff;border-radius:99px;padding:0 5px;font-size:9px;margin-left:2px"></span></div>
         <div id="sidebar-upload-status" style="display:none;padding:2px 10px 4px 32px;font-size:10px;color:#4a90e2;background:#eaf2ff;margin:-1px 6px 2px;border-radius:0 0 6px 6px"></div>
 
-        <div class="nav-section" style="cursor:default">人と車両</div>
+        <div class="nav-section" style="cursor:default">ドライバー・車両</div>
         <div class="nav-item" onclick="showPage('drivers',this)" data-page="drivers"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="4.5" r="2.5"/><path d="M2 13c0-2.8 2.2-5 5-5s5 2.2 5 5"/></svg>ドライバー管理</div>
         <div class="nav-item" onclick="showPage('vehicles',this)" data-page="vehicles"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="12" height="7" rx="2"/><circle cx="4" cy="10.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="10" cy="10.5" r="1.2" fill="currentColor" stroke="none"/></svg>車両管理</div>
         <div class="nav-item" onclick="showPage('contractors',this)" data-page="contractors"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="12" height="9" rx="1.5"/><path d="M5 3V2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1"/><path d="M4 7h6M4 9.5h4"/></svg>委託会社管理</div>
@@ -840,7 +844,7 @@ body.modal-open{overflow:hidden}
         </div>
       </div>
       <div id="page-dashboard" class="page active">
-        <div class="topbar"><h1>HOME</h1><span id="today-label" style="font-size:11px;color:#888"></span></div>
+        <div class="topbar"><h1>ホーム</h1><span id="today-label" style="font-size:11px;color:#888"></span></div>
         <div class="content">
           <!-- ★ 2026/09/18: HOMEを2つに分ける。
                ダッシュボード＝いまの状態、タスク＝やること。
@@ -15667,7 +15671,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.18-m';
+var FLEET_VERSION = '2026.09.18-n';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
