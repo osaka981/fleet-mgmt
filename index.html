@@ -792,7 +792,7 @@ body.modal-open{overflow:hidden}
     <aside class="sidebar" ondragover="event.preventDefault();document.getElementById('sidebar-upload-status').style.display='block';document.getElementById('sidebar-upload-status').textContent='ここにドロップでアップロード';document.getElementById('sidebar-upload-status').style.color='#4a90e2'" ondragleave="if(!this.contains(event.relatedTarget)){document.getElementById('sidebar-upload-status').style.display='none'}" ondrop="handleSidebarDrop(event)">
       <div class="logo" style="cursor:pointer" onclick="location.reload()"><div class="logo-title" style="display:flex;align-items:center;gap:6px"><img src="" id="sidebar-logo" style="width:22px;height:22px;object-fit:contain">フリート管理</div></div>
       <div style="padding:8px 4px 4px;flex:1;overflow-y:auto">
-        <div class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard',this)" data-page="dashboard"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg>ダッシュボード <span id="dash-alert-badge" style="background:#e53935;color:#fff;border-radius:99px;padding:0 5px;font-size:9px;margin-left:2px"></span></div>
+        <div class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard',this)" data-page="dashboard"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg>HOME <span id="dash-alert-badge" style="background:#e53935;color:#fff;border-radius:99px;padding:0 5px;font-size:9px;margin-left:2px"></span></div>
         <div id="sidebar-upload-status" style="display:none;padding:2px 10px 4px 32px;font-size:10px;color:#4a90e2;background:#eaf2ff;margin:-1px 6px 2px;border-radius:0 0 6px 6px"></div>
         <div class="nav-item" onclick="showPage('storage',this)" data-page="storage"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 3h5l1.5 2H13v7H1z"/><path d="M5 9h4M7 7v4"/></svg>データ管理</div>
         <div class="nav-item" onclick="showPage('documents',this)" data-page="documents"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="10" height="12" rx="1.5"/><path d="M4 5h6M4 8h6M4 11h4"/></svg>書類生成</div>
@@ -829,8 +829,22 @@ body.modal-open{overflow:hidden}
         </div>
       </div>
       <div id="page-dashboard" class="page active">
-        <div class="topbar"><h1>ダッシュボード</h1><span id="today-label" style="font-size:11px;color:#888"></span></div>
+        <div class="topbar"><h1>HOME</h1><span id="today-label" style="font-size:11px;color:#888"></span></div>
         <div class="content">
+          <!-- ★ 2026/09/18: HOMEを2つに分ける。
+               ダッシュボード＝いまの状態、タスク＝やること。
+               タスクは手で作らず、期限や登録状況から毎回計算する。
+               手で作って手で消す作りだと、放置されて溜まるだけになる。 -->
+          <div id="home-tabs" style="display:flex;gap:16px;border-bottom:1.5px solid var(--border);margin-bottom:14px">
+            <span onclick="homeTab('dash')" id="home-tab-dash"
+              style="cursor:pointer;font-size:13px;font-weight:500;padding-bottom:7px;margin-bottom:-1.5px;border-bottom:2px solid var(--text)">ダッシュボード</span>
+            <span onclick="homeTab('task')" id="home-tab-task"
+              style="cursor:pointer;font-size:13px;color:var(--text-sub);padding-bottom:7px">やること<span id="home-task-count" style="margin-left:5px;background:var(--bg-warn);color:var(--warn);border-radius:99px;font-size:11px;padding:1px 6px;display:none"></span></span>
+          </div>
+          <div id="home-task-pane" style="display:none">
+            <div id="task-list"></div>
+          </div>
+          <div id="home-dash-pane">
           <div class="sync-bar" style="justify-content:space-between;padding:6px 12px">
             <span class="sync-status" id="sync-status" style="font-size:11px;color:#888">自動同期中</span>
             <div style="display:flex;align-items:center;gap:8px">
@@ -848,6 +862,7 @@ body.modal-open{overflow:hidden}
           </div>
           <div style="margin-bottom:8px;font-size:12px;font-weight:500;color:#888">期限アラート（期限切れ・60日以内）</div>
           <div id="alert-list" class="table-wrap"></div>
+          </div><!-- /home-dash-pane -->
         </div>
       </div>
       <div id="page-vehicles" class="page">
@@ -7590,6 +7605,144 @@ function bnBadges(){
 }
 setInterval(bnBadges, 30000);
 document.addEventListener('DOMContentLoaded', function(){ bnPaint(); bnBadges(); });
+
+/* ★ 2026/09/18: やることの件数を、開かなくても分かるようにする。
+   HOMEのサブタブと、サイドバー・下部タブのバッジに出す。 */
+function refreshTaskCount(){
+  try{
+    var list=buildTasks();
+    var cnt=document.getElementById('home-task-count');
+    if(cnt){ cnt.textContent=list.length||''; cnt.style.display=list.length?'':'none'; }
+    var hb=document.getElementById('bn-badge-home');
+    if(hb){ hb.textContent=list.length||''; hb.style.display=list.length?'flex':'none'; }
+    var sb=document.getElementById('dash-alert-badge');
+    if(sb) sb.textContent=list.length||'';
+  }catch(e){}
+}
+setTimeout(refreshTaskCount, 2500);
+setInterval(refreshTaskCount, 60000);
+
+/* ══ ★ 2026/09/18: やること（タスク） ══
+   手で作るのではなく、いまのデータから毎回計算する。
+   ・免許・車検・自賠責・任意保険の期限切れ、または30日以内
+   ・フリートに登録済みだが経営管理の台帳に無い人
+   ・受信ボックスの未確認
+   ・未送信のメール（従来の mailTasks が残っていれば拾う）
+   済んだものは次に開いたときに自然に消える。 */
+function homeTab(which){
+  var d=document.getElementById('home-dash-pane');
+  var t=document.getElementById('home-task-pane');
+  var td=document.getElementById('home-tab-dash');
+  var tt=document.getElementById('home-tab-task');
+  var onDash = which!=='task';
+  if(d) d.style.display = onDash ? '' : 'none';
+  if(t) t.style.display = onDash ? 'none' : '';
+  if(td){ td.style.fontWeight = onDash?'500':'400';
+    td.style.color = onDash?'var(--text)':'var(--text-sub)';
+    td.style.borderBottom = onDash?'2px solid var(--text)':'none'; }
+  if(tt){ tt.style.fontWeight = onDash?'400':'500';
+    tt.style.color = onDash?'var(--text-sub)':'var(--text)';
+    tt.style.borderBottom = onDash?'none':'2px solid var(--text)'; }
+  if(!onDash) renderTasks();
+}
+function _taskDays(dateStr){
+  if(!dateStr) return null;
+  var t=new Date(String(dateStr)); if(isNaN(t)) return null;
+  t.setHours(0,0,0,0);
+  var today=new Date(); today.setHours(0,0,0,0);
+  return Math.round((t-today)/86400000);
+}
+function buildTasks(){
+  var out=[];
+  var push=function(kind,title,sub,days,page){
+    out.push({kind:kind,title:title,sub:sub||'',days:days,page:page||''});
+  };
+  // 免許（自社＋委託）
+  var all=[];
+  (drivers||[]).forEach(function(d){ if(d && (!d.status||d.status==='在籍')) all.push({d:d,src:''}); });
+  (companies||[]).forEach(function(c){
+    (typeof fleetDriverListLocal==='function'?fleetDriverListLocal(c.drivers):(Array.isArray(c.drivers)?c.drivers:[]))
+      .forEach(function(d){ if(d && (!d.status||d.status==='在籍')) all.push({d:d,src:c.name||'委託'}); });
+  });
+  all.forEach(function(x){
+    var lic=x.d.license||{};
+    var dl=_taskDays(lic.exp);
+    if(dl!==null && dl<=30) push('免許証', x.d.name||'(氏名なし)', x.src, dl, 'drivers');
+  });
+  // 車両の3点
+  (vehicles||[]).forEach(function(v){
+    if(!v || v.status==='廃車') return;
+    [['shaken','車検'],['jibai','自賠責'],['nin','任意保険']].forEach(function(p){
+      var o=v[p[0]]||{};
+      var dl=_taskDays(o.exp);
+      if(dl!==null && dl<=30) push(p[1], String(v.plate||'(番号なし)'), v.office||'', dl, 'vehicles');
+    });
+  });
+  // 台帳に未登録の人
+  try{
+    var un=(typeof getUnregisteredFleetDrivers==='function') ? getUnregisteredFleetDrivers() : [];
+    if(un && un.length) push('台帳に未登録', un.length+'名', '経営管理に登録が必要', null, '');
+  }catch(e){}
+  // 受信ボックスの未確認
+  try{
+    var inb=JSON.parse(localStorage.getItem('fleet_inbox')||'[]');
+    var yet=inb.filter(function(i){ return i && i.status==='未確認'; }).length;
+    if(yet) push('受信の確認', yet+'件', 'QRフォームからの提出', null, 'mail');
+  }catch(e){}
+  // 未送信のメール
+  try{
+    if(typeof mailTasks!=='undefined'){
+      var mp=mailTasks.filter(function(t){ return t.status==='pending'; }).length;
+      if(mp) push('未送信のメール', mp+'件', '', null, 'mail');
+    }
+  }catch(e){}
+  // 期限が近い順、期限の無いものは後ろ
+  out.sort(function(a,b){
+    if(a.days===null && b.days===null) return 0;
+    if(a.days===null) return 1;
+    if(b.days===null) return -1;
+    return a.days-b.days;
+  });
+  return out;
+}
+function renderTasks(){
+  var el=document.getElementById('task-list');
+  var cnt=document.getElementById('home-task-count');
+  if(!el) return;
+  var list=[];
+  try{ list=buildTasks(); }catch(e){ console.warn('[task] 算出に失敗', e); }
+  if(cnt){ cnt.textContent=list.length||''; cnt.style.display=list.length?'':'none'; }
+  if(!list.length){
+    el.innerHTML='<div style="padding:28px;text-align:center;color:var(--text-sub);font-size:12.5px">'
+      +'いま対応が必要なものはありません</div>';
+    return;
+  }
+  el.innerHTML='<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow:hidden">'
+    + list.map(function(t){
+      var col='var(--text-sub)', lbl='';
+      if(t.days!==null){
+        if(t.days<0){ col='var(--danger)'; lbl='切れ '+Math.abs(t.days)+'日'; }
+        else if(t.days<=7){ col='var(--danger)'; lbl='あと'+t.days+'日'; }
+        else { col='var(--warn)'; lbl='あと'+t.days+'日'; }
+      }
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--border);'
+        + (t.page?'cursor:pointer" onclick="bnGo(\''+t.page+'\')"':'"')+'>'
+        + '<span style="width:7px;height:7px;border-radius:50%;background:'+col+';flex:none"></span>'
+        + '<span style="font-size:11px;color:var(--text-sub);min-width:66px;flex:none">'+esc_f(t.kind)+'</span>'
+        + '<span style="font-size:13px;flex:1;min-width:0;overflow-wrap:anywhere">'+esc_f(t.title)
+        + (t.sub?'<span style="font-size:11px;color:var(--text-sub)">　'+esc_f(t.sub)+'</span>':'')+'</span>'
+        + (lbl?'<span style="font-size:11.5px;color:'+col+';white-space:nowrap;flex:none">'+lbl+'</span>':'')
+        + '</div>';
+    }).join('')
+    + '</div>';
+}
+// 委託会社の drivers が文字列で来ることがあるので、ここでも配列にそろえる
+function fleetDriverListLocal(v){
+  if(Array.isArray(v)) return v;
+  if(typeof v==='string'){ try{ var x=JSON.parse(v); return Array.isArray(x)?x:[]; }catch(e){ return []; } }
+  if(v && typeof v==='object') return Object.values(v);
+  return [];
+}
 
 function toggleSidebar(){
   document.querySelector('.sidebar').classList.toggle('open');
@@ -15421,7 +15574,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.18-f';
+var FLEET_VERSION = '2026.09.18-g';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
