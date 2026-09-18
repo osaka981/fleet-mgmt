@@ -10731,6 +10731,36 @@ function vscDragStart(e){
   e.dataTransfer.setData('text/plain','');
   el.style.opacity='0.4';
 }
+/* ★ 2026/09/18: 別のドライバーのカードに重なったとき、落とせることを示す */
+/* ★ 2026/09/18: 予備車（誰も乗っていない車両）をドライバーへ引っぱれるようにする */
+function spareDragStart(e){
+  var el=e.target.closest('[data-spare-vehicle]');
+  if(!el) return;
+  _vscDrag={ driverId:null, vehicleId:parseInt(el.dataset.spareVehicle) };
+  e.dataTransfer.effectAllowed='move';
+  try{ e.dataTransfer.setData('text/plain',''); }catch(_){}
+  el.style.opacity='0.4';
+}
+function spareDragEnd(e){
+  var el=e.target.closest('[data-spare-vehicle]');
+  if(el) el.style.opacity='';
+  _vscDrag=null;
+}
+
+function vscCardOver(e){
+  if(!_vscDrag) return;
+  var card=e.target.closest('[data-vsc-driver]');
+  if(!card) return;
+  if(_vscDrag.driverId!==null && String(card.dataset.vscDriver)===String(_vscDrag.driverId)) return;
+  e.preventDefault();
+  card.style.outline='2px dashed var(--accent)';
+  card.style.outlineOffset='2px';
+}
+function vscCardLeave(e){
+  var card=e.target.closest('[data-vsc-driver]');
+  if(card && !card.contains(e.relatedTarget)){ card.style.outline=''; }
+}
+
 function vscDragOver(e){
   e.preventDefault();
   var el=e.target.closest('.vsc-item');
@@ -10740,12 +10770,89 @@ function vscDragLeave(e){
   var el=e.target.closest('.vsc-item');
   if(el) el.style.boxShadow='';
 }
+/* ★ 2026/09/18: 車両を別のドライバーへ移せるようにする。
+   これまでは同じドライバーの中で順番を入れ替えるだけで、
+   他の人のカードに落としても何も起きなかった。
+   落とした先が別のドライバーなら、その人の搭乗車両に付け替える。 */
+function vscMoveToDriver(vehicleId, fromDriverId, toDriverId){
+  var v=vehicles.find(x=>String(x.id)===String(vehicleId));
+  var to=drivers.find(d=>String(d.id)===String(toDriverId));
+  var from=drivers.find(d=>String(d.id)===String(fromDriverId));
+  if(!v||!to) return false;
+
+  // 移す先がいま乗っている車両
+  var toCvs=vehicles.filter(x=>(x.driverId&&String(x.driverId)===String(to.id))||x.driver===to.name);
+  var order=(Array.isArray(to.vehicleOrder)&&to.vehicleOrder.length)
+    ? to.vehicleOrder.slice() : toCvs.map(x=>x.id);
+  order=order.filter(id=>String(id)!==String(vehicleId));
+  var mainId = order.length ? order[0] : null;
+  var mainV  = mainId ? vehicles.find(x=>String(x.id)===String(mainId)) : null;
+
+  /* ★ 2026/09/18: すでに車両に乗っている人へ落としたときは、
+     入れ替えるのか、2台目として足すのかを選んでもらう。
+     1台に決め打ちすると複数台持ちが壊れ、常に足すと
+     「乗せ換えたのに古い車が残る」ことになる。 */
+  var asMain = true;   // メインにするか（＝先頭に置くか）
+  if(mainV){
+    var ans = prompt(
+      (v.plate||'この車両')+' を '+to.name+' に登録します。\n\n'
+      +'いま乗っている車両: '+(mainV.plate||'')+'\n\n'
+      +'　1 … 乗せ換える（'+(mainV.plate||'')+' は未搭乗になります）\n'
+      +'　2 … 2台目として追加する（'+(mainV.plate||'')+' はメインのまま）\n\n'
+      +'番号を入力してください', '1');
+    if(ans===null) return false;
+    ans=String(ans).trim();
+    if(ans!=='1' && ans!=='2') return false;
+    if(ans==='1'){
+      // 乗せ換え: いまのメインを未搭乗に戻す
+      mainV.driverId='';
+      mainV.driver='';
+      order=order.filter(id=>String(id)!==String(mainId));
+      asMain=true;
+    }else{
+      asMain=false;   // 追加。メインは動かさない
+    }
+  }else{
+    if(!confirm((v.plate||'この車両')+' を '+to.name+' に登録しますか？')) return false;
+  }
+
+  // 元のドライバーの順序から外す
+  if(from && Array.isArray(from.vehicleOrder)){
+    from.vehicleOrder=from.vehicleOrder.filter(id=>String(id)!==String(vehicleId));
+  }
+  // 車両の担当を書き換える
+  v.driverId=to.id;
+  v.driver=to.name;
+  if(asMain) order.unshift(v.id); else order.push(v.id);
+  to.vehicleOrder=order;
+
+  saveLocal(); isDirty=true; scheduleAutoSave();
+  addLog('割当','車両の割当: '+(v.plate||v.id)+' '+(from?from.name:'未搭乗')+' → '+to.name
+    +(asMain?'（メイン）':'（予備）'));
+  renderStorage();
+  return true;
+}
+
 function vscDrop(e){
   e.preventDefault();
   e.stopPropagation();
   var targetEl=e.target.closest('.vsc-item');
+  var targetCard=e.target.closest('[data-vsc-driver]');
   if(targetEl) targetEl.style.boxShadow='';
-  if(!_vscDrag||!targetEl) return;
+  if(targetCard) targetCard.style.outline='';
+  if(!_vscDrag) return;
+
+  // ★ 別のドライバーのカードに落とした場合は乗せ換え
+  var toDriverId = targetEl ? targetEl.dataset.driverId
+                            : (targetCard ? targetCard.dataset.vscDriver : null);
+  if(toDriverId && String(toDriverId)!==String(_vscDrag.driverId)){
+    var vid=_vscDrag.vehicleId, fromId=_vscDrag.driverId;
+    _vscDrag=null;
+    vscMoveToDriver(vid, fromId, toDriverId);
+    return;
+  }
+  if(!targetEl) { _vscDrag=null; return; }
+
   var dragVid=_vscDrag.vehicleId;
   var dropVid=parseInt(targetEl.dataset.vehicleId);
   var driverId=_vscDrag.driverId;
@@ -10907,7 +11014,22 @@ function renderStorage(){
       allVehicles=allVehicles.filter(v=>!v._offices.length&&v.type==='持込');
     } else {
       allDrivers=allDrivers.filter(d=>d._offices.includes(offF));
-      allVehicles=allVehicles.filter(v=>v._offices.includes(offF)||v.office===offF);
+      /* ★ 2026/09/18: 営業所を選んでいるときの車両の出し方。
+         乗せ換えの相手を探すのに、その営業所の車両しか出ないと使えない。
+         ・自社の予備車（誰も乗っていない社有車）は、営業所に関係なく全部出す
+         ・持込の予備車は、その持込ドライバーの営業所にだけ出す
+           （持込は本人の車なので、他の営業所に貸せない）
+         誰かが乗っている車両は、これまでどおりその営業所のものだけ。 */
+      const _assigned = id => allDriversUnfiltered.some(d =>
+        (Array.isArray(d.vehicleOrder) && d.vehicleOrder.some(x=>String(x)===String(id)))
+      ) || vehicles.some(v => String(v.id)===String(id) && (v.driverId || v.driver));
+      allVehicles=allVehicles.filter(v=>{
+        const inOffice = v._offices.includes(offF) || v.office===offF;
+        if(inOffice) return true;
+        if(_assigned(v.id)) return false;          // 他の営業所で乗っている車は出さない
+        if(v.type==='持込') return false;          // 持込の予備は自分の営業所だけ
+        return true;                               // 自社の予備車はどこでも出す
+      });
     }
   }
 
@@ -11122,7 +11244,9 @@ function renderStorage(){
 
       // 搭乗車両（複数対応）
       if(cvs.length){
-        cardHtml+='<div id="vsc-wrap-'+d.id+'">';
+        // ★ 2026/09/18: カード全体でも受け取る（車両が1台も無い人にも移せるように）
+        cardHtml+='<div id="vsc-wrap-'+d.id+'" data-vsc-driver="'+d.id+'"'
+          +' ondragover="vscCardOver(event)" ondragleave="vscCardLeave(event)" ondrop="vscDrop(event)">';
         cvs.forEach(function(cv,cvIdx){
         var vaf2=cv.attachedFiles||[];
         var hasS2=vaf2.some(function(f){return (f.category||'').includes('車検');});
@@ -11131,7 +11255,7 @@ function renderStorage(){
         var posLabel=cvIdx===0?'<span style="font-size:8px;padding:1px 6px;border-radius:3px;background:#1565C0;color:#fff;margin-right:4px">メイン</span>':'<span style="font-size:8px;padding:1px 6px;border-radius:3px;background:#888;color:#fff;margin-right:4px">予備</span>';
         cardHtml+='<div class="vsc-item" data-driver-id="'+d.id+'" data-vehicle-id="'+cv.id+'" draggable="true" ondragstart="vscDragStart(event)" ondragover="vscDragOver(event)" ondragleave="vscDragLeave(event)" ondrop="vscDrop(event)" style="padding:10px 12px;background:#b8bfc9;color:#333;border-radius:8px;font-size:11px;margin-top:6px;transition:box-shadow .15s">';
         cardHtml+='<div style="display:flex;align-items:center;margin-bottom:4px;gap:8px">';
-        cardHtml+='<span style="cursor:grab;color:#666;font-size:14px;user-select:none;flex-shrink:0" title="ドラッグで順序入替">↕</span>';
+        cardHtml+='<span style="cursor:grab;color:#666;font-size:14px;user-select:none;flex-shrink:0" title="ドラッグで順序を入れ替え／別のドライバーへ落とすと乗せ換え">↕</span>';
         cardHtml+='<div style="flex:1;min-width:0">'+posLabel+'<span style="font-size:10px;color:#555">搭乗車両</span> <strong style="cursor:pointer;color:#4a90e2" onclick="event.stopPropagation();navigateToVehicle(\''+esc(cv.plate)+'\')">'+cv.plate+'</strong> <span style="color:#666">'+(cv.model||'')+'</span></div>';
         cardHtml+='<button class="btn btn-sm" style="font-size:10px;padding:2px 10px;flex-shrink:0" onclick="event.stopPropagation();openVehicleModal('+cv.id+')">編集</button>';
         cardHtml+='<span style="font-size:10px;padding:3px 10px;border-radius:20px;cursor:pointer;background:#4a90e2;color:#fff;flex-shrink:0" onclick="event.stopPropagation();openQuickUpload(\'vehicle\','+cv.id+',\'\')">+ 追加</span>';
@@ -11199,10 +11323,22 @@ function renderStorage(){
 
       // --- 折り畳み版 ---
       var vOfficesFull=(v._offices.join('・')||v.office||'未設定');
-      var collapsedHtml='<div id="sc-c-'+key+'" style="display:'+(expanded?'none':'block')+'"><div style="background:#8dd6f7;border:1.5px solid #5bb8db;border-radius:8px;padding:8px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;opacity:.75" onclick="storageToggleExpand(\''+key+'\')">'+
+      /* ★ 2026/09/18: 持込と社有で色を分ける。
+         持込は本人の車なので他の営業所へ貸せない。ひと目で分かるようにする。
+         あわせて、ここからドライバーへドラッグできるようにする。 */
+      var _isMochi = (v.type==='持込');
+      var _vBg   = _isMochi ? '#ffd9b3' : '#8dd6f7';
+      var _vBd   = _isMochi ? '#e8a765' : '#5bb8db';
+      var _vIcon = _isMochi ? '#8a5a12' : '#546E7A';
+      var _vTag  = _isMochi
+        ? '<span style="font-size:9px;background:#8a5a12;color:#fff;padding:1px 6px;border-radius:3px;margin-right:4px">持込</span>'
+        : '<span style="font-size:9px;background:#2a6b8a;color:#fff;padding:1px 6px;border-radius:3px;margin-right:4px">社有</span>';
+      var collapsedHtml='<div id="sc-c-'+key+'" style="display:'+(expanded?'none':'block')+'"'+
+          ' draggable="true" data-spare-vehicle="'+v.id+'" ondragstart="spareDragStart(event)" ondragend="spareDragEnd(event)"'+
+          '><div style="background:'+_vBg+';border:1.5px solid '+_vBd+';border-radius:8px;padding:8px 12px;cursor:grab;display:flex;align-items:center;justify-content:space-between;gap:8px;opacity:.85" onclick="storageToggleExpand(\''+key+'\')">'+
           '<div style="min-width:0;display:flex;align-items:center;gap:8px;flex:1">'+
-            '<div style="width:28px;height:28px;min-width:28px;min-height:28px;max-width:28px;max-height:28px;border-radius:50%;background:#546E7A;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;flex-shrink:0">車</div>'+
-            '<div style="min-width:0;overflow:hidden"><div style="font-weight:600;font-size:13px;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+v.plate+' <span style="font-size:10px;color:#555;font-weight:400">'+(v.model||'')+'</span></div>'+
+            '<div style="width:28px;height:28px;min-width:28px;min-height:28px;max-width:28px;max-height:28px;border-radius:50%;background:'+_vIcon+';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;flex-shrink:0">車</div>'+
+            '<div style="min-width:0;overflow:hidden"><div style="font-weight:600;font-size:13px;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_vTag+v.plate+' <span style="font-size:10px;color:#555;font-weight:400">'+(v.model||'')+'</span></div>'+
             '<div style="font-size:10px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(vOfficesFull)+'">'+vOfficesFull+'</div></div>'+
           '</div>'+
           '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+
@@ -15671,7 +15807,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.18-n';
+var FLEET_VERSION = '2026.09.18-p';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
