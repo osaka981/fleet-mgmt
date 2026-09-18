@@ -298,9 +298,39 @@ body.modal-open{overflow:hidden}
 .hamburger{display:none;position:fixed;top:10px;left:10px;z-index:250;width:36px;height:36px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer;flex-direction:column;align-items:center;justify-content:center;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
 .hamburger span{display:block;width:16px;height:2px;background:#555;border-radius:2px}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:150}
+/* ★ 2026/09/18: スマホは下部タブに変える。
+   左上のハンバーガーは片手で持つと親指が届かない。
+   毎日使う4つ（HOME・人と車両・書類・メール）を下に置き、
+   残りはメニューにまとめる。パソコンはこれまでどおりサイドバー。 */
+.bottom-nav{display:none}
+@media(max-width:900px){
+  .bottom-nav{
+    display:flex;position:fixed;left:0;right:0;bottom:0;z-index:240;
+    background:var(--bg-card);border-top:1px solid var(--border);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .bottom-nav button{
+    flex:1;background:transparent;border:none;cursor:pointer;
+    padding:7px 0 9px;color:var(--text-sub);font-family:inherit;
+    display:flex;flex-direction:column;align-items:center;gap:2px;position:relative;
+  }
+  .bottom-nav button.on{color:var(--text)}
+  .bottom-nav .bn-ico{font-size:19px;line-height:1}
+  .bottom-nav .bn-lbl{font-size:9.5px;letter-spacing:.02em}
+  .bottom-nav .bn-badge{
+    position:absolute;top:3px;right:50%;margin-right:-22px;min-width:15px;height:15px;
+    border-radius:99px;background:var(--danger);color:#fff;font-size:9px;
+    display:flex;align-items:center;justify-content:center;padding:0 4px;
+  }
+  /* 下タブのぶん、本文の下に余白を作る */
+  .main{padding-bottom:58px}
+  /* 下タブがあるので、左上のハンバーガーは出さない */
+  .hamburger{display:none!important}
+  #global-search-wrap{padding-left:12px!important}
+  .topbar{padding-left:12px!important}
+}
 @media(max-width:768px){
   html{zoom:1!important}
-  .hamburger{display:flex}
   #global-search-wrap{padding-left:52px!important}
   .sidebar{transform:translateX(-100%);transition:transform .25s;z-index:200}
   .sidebar.open{transform:translateX(0)}
@@ -733,6 +763,27 @@ body.modal-open{overflow:hidden}
 </div>
 
 <div id="app-screen">
+  <!-- ★ 2026/09/18: スマホ用の下部タブ。毎日使う4つだけを置く -->
+  <nav class="bottom-nav" id="bottom-nav" aria-label="メインメニュー">
+    <button data-bn="dashboard" onclick="bnGo('dashboard')">
+      <span class="bn-ico">⌂</span><span class="bn-lbl">HOME</span>
+      <span class="bn-badge" id="bn-badge-home" style="display:none"></span>
+    </button>
+    <button data-bn="drivers" onclick="bnGo('drivers')">
+      <span class="bn-ico">👤</span><span class="bn-lbl">人と車両</span>
+    </button>
+    <button data-bn="documents" onclick="bnGo('documents')">
+      <span class="bn-ico">▤</span><span class="bn-lbl">書類</span>
+    </button>
+    <button data-bn="mail" onclick="bnGo('mail')">
+      <span class="bn-ico">✉</span><span class="bn-lbl">メール</span>
+      <span class="bn-badge" id="bn-badge-mail" style="display:none"></span>
+    </button>
+    <button data-bn="__menu" onclick="toggleSidebar()">
+      <span class="bn-ico">☰</span><span class="bn-lbl">メニュー</span>
+    </button>
+  </nav>
+
   <button class="hamburger" id="hamburger" onclick="toggleSidebar()">
     <span></span><span></span><span></span>
   </button>
@@ -6259,6 +6310,8 @@ function showPage(name,el){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
   else{var navEl=document.querySelector('.nav-item[data-page="'+name+'"]');if(navEl)navEl.classList.add('active');}
+  // ★ 2026/09/18: スマホの下部タブの選択も合わせる
+  try{ bnPaint(name); }catch(e){}
   sessionStorage.setItem('fleet_current_page',name);
   currentOfficeFilter=null;
   // データ管理の営業所フィルター+展開状態をリセット
@@ -7502,6 +7555,42 @@ async function processTopFiles(files){
 }
 
 // ====== スマホ サイドバー ======
+/* ★ 2026/09/18: 下部タブから画面を開く。
+   サイドバーの項目をそのまま呼ぶので、動きはパソコンと同じ。
+   「人と車両」は、まずドライバーを開く（車両へはその画面から移れる）。 */
+function bnGo(page){
+  try{
+    var el=document.querySelector('.nav-item[data-page="'+page+'"]');
+    showPage(page, el);
+  }catch(e){}
+  closeSidebar();
+  bnPaint(page);
+}
+function bnPaint(page){
+  var cur = page || (document.querySelector('.nav-item.active')||{}).dataset?.page || '';
+  document.querySelectorAll('.bottom-nav button[data-bn]').forEach(function(b){
+    var p=b.dataset.bn;
+    // 車両の画面を開いているときも「人と車両」を選択中にする
+    var on = (p===cur) || (p==='drivers' && (cur==='vehicles'||cur==='contractors'));
+    b.classList.toggle('on', on);
+  });
+}
+// バッジ（未送信メール・未確認の受信）を下タブにも出す
+function bnBadges(){
+  try{
+    var mail=0;
+    try{ mail += (JSON.parse(localStorage.getItem('fleet_inbox')||'[]')).filter(function(i){return i&&i.status==='未確認';}).length; }catch(e){}
+    var mb=document.getElementById('bn-badge-mail');
+    if(mb){ mb.textContent=mail||''; mb.style.display=mail?'flex':'none'; }
+    var home=0;
+    try{ home = (typeof mailTasks!=='undefined') ? mailTasks.filter(function(t){return t.status==='pending';}).length : 0; }catch(e){}
+    var hb=document.getElementById('bn-badge-home');
+    if(hb){ hb.textContent=home||''; hb.style.display=home?'flex':'none'; }
+  }catch(e){}
+}
+setInterval(bnBadges, 30000);
+document.addEventListener('DOMContentLoaded', function(){ bnPaint(); bnBadges(); });
+
 function toggleSidebar(){
   document.querySelector('.sidebar').classList.toggle('open');
   document.getElementById('sidebar-overlay').classList.toggle('open');
@@ -15332,7 +15421,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.18-e';
+var FLEET_VERSION = '2026.09.18-f';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
