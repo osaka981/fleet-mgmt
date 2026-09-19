@@ -207,7 +207,8 @@ body.modal-open{overflow:hidden}
 .doc-section{border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;grid-column:1/-1}
 .doc-section-header{padding:9px 13px;background:#fafafa}
 .doc-section-title{font-size:11px;font-weight:500;color:#666}
-.doc-fields{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px 13px}
+/* ★ 2026/09/19: 3列固定だと狭い画面で潰れるので、入る数だけ並べる */
+.doc-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;padding:10px 13px}
 .filter-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .filter-chip{padding:4px 10px;border-radius:99px;border:1px solid #e0e0e0;background:transparent;cursor:pointer;font-size:11px;color:#888;transition:all .15s}
 .filter-chip:hover{background:#f5f5f5}
@@ -216,19 +217,29 @@ body.modal-open{overflow:hidden}
 .page.active{display:block}
 .office-list{display:flex;flex-direction:column;gap:6px}
 .office-row{display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid #e0e0e0;border-radius:7px;background:#fafafa}
-.doc-gen-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-.doc-card{background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:16px}
+/* ★ 2026/09/19: 2列で固定していたため、画面を半分にすると
+   カードの中身が押し出されて見切れていた（1列に戻るのは768px以下だった）。
+   幅に応じて自動で列数が決まるようにする。 */
+.doc-gen-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:12px}
+/* ★ 2026/09/19: 中身がはみ出さないようにする */
+.doc-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;min-width:0;overflow-wrap:anywhere}
+.doc-card .btn{white-space:normal}
 .doc-card-name{font-size:13px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
 .doc-card-info{font-size:11px;color:#888;margin-bottom:10px;line-height:1.6}
 .doc-card-btns{display:flex;gap:6px;flex-wrap:wrap}
-.doc-card-body{overflow:hidden}
-.doc-tab{padding:6px 12px;font-size:11px;border:none;background:none;cursor:pointer;color:#888;border-bottom:2px solid transparent;margin-bottom:-2px;font-weight:500;white-space:nowrap}
+/* ★ 2026/09/19: overflow:hidden だと、はみ出した中身が見えないまま切れる。
+   タブは横に送れるようにし、本体は縦に伸びるようにする。 */
+.doc-card-body{overflow:visible;min-width:0}
+.doc-card-body>div:first-child{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.doc-tab{padding:6px 12px;font-size:11px;border:none;background:none;cursor:pointer;color:#888;border-bottom:2px solid transparent;margin-bottom:-2px;font-weight:500;white-space:nowrap;flex:none}
 .doc-tab.active{color:#1565C0;border-bottom-color:#1565C0}
 .doc-tab:hover{color:#333}
 .mail-badge{display:inline-flex;align-items:center;padding:3px 10px;font-size:10px;border-radius:99px;cursor:pointer;border:1px solid #ccc;color:#888;background:#f5f5f5;font-weight:500;user-select:none;transition:all .15s}
 .mail-badge.active{background:#4a90e2;color:#fff;border-color:#4a90e2}
 .mail-badge[data-type="co"].active{background:#7B1FA2;border-color:#7B1FA2}
-.doc-date-bar{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:10px 16px;background:#fff;border-radius:8px;border:1px solid #e0e0e0}
+/* ★ 2026/09/19: 横並び固定で折り返さず、狭い画面で右側が切れていた */
+.doc-date-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding:10px 16px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border)}
+.doc-date-bar input[type="date"]{max-width:100%}
 .doc-date-bar label{font-size:12px;color:#666;font-weight:500;white-space:nowrap}
 .gen-progress{margin-top:8px;font-size:11px;color:#888;display:none}
 .gen-progress.show{display:block}
@@ -894,12 +905,24 @@ body.modal-open{overflow:hidden}
             </div>
           </div>
           <div class="stats" id="dash-stats"></div>
-          <div class="top-drop" ondragover="tdOver(event)" ondragleave="tdLeave(event)" ondrop="tdDrop(event)">
+          <!-- ★ 2026/09/19: ドロップ欄を折り畳めるようにした。
+               画面の3分の1を占めていて、その下の期限アラートが見えにくかった。
+               使うのは書類を取り込むときだけなので、既定では閉じておく。
+               開いた／閉じたはこの端末に覚えさせる。
+               閉じていても、画面にファイルを引っぱってくれば自動で開く。 -->
+          <div style="margin-bottom:8px">
+            <span id="td-toggle" onclick="tdToggle()"
+              style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-sub);
+                     border:1px solid var(--border);border-radius:99px;padding:5px 12px;background:var(--bg-card)">
+              <svg viewBox="0 0 22 22" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4v11"/><path d="M6.5 10.5 11 15l4.5-4.5"/><path d="M4 18h14"/></svg>
+              <span id="td-toggle-lbl">書類を取り込む</span>
+            </span>
+          </div>
+          <div class="top-drop" id="top-drop" style="display:none" ondragover="tdOver(event)" ondragleave="tdLeave(event)" ondrop="tdDrop(event)">
             <input type="file" accept=".pdf,image/*,.docx,.xlsx,.doc,.xls" multiple onchange="tdFile(event)" id="top-drop-file">
-            <div style="font-size:28px;color:#bbb">📁</div>
-            <div style="font-size:13px;font-weight:500;color:#555">ファイル・フォルダをドロップ</div>
-            <div style="font-size:11px;color:#999">PDF・画像・Word・Excel対応 / フォルダごとドロップOK</div>
-            <div id="top-drop-state" style="font-size:12px;color:#4a90e2;margin-top:4px">クリックまたはドロップ</div>
+            <div style="font-size:13px;font-weight:500;color:var(--text-sub)">ファイル・フォルダをドロップ</div>
+            <div style="font-size:11px;color:var(--text-sub)">PDF・画像・Word・Excel対応 / フォルダごとドロップOK</div>
+            <div id="top-drop-state" style="font-size:12px;color:var(--accent);margin-top:4px">クリックまたはドロップ</div>
           </div>
           <div style="margin-bottom:8px;font-size:12px;font-weight:500;color:#888">期限アラート（期限切れ・60日以内）</div>
           <div id="alert-list" class="table-wrap"></div>
@@ -7611,6 +7634,28 @@ function closeModal(id){var el=document.getElementById(id);if(el)el.style.displa
 function closeBg(e,id){if(e.target===document.getElementById(id))closeModal(id);}
 
 // ====== ダッシュボードPDFドロップ ======
+/* ★ 2026/09/19: ドロップ欄の開け閉め */
+function tdToggle(force){
+  var el=document.getElementById('top-drop');
+  var lbl=document.getElementById('td-toggle-lbl');
+  if(!el) return;
+  var open = (force===true) ? true : (force===false ? false : el.style.display==='none');
+  el.style.display = open ? '' : 'none';
+  if(lbl) lbl.textContent = open ? '閉じる' : '書類を取り込む';
+  try{ localStorage.setItem('fleet_td_open', open?'1':'0'); }catch(e){}
+}
+// 画面にファイルを引っぱってきたら、閉じていても開く
+document.addEventListener('dragover', function(e){
+  if(!e.dataTransfer || !Array.from(e.dataTransfer.types||[]).includes('Files')) return;
+  var pane=document.getElementById('home-dash-pane');
+  if(!pane || pane.style.display==='none') return;
+  var el=document.getElementById('top-drop');
+  if(el && el.style.display==='none') tdToggle(true);
+});
+document.addEventListener('DOMContentLoaded', function(){
+  try{ if(localStorage.getItem('fleet_td_open')==='1') tdToggle(true); }catch(e){}
+});
+
 function tdOver(e){e.preventDefault();e.currentTarget.classList.add('drag-over');}
 function tdLeave(e){e.currentTarget.classList.remove('drag-over');}
 function tdFile(e){processTopFiles(Array.from(e.target.files));e.target.value='';}
