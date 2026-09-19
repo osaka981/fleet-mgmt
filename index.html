@@ -72,6 +72,9 @@
 .theme-btn{background:transparent;border:none;color:var(--text-sub);cursor:pointer;
   line-height:1;padding:5px 7px;border-radius:6px;display:inline-flex;align-items:center}
 .theme-btn svg{width:19px;height:19px;display:block}
+/* パソコンはサイドバーが常に見えているので、メニューは出さない */
+.theme-btn-menu{display:none}
+@media(max-width:900px){ .theme-btn-menu{display:inline-flex} }
 .theme-btn:hover{background:var(--hover);color:var(--text)}
 .dark-mode .topbar{background:var(--topbar-bg)!important;border-color:var(--border)!important}
 .dark-mode .topbar h1{color:var(--text)!important}
@@ -323,10 +326,12 @@ body.modal-open{overflow:hidden}
    残りはメニューにまとめる。パソコンはこれまでどおりサイドバー。 */
 .bottom-nav{display:none}
 @media(max-width:900px){
+  /* ★ 2026/09/19: iPhoneのホームバー（画面下の黒い横棒）に
+     文字が重なって押しにくかった。安全域ぶんに余白を足して上へ逃がす。 */
   .bottom-nav{
     display:flex;position:fixed;left:0;right:0;bottom:0;z-index:240;
     background:var(--bg-card);border-top:1px solid var(--border);
-    padding-bottom:env(safe-area-inset-bottom);
+    padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 6px);
   }
   .bottom-nav button{
     flex:1;background:transparent;border:none;cursor:pointer;
@@ -342,7 +347,7 @@ body.modal-open{overflow:hidden}
     display:flex;align-items:center;justify-content:center;padding:0 4px;
   }
   /* 下タブのぶん、本文の下に余白を作る */
-  .main{padding-bottom:58px}
+  .main{padding-bottom:calc(64px + env(safe-area-inset-bottom, 0px))}
   /* 下タブがあるので、左上のハンバーガーは出さない */
   .hamburger{display:none!important}
   #global-search-wrap{padding-left:12px!important}
@@ -811,10 +816,7 @@ body.modal-open{overflow:hidden}
       <span class="bn-lbl">メール</span>
       <span class="bn-badge" id="bn-badge-mail" style="display:none"></span>
     </button>
-    <button data-bn="__menu" onclick="toggleSidebar()">
-      <svg class="bn-ico" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6.5h14M4 11h14M4 15.5h14"/></svg>
-      <span class="bn-lbl">メニュー</span>
-    </button>
+<!-- ★ 2026/09/19: メニューは右上のヘッダーへ移した（下は4つに） -->
   </nav>
 
   <button class="hamburger" id="hamburger" onclick="toggleSidebar()">
@@ -871,14 +873,14 @@ body.modal-open{overflow:hidden}
         <div class="topbar"><h1>ホーム</h1><span id="today-label" style="font-size:11px;color:#888"></span></div>
         <div class="content">
           <!-- ★ 2026/09/18: HOMEを2つに分ける。
-               ダッシュボード＝いまの状態、タスク＝やること。
+               ダッシュボード＝いまの状態、タスク＝対応が必要なもの。
                タスクは手で作らず、期限や登録状況から毎回計算する。
                手で作って手で消す作りだと、放置されて溜まるだけになる。 -->
           <div id="home-tabs" style="display:flex;gap:16px;border-bottom:1.5px solid var(--border);margin-bottom:14px">
             <span onclick="homeTab('dash')" id="home-tab-dash"
               style="cursor:pointer;font-size:13px;font-weight:500;padding-bottom:7px;margin-bottom:-1.5px;border-bottom:2px solid var(--text)">ダッシュボード</span>
             <span onclick="homeTab('task')" id="home-tab-task"
-              style="cursor:pointer;font-size:13px;color:var(--text-sub);padding-bottom:7px">やること<span id="home-task-count" style="margin-left:5px;background:var(--bg-warn);color:var(--warn);border-radius:99px;font-size:11px;padding:1px 6px;display:none"></span></span>
+              style="cursor:pointer;font-size:13px;color:var(--text-sub);padding-bottom:7px">タスク<span id="home-task-count" style="margin-left:5px;background:var(--bg-warn);color:var(--warn);border-radius:99px;font-size:11px;padding:1px 6px;display:none"></span></span>
           </div>
           <div id="home-task-pane" style="display:none">
             <div id="task-list"></div>
@@ -7759,7 +7761,7 @@ function bnBadges(){
 setInterval(bnBadges, 30000);
 document.addEventListener('DOMContentLoaded', function(){ bnPaint(); bnBadges(); });
 
-/* ★ 2026/09/18: やることの件数を、開かなくても分かるようにする。
+/* ★ 2026/09/18: タスクの件数を、開かなくても分かるようにする。
    HOMEのサブタブと、サイドバー・下部タブのバッジに出す。 */
 function refreshTaskCount(){
   try{
@@ -7775,7 +7777,7 @@ function refreshTaskCount(){
 setTimeout(refreshTaskCount, 2500);
 setInterval(refreshTaskCount, 60000);
 
-/* ══ ★ 2026/09/18: やること（タスク） ══
+/* ══ ★ 2026/09/18: タスク ══
    手で作るのではなく、いまのデータから毎回計算する。
    ・免許・車検・自賠責・任意保険の期限切れ、または30日以内
    ・フリートに登録済みだが経営管理の台帳に無い人
@@ -15205,7 +15207,11 @@ function mountThemeButtons(){
       +'<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'
       +'<circle cx="11" cy="11" r="3"/>'
       +'<path d="M11 2.5v2M11 17.5v2M2.5 11h2M17.5 11h2M5 5l1.4 1.4M15.6 15.6 17 17M5 17l1.4-1.4M15.6 6.4 17 5"/>'
-      +'</svg></button>';
+      +'</svg></button>'
+      /* ★ 2026/09/19: メニューを右上に置く。下部タブは毎日使う4つだけにする。 */
+      +'<button class="theme-btn theme-btn-menu" aria-label="メニュー" title="メニュー">'
+      +'<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">'
+      +'<path d="M4 6.5h14M4 11h14M4 15.5h14"/></svg></button>';
     var btns=wrap.querySelectorAll('button');
     btns[0].onclick=cycleTheme;
     // 長押しで自動に戻す
@@ -15215,6 +15221,7 @@ function mountThemeButtons(){
       btns[0].addEventListener(ev,function(){ if(t){ clearTimeout(t); t=null; } });
     });
     btns[1].onclick=function(){ try{ showPage('settings', document.querySelector('.nav-item[data-page="settings"]')); }catch(e){} };
+    if(btns[2]) btns[2].onclick=function(){ try{ toggleSidebar(); }catch(e){} };
     tb.appendChild(wrap);
   });
   applyTheme();
@@ -15906,7 +15913,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.18-s';
+var FLEET_VERSION = '2026.09.19-a';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
