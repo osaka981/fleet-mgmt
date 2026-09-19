@@ -3165,34 +3165,101 @@ function renderSettingsOffices(){
     </div>`;
   }).join('');
 
-  // 営業所リストにない営業所に紐づいたデータを検出
+  /* 営業所リストにない営業所に紐づいたデータを検出
+     ★ 2026/09/19: これまで氏名や車両番号の「文字列」だけを集めていたため、
+     まとめて移すことしかできなかった。1件ずつ選べるように、対象の実体
+     （どの配列の何番か）も一緒に持つ。 */
   const allOfficeNames = new Set(offices);
   const orphanedOffices = new Map();
+  const _orphanGet = o => {
+    if(!orphanedOffices.has(o)) orphanedOffices.set(o,{drivers:[],vehicles:[],items:[]});
+    return orphanedOffices.get(o);
+  };
   drivers.forEach(d=>{
     const offs=Array.isArray(d.offices)?d.offices:d.office?[d.office]:[];
-    offs.forEach(o=>{if(o&&!allOfficeNames.has(o)){if(!orphanedOffices.has(o))orphanedOffices.set(o,{drivers:[],vehicles:[]});orphanedOffices.get(o).drivers.push(d.name+(d.status&&d.status!=='在籍'?' ('+d.status+')':''));}});
+    offs.forEach(o=>{
+      if(o&&!allOfficeNames.has(o)){
+        const g=_orphanGet(o);
+        const label=d.name+(d.status&&d.status!=='在籍'?' ('+d.status+')':'');
+        g.drivers.push(label);
+        g.items.push({kind:'driver', src:'own', id:d.id, label:label, office:o});
+      }
+    });
   });
-  vehicles.forEach(v=>{if(v.office&&!allOfficeNames.has(v.office)){if(!orphanedOffices.has(v.office))orphanedOffices.set(v.office,{drivers:[],vehicles:[]});orphanedOffices.get(v.office).vehicles.push(v.plate);}});
+  vehicles.forEach(v=>{
+    if(v.office&&!allOfficeNames.has(v.office)){
+      const g=_orphanGet(v.office);
+      // 誰かが乗っているかを出す（未搭乗の車だけ移したい場面があるため）
+      const rider=(drivers||[]).find(d=>(v.driverId&&String(d.id)===String(v.driverId))||d.name===v.driver);
+      const label=String(v.plate||v.id)+(rider?'（'+rider.name+'）':'（未搭乗）');
+      g.vehicles.push(label);
+      g.items.push({kind:'vehicle', src:'own', id:v.id, label:label, office:v.office, riding:!!rider});
+    }
+  });
   companies.forEach(c=>{
-    (c.drivers||[]).forEach(d=>{(d.offices||[]).forEach(o=>{if(o&&!allOfficeNames.has(o)){if(!orphanedOffices.has(o))orphanedOffices.set(o,{drivers:[],vehicles:[]});orphanedOffices.get(o).drivers.push(d.name+' ['+c.name+']');}});});
-    (c.vehicles||[]).forEach(v=>{(v.offices||[]).forEach(o=>{if(o&&!allOfficeNames.has(o)){if(!orphanedOffices.has(o))orphanedOffices.set(o,{drivers:[],vehicles:[]});orphanedOffices.get(o).vehicles.push(v.plate+' ['+c.name+']');}});});
+    _normalizeArrayField(c.drivers).forEach(d=>{(d.offices||[]).forEach(o=>{
+      if(o&&!allOfficeNames.has(o)){
+        const g=_orphanGet(o);
+        const label=d.name+' ['+c.name+']';
+        g.drivers.push(label);
+        g.items.push({kind:'driver', src:'co', companyId:c.id, id:d.id, label:label, office:o});
+      }
+    });});
+    _normalizeArrayField(c.vehicles).forEach(v=>{(v.offices||[]).forEach(o=>{
+      if(o&&!allOfficeNames.has(o)){
+        const g=_orphanGet(o);
+        const label=String(v.plate||v.id)+' ['+c.name+']';
+        g.vehicles.push(label);
+        g.items.push({kind:'vehicle', src:'co', companyId:c.id, id:v.id, label:label, office:o});
+      }
+    });});
   });
+  // 画面から参照できるように控えておく
+  window._orphanItems = {};
+  orphanedOffices.forEach((data,offName)=>{ window._orphanItems[offName]=data.items; });
   if(orphanedOffices.size){
     const migrateOpts=offices.map(o=>`<option value="${o}">${o}</option>`).join('');
     let orphanHtml='<div style="margin-top:12px;padding:10px 14px;background:#fff3e0;border:1px solid #ffcc80;border-radius:8px"><div style="font-size:11px;font-weight:600;color:#e65100;margin-bottom:8px">営業所リストにない旧営業所名が残っています</div>';
     let idx=0;
     orphanedOffices.forEach((data,offName)=>{
       const selId='orphan-migrate-'+idx;
-      orphanHtml+=`<div style="padding:8px 0;border-bottom:1px solid #ffe0b2;font-size:11px">
-        <strong style="color:#e65100">${esc(offName)}</strong>　D ${data.drivers.length}名 / 車両 ${data.vehicles.length}台
-        ${data.drivers.length?'<br><span style="color:#888">'+data.drivers.join('、 ')+'</span>':''}
-        <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+      /* ★ 2026/09/19: 1件ずつ選んで移せるようにする。
+         全部まとめて移すと、ドライバーは移したいが車は置いておきたい、
+         といった調整ができなかった。
+         ドライバーと未搭乗車両を分け、それぞれ全選択も置く。 */
+      const dItems=data.items.filter(x=>x.kind==='driver');
+      const vItems=data.items.filter(x=>x.kind==='vehicle');
+      const chk=(x,i)=>`<label style="display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer">
+          <input type="checkbox" class="orphan-chk-${idx}" data-i="${i}" checked style="width:14px;height:14px;flex:none">
+          <span style="overflow-wrap:anywhere">${esc(x.label)}</span>
+        </label>`;
+      orphanHtml+=`<div style="padding:10px 0;border-bottom:1px solid #ffe0b2;font-size:11px">
+        <strong style="color:#e65100">${esc(offName)}</strong>　ドライバー ${dItems.length}名 / 車両 ${vItems.length}台
+        <div style="margin-top:7px;display:flex;gap:14px;flex-wrap:wrap">
+          ${dItems.length?`<div style="flex:1;min-width:190px">
+            <label style="display:flex;align-items:center;gap:6px;font-weight:600;color:#555;padding-bottom:3px;border-bottom:1px solid #ffe0b2;cursor:pointer">
+              <input type="checkbox" checked style="width:14px;height:14px;flex:none"
+                onchange="orphanToggleAll(${idx},'driver',this.checked)">
+              ドライバー（搭乗車両はそのまま）
+            </label>
+            ${dItems.map(x=>chk(x,data.items.indexOf(x))).join('')}
+          </div>`:''}
+          ${vItems.length?`<div style="flex:1;min-width:190px">
+            <label style="display:flex;align-items:center;gap:6px;font-weight:600;color:#555;padding-bottom:3px;border-bottom:1px solid #ffe0b2;cursor:pointer">
+              <input type="checkbox" checked style="width:14px;height:14px;flex:none"
+                onchange="orphanToggleAll(${idx},'vehicle',this.checked)">
+              車両
+            </label>
+            ${vItems.map(x=>chk(x,data.items.indexOf(x))).join('')}
+          </div>`:''}
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px;align-items:center">
           <select id="${selId}" style="flex:1;padding:5px 8px;font-size:11px;border:1px solid #ddd;border-radius:4px">
             <option value="">移行先を選択</option>
             <option value="__remove__">紐づけ解除（空にする）</option>
             ${migrateOpts}
           </select>
-          <button class="btn btn-sm btn-primary" style="font-size:10px" onclick="migrateOrphan('${esc(offName)}','${selId}')">移行</button>
+          <button class="btn btn-sm btn-primary" style="font-size:10px" onclick="migrateOrphanSelected('${esc(offName)}','${selId}',${idx})">選んだものを移行</button>
         </div>
       </div>`;
       idx++;
@@ -3201,6 +3268,73 @@ function renderSettingsOffices(){
     document.getElementById('settings-office-list').innerHTML+=orphanHtml;
   }
 }
+/* ★ 2026/09/19: 選んだものだけ移す。
+   チェックの付いた行だけを対象にし、それ以外は元の営業所のまま残す。
+   ドライバーを移しても、その人の搭乗車両は動かさない（車は車で選ぶ）。 */
+function orphanToggleAll(idx, kind, on){
+  const items=(window._orphanItems||{});
+  document.querySelectorAll('.orphan-chk-'+idx).forEach(function(cb){
+    const list=Object.values(items)[idx]||[];
+    const it=list[Number(cb.dataset.i)];
+    if(it && it.kind===kind) cb.checked=on;
+  });
+}
+function migrateOrphanSelected(oldName, selId, idx){
+  const sel=document.getElementById(selId);
+  const to=sel?sel.value:'';
+  if(!to){ alert('移行先を選んでください'); return; }
+  const items=(window._orphanItems||{})[oldName]||[];
+  const picked=[];
+  document.querySelectorAll('.orphan-chk-'+idx).forEach(function(cb){
+    if(cb.checked){ const it=items[Number(cb.dataset.i)]; if(it) picked.push(it); }
+  });
+  if(!picked.length){ alert('移すものを選んでください'); return; }
+
+  const toLabel = (to==='__remove__') ? '紐づけを解除' : ('「'+to+'」へ移行');
+  const lines=picked.slice(0,20).map(function(x){
+    return '　'+(x.kind==='driver'?'ドライバー　':'車両　')+x.label; }).join('\n');
+  if(!confirm('「'+oldName+'」の次のものを'+toLabel+'します。\n\n'+lines
+      +(picked.length>20?'\n　ほか '+(picked.length-20)+'件':'')
+      +'\n\n計 '+picked.length+'件。選んでいないものは元のまま残ります。')) return;
+
+  // 控えを残す
+  try{ localStorage.setItem('fleet_orphan_backup_'+Date.now(), JSON.stringify({oldName:oldName,to:to,picked:picked})); }catch(e){}
+
+  const swap=function(arr){
+    if(!Array.isArray(arr)) return arr;
+    var out=arr.filter(function(o){ return o!==oldName; });
+    if(to!=='__remove__' && out.indexOf(to)<0) out.push(to);
+    return out;
+  };
+  var done=0;
+  picked.forEach(function(x){
+    var target=null;
+    if(x.src==='own'){
+      target = (x.kind==='driver')
+        ? (drivers||[]).find(function(d){ return String(d.id)===String(x.id); })
+        : (vehicles||[]).find(function(v){ return String(v.id)===String(x.id); });
+    }else{
+      var co=(companies||[]).find(function(c){ return String(c.id)===String(x.companyId); });
+      if(co){
+        var list=(x.kind==='driver') ? _normalizeArrayField(co.drivers) : _normalizeArrayField(co.vehicles);
+        target=list.find(function(o){ return String(o.id)===String(x.id); });
+        if(x.kind==='driver') co.drivers=list; else co.vehicles=list;
+      }
+    }
+    if(!target) return;
+    target.offices=swap(target.offices);
+    if(target.office===oldName) target.office=(to==='__remove__')?'':to;
+    done++;
+  });
+
+  saveLocal(); if(typeof saveCompanies==='function') saveCompanies();
+  isDirty=true; scheduleAutoSave();
+  addLog('拠点','旧営業所の移行: '+oldName+' → '+(to==='__remove__'?'（解除）':to)+' '+done+'件');
+  try{ renderAll(); }catch(e){}
+  try{ renderSettingsOffices(); }catch(e){}
+  alert(done+'件を移しました。');
+}
+
 function migrateOrphan(oldName, selId){
   const newVal=document.getElementById(selId)?.value||'';
   if(!newVal){alert('移行先を選択してください');return;}
@@ -16212,7 +16346,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.19-i';
+var FLEET_VERSION = '2026.09.19-j';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
