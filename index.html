@@ -11521,18 +11521,23 @@ function renderStorage(){
       // --- 折り畳み版 ---
       const officesOnly=(d._offices.join('・')||'未設定');
       const fileInfo='<span style="font-size:10px;line-height:1.4;display:inline-block;text-align:right;background:#fff;color:#444;padding:2px 8px;border-radius:6px;border:1px solid #aab">ドライバー '+af.length+'件<br>車両 '+vaf.length+'件</span>';
-      const collapsedHtml='<div id="sc-c-'+key+'" style="display:'+(expanded?'none':'block')+'"><div style="background:#d8dce3;border:1.5px solid #888;border-radius:8px;padding:8px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px" onclick="storageToggleExpand(\''+key+'\')">'+
-          '<div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">'+
-            '<div style="width:28px;height:28px;min-width:28px;min-height:28px;max-width:28px;max-height:28px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;flex-shrink:0;align-self:flex-start">'+typeIcon+'</div>'+
-            '<div style="min-width:0;overflow:hidden"><div style="font-weight:600;font-size:13px;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+d.name+'</div>'+
-            '<div style="font-size:10px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d._offices.join('・'))+'">'+officesOnly+'</div></div>'+
+      /* ★ 2026/09/19: 氏名・期限・番号・件数を横1列に並べていたため、
+         氏名に幅が残らず「北…」「久留米…」のように途切れていた。
+         氏名は1行を使い、期限や件数は下の段に置く。 */
+      const collapsedHtml='<div id="sc-c-'+key+'" style="display:'+(expanded?'none':'block')+'"><div style="background:#d8dce3;border:1.5px solid #888;border-radius:8px;padding:9px 12px;cursor:pointer" onclick="storageToggleExpand(\''+key+'\')">'+
+          '<div style="display:flex;align-items:flex-start;gap:8px;min-width:0">'+
+            '<div style="width:28px;height:28px;min-width:28px;min-height:28px;max-width:28px;max-height:28px;border-radius:50%;'+typeColor+';display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;flex-shrink:0">'+typeIcon+'</div>'+
+            '<div style="min-width:0;flex:1">'+
+              '<div style="font-weight:600;font-size:13.5px;color:#222;overflow-wrap:anywhere;line-height:1.35">'+d.name+'</div>'+
+              '<div style="font-size:10px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(d._offices.join('・'))+'">'+officesOnly+'</div>'+
+            '</div>'+
+            '<span style="font-size:10px;color:#999;flex-shrink:0;margin-top:2px">▶</span>'+
           '</div>'+
-          '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">'+
+          '<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:7px;padding-left:36px">'+
             companyBadge+
             expBadge(d.license?.exp,hasLic)+
             plateBadge+
             fileInfo+
-            '<span style="font-size:10px;color:#999;margin-left:2px">▶</span>'+
           '</div>'+
         '</div></div>';
 
@@ -11706,17 +11711,20 @@ function renderStorage(){
         : '<span style="font-size:9px;background:#2a6b8a;color:#fff;padding:1px 6px;border-radius:3px;margin-right:4px">社有</span>';
       var collapsedHtml='<div id="sc-c-'+key+'" style="display:'+(expanded?'none':'block')+'"'+
           ' draggable="true" data-spare-vehicle="'+v.id+'" ondragstart="spareDragStart(event)" ondragend="spareDragEnd(event)"'+
-          '><div style="background:'+_vBg+';border:1.5px solid '+_vBd+';border-radius:8px;padding:8px 12px;cursor:grab;display:flex;align-items:center;justify-content:space-between;gap:8px;opacity:.85" onclick="storageToggleExpand(\''+key+'\')">'+
-          '<div style="min-width:0;display:flex;align-items:center;gap:8px;flex:1">'+
+          /* ★ 2026/09/19: ドライバーのカードと同じく、車両番号が1行を使えるようにする */
+          '><div style="background:'+_vBg+';border:1.5px solid '+_vBd+';border-radius:8px;padding:9px 12px;cursor:grab;opacity:.85" onclick="storageToggleExpand(\''+key+'\')">'+
+          '<div style="min-width:0;display:flex;align-items:flex-start;gap:8px">'+
             '<div style="width:28px;height:28px;min-width:28px;min-height:28px;max-width:28px;max-height:28px;border-radius:50%;background:'+_vIcon+';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;flex-shrink:0">車</div>'+
-            '<div style="min-width:0;overflow:hidden"><div style="font-weight:600;font-size:13px;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_vTag+v.plate+' <span style="font-size:10px;color:#555;font-weight:400">'+(v.model||'')+'</span></div>'+
-            '<div style="font-size:10px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(vOfficesFull)+'">'+vOfficesFull+'</div></div>'+
+            '<div style="min-width:0;flex:1">'+
+              '<div style="font-weight:600;font-size:13.5px;color:#222;overflow-wrap:anywhere;line-height:1.35">'+_vTag+v.plate+' <span style="font-size:10px;color:#555;font-weight:400">'+(v.model||'')+'</span></div>'+
+              '<div style="font-size:10px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(vOfficesFull)+'">'+vOfficesFull+'</div>'+
+            '</div>'+
+            '<span style="font-size:10px;color:#999;flex-shrink:0;margin-top:2px">▶</span>'+
           '</div>'+
-          '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+
+          '<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:7px;padding-left:36px">'+
             '<span style="font-size:9px;color:#666;margin-right:2px">車検</span>'+
             expBadge(v.shaken?.exp,hasShaken)+
             '<span style="font-size:10px;background:#fff;color:#444;padding:2px 8px;border-radius:6px;border:1px solid #aab">'+vaf.length+'件</span>'+
-            '<span style="font-size:10px;color:#999">▶</span>'+
           '</div>'+
         '</div></div>';
 
@@ -16195,7 +16203,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.19-g';
+var FLEET_VERSION = '2026.09.19-h';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
