@@ -1215,6 +1215,7 @@ body.modal-open{overflow:hidden}
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
               <button class="btn btn-sm" style="font-size:11px" onclick="syncOfficesNow(this)">経営管理から取り込む</button>
+              <button class="btn btn-sm" style="font-size:11px" onclick="syncStaffOfficesNow(this)">所属を経営管理に合わせる</button>
               <button class="btn btn-sm" style="font-size:11px" onclick="migrateYokomochiToSakai()">集荷(横持)を堺へ付け替え</button>
             </div>
           </div>
@@ -8020,6 +8021,103 @@ async function syncOfficesFromMgmt(opts){
   }catch(e){
     console.warn('[拠点] 取り込めませんでした', e);
     return { ok:false, error:e.message };
+  }
+}
+
+/* ★ 2026/09/19: 誰がどこの営業所かを、経営管理から取り込む。
+   拠点名だけ流していて所属を流していなかったため、堺営業所が 0人 のままだった。
+   所属は経営管理で決める。フリートは受け取るだけ。
+   突き合わせは uid → 社員番号 → 氏名 の順。uid が一番確かなので優先する。
+   複数の営業所に所属している人は、経営管理の値を先頭に置き、残りは残す
+   （藤井寺と兼務、のような例があるため勝手に消さない）。 */
+async function syncStaffOfficesFromMgmt(opts){
+  opts = opts || {};
+  try{
+    const res = await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'getStaffOffices'})});
+    const json = await res.json();
+    if(!json || !json.ok || !Array.isArray(json.staff)) throw new Error((json&&json.error)||'取得できません');
+
+    const nm  = v => String(v||'').replace(/\s+/g,'');
+    const emp = v => String(v||'').replace(/-/g,'').trim();
+    const byUid={}, byEmp={}, byName={};
+    json.staff.forEach(s=>{
+      if(s.uid)   byUid[String(s.uid)] = s;
+      if(s.empNo) byEmp[emp(s.empNo)]  = s;
+      if(s.name){ const k=nm(s.name); (byName[k]=byName[k]||[]).push(s); }
+    });
+
+    const changes=[], unmatched=[], ambiguous=[];
+    (drivers||[]).forEach(d=>{
+      if(!d || !d.name) return;
+      if(d.status && d.status!=='在籍') return;      // 退職者は触らない
+      let hit=null, why='';
+      if(d.uid && byUid[String(d.uid)]){ hit=byUid[String(d.uid)]; why='uid'; }
+      if(!hit && d.empNo && byEmp[emp(d.empNo)]){ hit=byEmp[emp(d.empNo)]; why='社員番号'; }
+      if(!hit){
+        const cands=byName[nm(d.name)]||[];
+        if(cands.length===1){ hit=cands[0]; why='氏名'; }
+        else if(cands.length>1){ ambiguous.push({name:d.name, n:cands.length}); return; }
+      }
+      if(!hit){ unmatched.push(d.name); return; }
+      const want=hit.short;
+      if(!want) return;                               // 経営管理側が空なら触らない
+      const now=d.office||'';
+      if(now===want) return;                          // すでに一致
+      changes.push({ d:d, from:now||'(未設定)', to:want, why:why });
+    });
+
+    if(!changes.length){
+      return { ok:true, changed:0, unmatched:unmatched, ambiguous:ambiguous };
+    }
+    if(!opts.silent){
+      const lines=changes.slice(0,25).map(c=>
+        '　'+c.d.name+'　'+c.from+' → '+c.to+'　['+c.why+']').join('\n');
+      const extra=[];
+      if(unmatched.length) extra.push('経営管理に見つからない: '+unmatched.length+'名（触りません）');
+      if(ambiguous.length) extra.push('同姓同名で特定できない: '+ambiguous.length+'名（触りません）');
+      const go=confirm(
+        '経営管理の所属に合わせます。\n\n'+lines
+        +(changes.length>25?'\n　ほか '+(changes.length-25)+'名':'')
+        +'\n\n計 '+changes.length+'名。所属以外の項目には触れません。'
+        +(extra.length?'\n\n'+extra.join('\n'):''));
+      if(!go) return { ok:false, cancelled:true };
+    }
+
+    // 控えを残す
+    try{
+      localStorage.setItem('fleet_office_backup_'+Date.now(), JSON.stringify(
+        changes.map(c=>({id:c.d.id,name:c.d.name,office:c.d.office,offices:c.d.offices}))));
+    }catch(e){}
+
+    changes.forEach(c=>{
+      const d=c.d;
+      d.office=c.to;
+      // 複数所属は、経営管理の値を先頭にして残りを残す
+      const rest=(Array.isArray(d.offices)?d.offices:[]).filter(o=>o&&o!==c.to&&o!==c.from);
+      d.offices=[c.to].concat(rest);
+    });
+    saveLocal(); isDirty=true; scheduleAutoSave();
+    addLog('拠点','所属を経営管理に合わせました: '+changes.length+'名');
+    try{ renderAll(); }catch(e){}
+    return { ok:true, changed:changes.length, unmatched:unmatched, ambiguous:ambiguous };
+  }catch(e){
+    console.warn('[所属] 取り込めませんでした', e);
+    return { ok:false, error:e.message };
+  }
+}
+async function syncStaffOfficesNow(btn){
+  const label=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.textContent='取込中...'; }
+  const r=await syncStaffOfficesFromMgmt();
+  if(btn){ btn.disabled=false; btn.textContent=label||'所属を経営管理に合わせる'; }
+  if(r && r.ok){
+    const ex=[];
+    if(r.unmatched&&r.unmatched.length) ex.push('経営管理に見つからない '+r.unmatched.length+'名');
+    if(r.ambiguous&&r.ambiguous.length) ex.push('同姓同名で特定できない '+r.ambiguous.length+'名');
+    alert(r.changed ? (r.changed+'名の所属を更新しました。'+(ex.length?'\n\n'+ex.join('\n'):''))
+                    : ('変更はありません。すでに一致しています。'+(ex.length?'\n\n'+ex.join('\n'):'')));
+  }else if(r && !r.cancelled){
+    alert('取り込めませんでした。\n'+((r&&r.error)||''));
   }
 }
 
@@ -16090,7 +16188,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.19-e';
+var FLEET_VERSION = '2026.09.19-f';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
