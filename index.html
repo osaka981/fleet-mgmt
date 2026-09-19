@@ -990,7 +990,9 @@ body.modal-open{overflow:hidden}
             </select>
             <button class="btn btn-primary" onclick="openFileMgrUploadGeneral()" style="white-space:nowrap;min-height:38px;padding:8px 14px;font-size:12px">＋ ファイル追加</button>
           </div>
-          <div id="storage-office-badges" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:6px;margin-bottom:10px"></div>
+          <!-- ★ 2026/09/19: 拠点が増えて7つになり、1行に詰め込むと右端の「堺」が
+               切れていた。入る数だけ並べて、あふれたら次の行へ折り返す。 -->
+          <div id="storage-office-badges" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
           <div id="storage-legend" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px;font-size:10px;color:#888;padding:6px 10px;background:#fafafa;border-radius:6px">
             <span style="font-weight:600;color:#666">凡例：</span>
             <span><span style="display:inline-block;width:16px;height:14px;background:#2e7d32;color:#fff;border-radius:3px;text-align:center;line-height:14px;font-size:8px">社</span> 社員</span>
@@ -11343,7 +11345,9 @@ function renderStorage(){
       var allBadgeActive=!storageOfficeFilter;
       var allBg=allBadgeActive?(storageSplitMode?'background:#1a237e;color:#fff;border:1px solid #1a237e':'background:#4a90e2;color:#fff;border:1px solid #4a90e2'):'background:#f7f7f7;border:1px solid #ddd;color:#555';
       var totalD=allDrivers.length, totalV=allVehicles.length;
-      var allBadgeHtml='<div style="padding:8px 6px;border-radius:8px;cursor:pointer;text-align:center;'+allBg+'" onclick="storageClickAll()"><div style="font-size:12px;font-weight:600;white-space:nowrap">すべて</div><div style="font-size:9px;opacity:.7;white-space:nowrap">'+totalD+'人/'+totalV+'台</div></div>';
+      // ★ 2026/09/19: 折り返すようにしたので、1枚あたりの幅を決める
+      var _badgeW='flex:1 1 92px;min-width:92px;max-width:150px;';
+      var allBadgeHtml='<div style="'+_badgeW+'padding:8px 6px;border-radius:8px;cursor:pointer;text-align:center;'+allBg+'" onclick="storageClickAll()"><div style="font-size:12px;font-weight:600;white-space:nowrap">すべて</div><div style="font-size:9px;opacity:.7;white-space:nowrap">'+totalD+'人/'+totalV+'台</div></div>';
       badgesEl.innerHTML=allBadgeHtml+allKeys.map(o=>{
         const cnt=officeCounts[o]||{d:0,v:0};
         const total=cnt.d+cnt.v;
@@ -11352,7 +11356,7 @@ function renderStorage(){
         const isUncat=o==='未分類';
         const isGaishu=o==='外注(未設定)';
         const bg=isActive?'background:#4a90e2;color:#fff;border:1px solid #4a90e2':'background:#f7f7f7;border:1px solid '+(isUncat?'#e53935':isGaishu?'#E65100':'#ddd')+';color:'+(isUncat?'#e53935':isGaishu?'#E65100':'#555');
-        return '<div style="padding:8px 6px;border-radius:8px;cursor:pointer;text-align:center;'+bg+'" onclick="storageSetOffice(\''+(isActive?'':o)+'\')">'+
+        return '<div style="'+_badgeW+'padding:8px 6px;border-radius:8px;cursor:pointer;text-align:center;'+bg+'" onclick="storageSetOffice(\''+(isActive?'':o)+'\')">'+
           '<div style="font-size:12px;font-weight:600;white-space:nowrap">'+o+'</div>'+
           '<div style="font-size:9px;opacity:.7;white-space:nowrap">'+(isUncat?uncatTotal+'件':cnt.d+'人/'+cnt.v+'台')+'</div>'+
         '</div>';
@@ -11450,7 +11454,10 @@ function renderStorage(){
         '</div>'+
       '</div>';
     });
-    html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:20px" class="split-grid-3">'+driverCardsSplit.join('')+'</div>';
+    /* ★ 2026/09/19: 3列で等分していたため、件数が少ない営業所ではカードが
+       横に引き伸ばされ、タブを切り替えるたびに大きさが変わっていた。
+       1枚あたりの幅に上限を決め、どの営業所でも同じ大きさにする。 */
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,380px));gap:6px;margin-bottom:20px" class="split-grid-3">'+driverCardsSplit.join('')+'</div>';
     }
     // --- 車両一覧 ---
     if(allVehicles.length){
@@ -11477,7 +11484,7 @@ function renderStorage(){
         '</div>'+
       '</div>';
     });
-    html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px" class="split-grid-3">'+vehicleCardsSplit.join('')+'</div>';
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,380px));gap:6px" class="split-grid-3">'+vehicleCardsSplit.join('')+'</div>';
     }
     el.innerHTML=html;return;
   }
@@ -16188,7 +16195,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.19-f';
+var FLEET_VERSION = '2026.09.19-g';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
