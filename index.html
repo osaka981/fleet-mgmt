@@ -5561,11 +5561,11 @@ function renderHistory(){
   // 日付でグループ化
   const groups={};
   data.forEach(h=>{const key=`${h.date}__${h.office}__${h.tag}`;if(!groups[key])groups[key]={date:h.date,office:h.office,tag:h.tag,time:h.time,files:[]};groups[key].files.push(...(h.files||[]));});
-  const sorted=Object.values(groups).sort((a,b)=>b.date.localeCompare(a.date)||b.time?.localeCompare(a.time||'')||0);
+  const sorted=Object.values(groups).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.time||'').localeCompare(String(a.time||''))||0);
   // 日付ごとにまとめる
   const byDate={};
   sorted.forEach(g=>{if(!byDate[g.date])byDate[g.date]=[];byDate[g.date].push(g);});
-  const html=Object.keys(byDate).sort((a,b)=>b.localeCompare(a)).map(date=>{
+  const html=Object.keys(byDate).sort((a,b)=>String(b).localeCompare(String(a))).map(date=>{
     const entries=byDate[date];
     const totalFiles=entries.reduce((s,e)=>s+e.files.length,0);
     const rowsHtml=entries.map(e=>`
@@ -6327,7 +6327,7 @@ function renderArchive(){
   if(allArchivedFiles.length){
     html+='<div style="font-size:11px;font-weight:600;color:#888;margin:16px 0 8px;padding:4px 0;border-bottom:1px solid #e0e0e0">法定保管書類（'+allArchivedFiles.length+'件）</div>';
     html+='<div class="table-wrap"><table><thead><tr><th>ドライバー</th><th>書類</th><th>保管日</th><th>元の登録日</th><th></th></tr></thead><tbody>';
-    allArchivedFiles.sort((a,b)=>(b.archivedAt||'').localeCompare(a.archivedAt||'')).forEach(f=>{
+    allArchivedFiles.sort((a,b)=>String(b.archivedAt||'').localeCompare(String(a.archivedAt||''))).forEach(f=>{
       const dateStr=f.archivedAt?(f.archivedAt+'').slice(0,10):'—';
       const uploadStr=f.uploadedAt?(f.uploadedAt+'').slice(0,10):'—';
       const fid=f.fileId||'';
@@ -11309,12 +11309,16 @@ function renderStorage(){
     allDrivers.sort(function(a,b){
       var oA=offOrder[a._offices[0]||'']||999, oB=offOrder[b._offices[0]||'']||999;
       if(oA!==oB) return oA-oB;
-      return (a.name||'').localeCompare(b.name||'','ja');
+      // ★ 2026/09/19: 数値が入っていると localeCompare で落ちるので文字列にそろえる
+      return String(a.name||'').localeCompare(String(b.name||''),'ja');
     });
     allVehicles.sort(function(a,b){
       var oA=offOrder[a._offices[0]||a.office||'']||999, oB=offOrder[b._offices[0]||b.office||'']||999;
       if(oA!==oB) return oA-oB;
-      return (a.plate||'').localeCompare(b.plate||'','ja');
+      /* ★ 2026/09/19: 車両番号が数値のものがあり（例 4800）、
+         localeCompare が無くて並べ替えで落ちていた。
+         そこで描画が止まり、一覧の残りが表示されなくなっていた。 */
+      return String(a.plate||'').localeCompare(String(b.plate||''),'ja',{numeric:true});
     });
   }
 
@@ -16086,7 +16090,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.19-a';
+var FLEET_VERSION = '2026.09.19-e';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
