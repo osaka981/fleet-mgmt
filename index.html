@@ -1205,6 +1205,20 @@ body.modal-open{overflow:hidden}
             <button class="btn btn-sm btn-primary" style="font-size:11px;margin-top:10px" onclick="systemUpdateCheck(this)">システムを確認</button>
           </div>
 
+          <!-- ★ 2026/09/19: 拠点は経営管理を正とする。ここから取り込む。 -->
+          <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:#888">拠点（営業所）</div>
+          <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:28px">
+            <div style="font-size:11.5px;color:var(--text-sub);line-height:1.8" id="loc-sync-note">—</div>
+            <div style="font-size:11px;color:var(--text-sub);margin-top:8px;line-height:1.7">
+              拠点は経営管理システムの拠点マスタで管理します。<br>
+              追加・名称の変更は経営管理で行ってください。ここでは取り込むだけです。
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+              <button class="btn btn-sm" style="font-size:11px" onclick="syncOfficesNow(this)">経営管理から取り込む</button>
+              <button class="btn btn-sm" style="font-size:11px" onclick="migrateYokomochiToSakai()">集荷(横持)を堺へ付け替え</button>
+            </div>
+          </div>
+
           <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:#888">文字サイズ</div>
           <div style="background:#f8f9fa;border:1px solid #e8e8e8;border-radius:10px;padding:16px;margin-bottom:28px">
             <div style="font-size:12px;color:#555;margin-bottom:12px">画面全体の文字と表示サイズを変更します。見やすい大きさを選んでください。</div>
@@ -7943,6 +7957,120 @@ function fleetDriverListLocal(v){
   if(v && typeof v==='object') return Object.values(v);
   return [];
 }
+
+/* ══ ★ 2026/09/19: 拠点は経営管理を正とする ══
+   これまでフリートは自前の営業所一覧を持っていて、経営管理の拠点マスタとは
+   別物だった。名前も「西成」と「西成郵便局」で食い違い、突き合わせられなかった。
+   経営管理から一方向で流し、フリートでは短い名前のまま扱う。
+   （両方から書き込めると、どちらが新しいか判定できない。オフラインでの編集や
+     削除が絡むと時刻でも判断できないため、書き込む側を1つに決める） */
+let _locMap = {};          // 短い名前 → 正式名称
+function shortenLocName(name){
+  return String(name||'').trim().replace(/(郵便局|営業所|支店|センター)$/,'') || String(name||'');
+}
+function loadLocMap(){
+  try{ _locMap = JSON.parse(localStorage.getItem('fleet_loc_map')||'{}'); }catch(e){ _locMap={}; }
+}
+// 短い名前から正式名称を引く（経営管理へ渡すときに使う）
+function toFullOffice(shortName){
+  var s=String(shortName||'');
+  return _locMap[s] || s;
+}
+
+async function syncOfficesFromMgmt(opts){
+  opts = opts || {};
+  try{
+    const res = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'getLocations' }) });
+    const json = await res.json();
+    if(!json || !json.ok || !Array.isArray(json.locations)) throw new Error((json&&json.error)||'取得できません');
+
+    const locs = json.locations;
+    const newOffices = locs.map(l=>l.short).filter(Boolean);
+    const map = {};
+    locs.forEach(l=>{ if(l.short) map[l.short]=l.name; });
+
+    // いまフリートで使われている営業所のうち、拠点マスタに無いもの
+    const used = new Set();
+    (drivers||[]).forEach(d=>{ if(d.office) used.add(d.office); (d.offices||[]).forEach(o=>used.add(o)); });
+    (vehicles||[]).forEach(v=>{ if(v.office) used.add(v.office); (v.offices||[]).forEach(o=>used.add(o)); });
+    const orphan = [...used].filter(o=>o && newOffices.indexOf(o)<0);
+
+    if(orphan.length && !opts.force){
+      /* 拠点マスタに無い営業所が使われている場合は、黙って消さない。
+         消すとその所属のドライバーや車両が宙に浮く。 */
+      const go = confirm(
+        '経営管理の拠点マスタに無い営業所が使われています。\n\n'
+        +'　'+orphan.join('、')+'\n\n'
+        +'このまま取り込むと、上の営業所は一覧から消えます。\n'
+        +'（所属しているドライバーや車両のデータは消えません）\n\n'
+        +'先に経営管理で拠点を追加するか、所属を付け替えてください。\n\n'
+        +'それでも取り込みますか？');
+      if(!go) return { ok:false, cancelled:true };
+    }
+
+    offices = newOffices;
+    _locMap = map;
+    try{
+      localStorage.setItem('fleet_offices', JSON.stringify(offices));
+      localStorage.setItem('fleet_loc_map', JSON.stringify(map));
+    }catch(e){}
+    console.log('[拠点] 経営管理から取り込みました:', offices.join(' / '));
+    try{ renderAll(); }catch(e){}
+    return { ok:true, count:offices.length, orphan:orphan };
+  }catch(e){
+    console.warn('[拠点] 取り込めませんでした', e);
+    return { ok:false, error:e.message };
+  }
+}
+
+// 「集荷(横持)」を「堺」へ付け替える（一度だけ）
+async function migrateYokomochiToSakai(){
+  const from='集荷(横持)', to='堺';
+  const dv=(drivers||[]).filter(d=>d.office===from||(d.offices||[]).includes(from));
+  const vh=(vehicles||[]).filter(v=>v.office===from||(v.offices||[]).includes(from));
+  if(!dv.length && !vh.length){ alert('付け替えの対象がありません'); return; }
+  const lines=[]
+    .concat(dv.map(d=>'　ドライバー　'+d.name))
+    .concat(vh.map(v=>'　車両　'+(v.plate||v.id)));
+  if(!confirm('「'+from+'」を「'+to+'（堺営業所）」へ付け替えます。\n\n'
+      +lines.slice(0,20).join('\n')+(lines.length>20?'\n　ほか '+(lines.length-20)+'件':'')
+      +'\n\n計 '+(dv.length+vh.length)+'件。所属以外は触りません。')) return;
+  try{ localStorage.setItem('fleet_migrate_backup_'+Date.now(),
+    JSON.stringify({drivers:dv,vehicles:vh})); }catch(e){}
+  const swap=o=>o===from?to:o;
+  dv.forEach(d=>{ if(d.office===from) d.office=to;
+    if(Array.isArray(d.offices)) d.offices=[...new Set(d.offices.map(swap))]; });
+  vh.forEach(v=>{ if(v.office===from) v.office=to;
+    if(Array.isArray(v.offices)) v.offices=[...new Set(v.offices.map(swap))]; });
+  saveLocal(); isDirty=true; scheduleAutoSave();
+  addLog('拠点', from+' → '+to+' に付け替え: '+(dv.length+vh.length)+'件');
+  try{ renderAll(); }catch(e){}
+  alert((dv.length+vh.length)+'件を付け替えました。');
+}
+
+// 設定画面のボタンから実行し、結果を表示する
+async function syncOfficesNow(btn){
+  var label=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.textContent='取込中...'; }
+  var r=await syncOfficesFromMgmt();
+  if(btn){ btn.disabled=false; btn.textContent=label||'経営管理から取り込む'; }
+  paintLocNote();
+  if(r && r.ok) alert('拠点を取り込みました。\n\n'+offices.join(' / '));
+  else if(r && !r.cancelled) alert('取り込めませんでした。\n'+((r&&r.error)||''));
+}
+function paintLocNote(){
+  var el=document.getElementById('loc-sync-note');
+  if(!el) return;
+  if(!offices || !offices.length){ el.textContent='まだ取り込んでいません'; return; }
+  el.innerHTML = '現在の拠点（'+offices.length+'）<br>'
+    + offices.map(function(o){
+        var full=_locMap[o];
+        return full && full!==o ? (o+'<span style="color:var(--text-sub)">（'+full+'）</span>') : o;
+      }).join('　');
+}
+
+loadLocMap();
+setTimeout(function(){ syncOfficesFromMgmt(); }, 6000);
 
 function toggleSidebar(){
   document.querySelector('.sidebar').classList.toggle('open');
@@ -15539,7 +15667,7 @@ function calendarShowDetail(dateKey){
   detail.style.display='block';
 }
 
-function renderSettingsAll(){try{checkGasVersion(false);}catch(e){} renderSettingsOffices();generateQR();loadAiSettings();renderMailSettings();loadAlertSettings();loadStampSettings();renderOperationLogs();loadSessionTimeout();var dt=document.getElementById('dark-mode-toggle');if(dt)dt.checked=document.documentElement.classList.contains('dark-mode');highlightFontSizeBtn();}
+function renderSettingsAll(){try{checkGasVersion(false);}catch(e){} try{paintLocNote();}catch(e){} renderSettingsOffices();generateQR();loadAiSettings();renderMailSettings();loadAlertSettings();loadStampSettings();renderOperationLogs();loadSessionTimeout();var dt=document.getElementById('dark-mode-toggle');if(dt)dt.checked=document.documentElement.classList.contains('dark-mode');highlightFontSizeBtn();}
 
 // ★ 2026/07/13: 文字サイズ設定(特大/大/中/小)。html要素のzoomで全体を拡縮する。
 //   中=1.15(従来の既定値)を基準に、小/大/特大を用意。端末ごとにlocalStorageへ保存。
