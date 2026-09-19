@@ -1028,7 +1028,13 @@ body.modal-open{overflow:hidden}
         <div class="content">
           <!-- メイン タブ: 送信 / 受信ボックス -->
           <div style="display:flex;border-bottom:2px solid #e0e0e0;margin-bottom:12px" id="mail-main-tabs">
-            <div onclick="mailMainTab('send')" class="filter-chip active" data-mtab="send" style="cursor:pointer;padding:8px 16px;font-size:13px;font-weight:600;position:relative">メール送信<span id="mail-pending-count" style="position:absolute;top:2px;right:2px;min-width:16px;height:16px;border-radius:50%;background:#EF9F27;color:#fff;font-size:9px;display:none;align-items:center;justify-content:center"></span></div>
+            <!-- ★ 2026/09/19: 「メール送信」タブ（メールタスク）は廃止。
+                 手で作って手で消す待ち行列だったため放置されて溜まるだけだった。
+                 いまは HOME のタスクが期限や登録状況から毎回計算するので、
+                 役割が重なる。送信は書類生成から行う。
+                 （タスクのデータ自体は残してあるので、戻したくなったら
+                   この行と mailMainTab の既定を 'send' に戻せばよい） -->
+            <span id="mail-pending-count" style="display:none"></span>
             <div onclick="mailMainTab('inbox')" class="filter-chip" data-mtab="inbox" style="cursor:pointer;padding:8px 16px;font-size:13px;font-weight:600;position:relative">受信ボックス<span id="inbox-badge" style="position:absolute;top:2px;right:2px;min-width:16px;height:16px;border-radius:50%;background:#e53935;color:#fff;font-size:9px;display:none;align-items:center;justify-content:center"></span></div>
             <div onclick="mailMainTab('history')" class="filter-chip" data-mtab="history" style="cursor:pointer;padding:8px 16px;font-size:13px;font-weight:600;position:relative">送信履歴</div>
           </div>
@@ -4575,11 +4581,12 @@ function genTekigoOsakaXml(office,dateStr){
 // ====== データ送信管理 ======
 let mailTasks = JSON.parse(localStorage.getItem('fleet_mail_tasks')||'[]');
 let mailCurrentTab = 'pending';
-let mailMainSection = 'send';
+let mailMainSection = 'inbox';   // ★ 2026/09/19: 送信タブ廃止に伴い既定を受信へ
 
 function saveMailTasks(){localStorage.setItem('fleet_mail_tasks',JSON.stringify(mailTasks));isDirty=true;scheduleAutoSave();}
 
 function mailMainTab(section){
+  if(section==='send') section='inbox';   // ★ 2026/09/19: 送信タブは廃止
   mailMainSection=section;
   document.querySelectorAll('#mail-main-tabs .filter-chip').forEach(c=>c.classList.remove('active'));
   document.querySelector('#mail-main-tabs [data-mtab="'+section+'"]')?.classList.add('active');
@@ -16346,7 +16353,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.19-j';
+var FLEET_VERSION = '2026.09.19-k';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
