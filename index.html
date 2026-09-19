@@ -11514,9 +11514,18 @@ function renderStorage(){
 
       // 搭乗車両バッジ（折り畳み時のみ表示）
       const plateNum=cv?parsePlate(cv.plate).num:'';
+      /* ★ 2026/09/19: 搭乗車両のナンバーがグレーで沈んでいたので、
+         ひと目で分かる色にする。メイン（先頭）は濃く、2台目以降は薄く。
+         未搭乗は逆に目立たせない。 */
       const plateBadge=cvs.length
-        ?cvs.map(function(v){var pn=parsePlate(v.plate).num;return '<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:#546E7A;color:#fff;white-space:nowrap">'+(pn||v.plate)+'</span>';}).join(' ')
-        :'<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:#e0e0e0;color:#888;white-space:nowrap">未搭乗</span>';
+        ?cvs.map(function(v,i){
+            var pn=parsePlate(v.plate).num;
+            var st=i===0
+              ? 'background:#1565C0;color:#fff;font-weight:600'
+              : 'background:#e3f0fb;color:#1565C0;border:1px solid #9cc5ea';
+            return '<span style="font-size:10px;padding:2px 7px;border-radius:4px;'+st+';white-space:nowrap">'+(pn||v.plate)+'</span>';
+          }).join(' ')
+        :'<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:#f0f0f0;color:#999;white-space:nowrap">未搭乗</span>';
 
       // --- 折り畳み版 ---
       const officesOnly=(d._offices.join('・')||'未設定');
@@ -16203,7 +16212,7 @@ setInterval(function(){
 //   端末ごとにキャッシュが残ると「PCとスマホで件数が違う」原因になるため、
 //   どのコードが動いているか画面左下で必ず確認できるようにする。
 // ================================================================
-var FLEET_VERSION = '2026.09.19-h';
+var FLEET_VERSION = '2026.09.19-i';
 (function(){
   function put(){
     if(document.getElementById('fleet-ver')) return;
